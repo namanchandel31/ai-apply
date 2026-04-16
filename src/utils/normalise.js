@@ -10,7 +10,7 @@
  */
 const normalizeSkills = (skills) => {
   if (!Array.isArray(skills)) return [];
-  return [...new Set(skills.map((s) => s.toLowerCase().trim()).filter(Boolean))];
+  return [...new Set(skills.filter(s => typeof s === "string").map((s) => s.toLowerCase().trim()).filter(Boolean))];
 };
 
 /**

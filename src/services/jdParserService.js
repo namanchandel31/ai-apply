@@ -48,8 +48,11 @@ const callOpenAI = async (rawText) => {
     response = await openai.responses.create({
       model: MODEL,
       temperature: 0,
-      response_format: { type: "json_object" },
-      timeout: 10000,
+      text: {
+        format: {
+          type: "json_object"
+        }
+      },
       input: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: rawText },
