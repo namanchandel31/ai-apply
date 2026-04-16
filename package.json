@@ -1,0 +1,32 @@
+{
+  "name": "ai-apply",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test:unit": "jest tests/jdParser.unit.test.js",
+    "test:integration": "node tests/jdParser.integration.test.js",
+    "test:stress": "node tests/stressTest.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "googleapis": "^171.4.0",
+    "multer": "^2.1.1",
+    "openai": "^6.34.0",
+    "pdf-parse": "^2.4.5",
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14"
+  }
+}
