@@ -11,8 +11,22 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+const resumeRoutes = require("./src/routes/resumeRoutes");
+
+app.use('/api', resumeRoutes);
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Global error handler — catch-all for unhandled errors
+app.use((err, req, res, next) => {
+  const reqId = req.requestId || 'NO_REQ_ID';
+  console.error(`[${reqId}] [UNHANDLED_ERROR]`, err.message || err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+  });
 });
 
 // Start server
