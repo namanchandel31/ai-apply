@@ -35,7 +35,11 @@ const withRetry = async (fn, { maxAttempts = 3, baseDelayMs = 500 } = {}) => {
 
       if (attempt === maxAttempts) break;
 
-      await sleep(baseDelayMs * attempt);
+      // Exponential backoff mapping simulating deep retries natively
+      // Added random jitter (up to 30% of base delay) to prevent thundering herd / retry storms
+      const jitter = Math.random() * baseDelayMs * 0.3;
+      const delay = (baseDelayMs * Math.pow(2, attempt - 1)) + jitter;
+      await sleep(delay);
     }
   }
 
