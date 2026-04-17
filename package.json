@@ -8,7 +8,8 @@
     "test": "jest",
     "test:unit": "jest tests/jdParser.unit.test.js",
     "test:integration": "node tests/jdParser.integration.test.js",
-    "test:stress": "node tests/stressTest.js"
+    "test:stress": "node tests/stressTest.js",
+    "test:middleware": "jest tests/middleware"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "jest": "^30.3.0",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }
