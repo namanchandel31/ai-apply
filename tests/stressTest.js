@@ -2,7 +2,7 @@ require("dotenv").config();
 const { performance } = require("perf_hooks");
 const { parseJobDescription } = require("../src/services/jdParserService");
 
-const TOTAL_RUNS = 5;
+const TOTAL_RUNS = 2;
 const CONCURRENCY_LIMIT = 1;
 const INPUT_STRING = "urgent hiring flutter dev exp 1-2 yrs call 9876543210 location jaipur";
 
