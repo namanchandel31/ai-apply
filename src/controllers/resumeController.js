@@ -1,24 +1,29 @@
+const crypto = require("crypto");
 const OpenAI = require("openai");
 const pdfParse = require('pdf-parse');
 const { withRetry } = require("../utils/retry");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { safeParseJSON } = require("../utils/json");
+const { ResumeSchema } = require("../schemas/resumeSchema");
+const { normalizeSkills } = require("../utils/normalise");
+const { findResumeByHash, createResumeWithParsedData } = require("../models/resumeModel");
 
 // Lazy load OpenAI client to allow dynamic env changes in tests
 const getOpenAIClient = () => new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }); 
 
-const MODEL = "gpt-4.1"; 
+const MODEL = "gpt-4.1-mini"; 
 const MAX_INPUT_LENGTH = 10000; 
+const LLM_TIMEOUT_MS = 15000; // 15 seconds
 
 // ---------------------------------------------------------------------
-// SYSTEM PROMPT & SCHEMA
+// SYSTEM PROMPT
 // ------------------------
 const SYSTEM_PROMPT = `You are a highly accurate resume parsing engine.
 
 STRICT RULES:
-* Output ONLY valid JSON.
+* Output ONLY valid JSON matching the exact schema.
 * ALWAYS include all schema fields.
 * Do NOT add extra fields.
 * Do NOT hallucinate.
@@ -66,59 +71,6 @@ SCHEMA:
 ],
 "certifications": string[]
 }`;
-
-const validateParsedData = (data) => {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new Error('Validation failed: data is not an object');
-  }
-
-  const requiredKeys = [
-    'name', 'email', 'phone', 'location', 'linkedin', 'github', 
-    'portfolio', 'summary', 'skills', 'experience', 'education', 
-    'projects', 'certifications'
-  ];
-
-  for (const key of requiredKeys) {
-    if (!(key in data)) {
-      throw new Error(`Validation failed: missing required key '${key}'`);
-    }
-  }
-
-  if (!Array.isArray(data.skills)) {
-    throw new Error('Validation failed: skills is not an array');
-  }
-  if (!Array.isArray(data.experience)) {
-    throw new Error('Validation failed: experience is not an array');
-  }
-  for (const exp of data.experience) {
-    if (typeof exp !== 'object') {
-      throw new Error('Validation failed: invalid experience entry');
-    }
-  }
-  if (!Array.isArray(data.education)) {
-    throw new Error('Validation failed: education is not an array');
-  }
-  if (!Array.isArray(data.projects)) {
-    throw new Error('Validation failed: projects is not an array');
-  }
-  if (!Array.isArray(data.certifications)) {
-    throw new Error('Validation failed: certifications is not an array');
-  }
-};
-
-const normalizeParsedData = (data) => {
-  if (Array.isArray(data.skills)) {
-    const normalizedSkills = data.skills
-      .filter(s => typeof s === 'string')
-      .map(s => s.toLowerCase().trim())
-      .filter(s => s !== '');
-    return {
-      ...data,
-      skills: [...new Set(normalizedSkills)]
-    };
-  }
-  return { ...data };
-};
 
 /**
  * Extract raw text from PDF buffer
@@ -169,39 +121,14 @@ const cleanText = (rawText) => {
 };
 
 /**
- * Safely attempts to parse JSON from the LLM response, cleaning markdown wrappers
- * @param {string} textRaw
- * @returns {object}
- */
-const safeJsonParse = (textRaw) => {
-    let cleanedText = textRaw.trim();
-    
-    // Remove markdown wrappers (```json)
-    if (cleanedText.startsWith("```")) {
-        cleanedText = cleanedText.replace(/(^```json|```)$/g, '').trim();
-    }
-
-    try {
-        // Attempt 1
-        return JSON.parse(cleanedText);
-    } catch (e) {
-        console.error(`JSON parse failed. Raw LLM response: ${textRaw.substring(0, 500)}`);
-        // Fallback: If parsing fails, we let the retry mechanism handle the retry instruction,
-        // as manual JSON repair is too complex for a utility function.
-        return null;
-    }
-};
-
-
-/**
  * Coordinates the call to OpenAI API to structure the data
  * @param {string} cleanedText - The cleaned text from the resume.
  * @param {number} attempt - Current retry attempt number.
- * @returns {Promise<object>} The parsed JSON object.
+ * @returns {Promise<string>} The raw string output from LLM.
  */
 const callOpenAI = async (cleanedText, attempt) => {
   if (process.env.TEST_MODE === 'true') {
-    return {
+    return JSON.stringify({
       name: "John Doe",
       email: "john@example.com",
       phone: "1234567890",
@@ -215,7 +142,7 @@ const callOpenAI = async (cleanedText, attempt) => {
       education: [],
       projects: [],
       certifications: []
-    };
+    });
   }
 
   if (process.env.FORCE_LLM_ERROR === 'true') {
@@ -224,100 +151,81 @@ const callOpenAI = async (cleanedText, attempt) => {
 
   const openai = getOpenAIClient();
 
-  const messageHistory = [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}` },
-  ];
-  
-  let response;
+  const llmPromise = openai.responses.create({
+    model: MODEL,
+    temperature: 0,
+    text: {
+      format: {
+        type: "json_object"
+      }
+    },
+    input: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}` },
+    ],
+  });
 
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new RetryableError("LLM response timed out")), LLM_TIMEOUT_MS)
+  );
+
+  let response;
   try {
-    response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: messageHistory,
-      temperature: 0,
-      response_format: { type: "json_object" }, 
-    });
+    response = await Promise.race([llmPromise, timeoutPromise]);
   } catch (err) {
-    // Catch API errors (rate limits, authentication, service outages)
     throw new RetryableError(`OpenAI API request failed (Attempt ${attempt}): ${err.message}`);
   }
 
-  const rawContent = response.choices[0]?.message?.content;
-  if (!rawContent) {
+  const content = response.output
+    ?.flatMap((o) => o.content || [])
+    ?.find((c) => c.type === "output_text")
+    ?.text
+    ?.trim();
+
+  if (!content) {
     throw new RetryableError("OpenAI returned empty content.");
   }
-
-  let parsedJson = safeJsonParse(rawContent);
-
-  if (!parsedJson) {
-    // Fail parsing, but let the outer function handle the specific retry instruction.
-    const error = new NonRetryableError("JSON parsing failed permanently");
-    error.rawContent = rawContent;
-    throw error;
-  }
   
-  return parsedJson;
+  return content;
 };
-
 
 /**
  * Main orchestrating function to parse the resume text using LLM
- * Implements retry logic and fallback instructions.
+ * Implements retry logic and Zod validation.
  * @param {string} cleanedText - The cleaned text extracted from the PDF.
  * @returns {Promise<object>} The final structured data object.
  */
 const parseWithLLM = async (cleanedText) => {
-    try {
-        // Attempt 1: Initial parsing attempt
-        let data = await withRetry(
-            async (attempt) => {
-                return callOpenAI(cleanedText, attempt);
-            },
-            { maxAttempts: 3, baseDelayMs: 1000 }
+  return await withRetry(
+    async (attempt) => {
+      let raw;
+      try {
+        raw = await callOpenAI(cleanedText, attempt);
+      } catch (err) {
+        console.error("RESUME_PARSE_ERROR", { attempt, error: err.message });
+        throw err;
+      }
+
+      const parsed = safeParseJSON(raw);
+      if (!parsed) {
+        const err = new RetryableError(`JSON parse failed (attempt ${attempt})`);
+        console.error("RESUME_PARSE_ERROR", { attempt, error: err.message });
+        throw err;
+      }
+
+      const result = ResumeSchema.safeParse(parsed);
+      if (!result.success) {
+        // Schema mismatch is permanent
+        throw new NonRetryableError(
+          `Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`
         );
-        return data;
+      }
 
-    } catch (error) {
-        // Handle initial failure types
-        if (error instanceof NonRetryableError && error.rawContent) {
-            // If initial failure is due to malformed JSON/schema, we attempt the fallback.
-            try {
-                console.log("Attempting LLM fallback: 'Fix JSON' instruction.");
-                
-                // Retry LLM once with the explicit fix instruction
-                const fallbackRawText = `The following JSON is invalid. Fix it to strictly match schema:\n\n${error.rawContent}`;
-
-                const openai = getOpenAIClient();
-                const fallbackResponse = await openai.chat.completions.create({
-                    model: MODEL,
-                    messages: [
-                        { role: "system", content: SYSTEM_PROMPT },
-                        { role: "user", content: fallbackRawText }
-                    ],
-                    temperature: 0,
-                    response_format: { type: "json_object" },
-                });
-
-                const fallbackRawContent = fallbackResponse.choices[0]?.message?.content;
-                const fallbackData = safeJsonParse(fallbackRawContent);
-
-                if (!fallbackData) {
-                    throw new Error("Failed to parse JSON even after the 'fix' instruction.");
-                }
-                
-                return fallbackData;
-
-            } catch (fixError) {
-                throw new Error("LLM/Parsing Error: Initial failure and mandated fallback failed. " + fixError.message);
-            }
-        } else {
-            // Re-throw retryable or general errors
-            throw error;
-        }
-    }
+      return result.data;
+    },
+    { maxAttempts: 3, baseDelayMs: 1000 }
+  );
 };
-
 
 // ---------------------------------------------------------------------
 // PUBLIC API CONTROLLER (Implementation)
@@ -334,6 +242,21 @@ const uploadResumeController = async (req, res) => {
     }
     if (req.file.size > 2 * 1024 * 1024) {
       return res.status(400).json({ success: false, message: 'File size exceeds 2MB' });
+    }
+
+    // 0. DEDUPLICATION CHECK (O(1) lookup using file hash)
+    const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const existing = await findResumeByHash(fileHash);
+    
+    if (existing) {
+      console.log(`[${reqId}] Dedup hit: Resume already parsed (Hash: ${fileHash})`);
+      return res.status(200).json({
+        success: true,
+        resumeId: existing.resumeId,
+        parsedResumeId: existing.parsedResumeId,
+        data: existing.parsedJson,
+        message: 'Resume retrieved from cache'
+      });
     }
 
     // 1. PDF TEXT EXTRACTION
@@ -358,17 +281,39 @@ const uploadResumeController = async (req, res) => {
       });
     }
 
-    // 3. LLM PARSING
+    // 3. LLM PARSING (with Zod validation)
     console.log(`[${reqId}] Calling LLM for structured parsing...`);
     const parsedData = await parseWithLLM(cleanedText);
 
-    validateParsedData(parsedData);
-    const normalizedData = normalizeParsedData(parsedData);
+    // Sanitize skills
+    parsedData.skills = normalizeSkills(parsedData.skills);
+    
+    // 4. PERSISTENCE (Transactional)
+    console.log(`[${reqId}] Persisting parsed resume...`);
+    let dbResult;
+    try {
+      dbResult = await createResumeWithParsedData(
+        req.file.originalname,
+        req.file.size,
+        fileHash,
+        cleanedText,
+        parsedData
+      );
+    } catch (dbErr) {
+      console.error(`[${reqId}] DB Persistence Error:`, dbErr.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to store resume data",
+      });
+    }
 
-    // 4. SUCCESS RESPONSE
+    // 5. SUCCESS RESPONSE
     return res.status(200).json({
       success: true,
-      data: normalizedData,
+      resumeId: dbResult.resumeId,
+      parsedResumeId: dbResult.parsedResumeId,
+      data: parsedData,
+      message: 'Resume processed and stored successfully'
     });
 
   } catch (error) {
@@ -381,7 +326,7 @@ const uploadResumeController = async (req, res) => {
     } else if (error instanceof NonRetryableError || error.message.includes("Parsing failed permanently")) {
         status = 400;
         message = `Parsing failed: ${error.message}`;
-    } else if (error.message.includes('Validation failed')) {
+    } else if (error.message.includes('Schema validation failed')) {
         status = 400;
         message = error.message;
     } else {
@@ -398,4 +343,7 @@ const uploadResumeController = async (req, res) => {
 
 module.exports = {
   uploadResumeController,
+  // Exported for testing only
+  cleanText,
+  parseWithLLM
 };

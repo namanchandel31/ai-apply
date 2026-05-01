@@ -44,20 +44,26 @@ Rules (follow strictly):
 const callOpenAI = async (rawText) => {
   let response;
 
+  const llmPromise = openai.responses.create({
+    model: MODEL,
+    temperature: 0,
+    text: {
+      format: {
+        type: "json_object"
+      }
+    },
+    input: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: rawText },
+    ],
+  });
+
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new RetryableError("LLM response timed out")), 15000)
+  );
+
   try {
-    response = await openai.responses.create({
-      model: MODEL,
-      temperature: 0,
-      text: {
-        format: {
-          type: "json_object"
-        }
-      },
-      input: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: rawText },
-      ],
-    });
+    response = await Promise.race([llmPromise, timeoutPromise]);
   } catch (err) {
     throw new RetryableError(`OpenAI request failed: ${err.message}`);
   }

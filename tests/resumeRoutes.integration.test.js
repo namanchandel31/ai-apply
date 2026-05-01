@@ -12,6 +12,14 @@ const buildValidPdfBuffer = () => {
   return Buffer.from(base64Pdf, 'base64');
 };
 
+jest.mock('../src/models/resumeModel', () => ({
+  findResumeByHash: jest.fn().mockResolvedValue(null),
+  createResumeWithParsedData: jest.fn().mockResolvedValue({
+    resumeId: 'test-resume-uuid',
+    parsedResumeId: 'test-parsed-uuid'
+  })
+}));
+
 describe('POST /api/upload-resume Integration Tests', () => {
   jest.setTimeout(40000);
 
@@ -19,9 +27,10 @@ describe('POST /api/upload-resume Integration Tests', () => {
 
   // Guarantee env isolation: any flags set during a test are always cleaned up,
   // even if the test throws before reaching its manual cleanup line.
-  afterEach(() => {
+  afterEach(async () => {
     delete process.env.TEST_MODE;
     delete process.env.FORCE_LLM_ERROR;
+    jest.clearAllMocks();
   });
 
   // ---------------------------------------------------------------
@@ -36,6 +45,12 @@ describe('POST /api/upload-resume Integration Tests', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty('success', true);
+
+    // Validate new persistence response structure
+    expect(response.body).toHaveProperty('resumeId');
+    expect(response.body).toHaveProperty('parsedResumeId');
+    expect(typeof response.body.resumeId).toBe('string');
+    expect(typeof response.body.parsedResumeId).toBe('string');
 
     // Validate full schema structure returned by the pipeline
     expect(response.body.data).toEqual(expect.objectContaining({

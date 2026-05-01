@@ -12,8 +12,10 @@ app.use(express.json());
 
 // Routes
 const resumeRoutes = require("./src/routes/resumeRoutes");
+const jdRoutes = require("./src/routes/jdRoutes");
 
 app.use('/api', resumeRoutes);
+app.use('/api', jdRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
