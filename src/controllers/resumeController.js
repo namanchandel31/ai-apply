@@ -2,10 +2,11 @@ const crypto = require("crypto");
 const { processResumeJob } = require("../services/jobHandler");
 const { findResumeByHash } = require("../models/resumeModel");
 const { RetryableError } = require("../utils/errors");
-const { logError } = require("../utils/logger");
+const { logInfo, logError } = require("../utils/logger");
 
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
+  const jobId = crypto.randomUUID();
 
   try {
     if (!req.file || !req.file.buffer) {
@@ -17,10 +18,13 @@ const uploadResumeController = async (req, res) => {
     }
     
     const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    logInfo("request_start", { reqId, jobId, fileHash, source: "resume" });
     
     // Deduplication check
     const existing = await findResumeByHash(fileHash);
     if (existing) {
+      logInfo("request_end", { reqId, jobId, fileHash, cacheHit: true, source: "resume" });
       return res.status(200).json({
         success: true,
         resumeId: existing.resumeId,
@@ -37,6 +41,7 @@ const uploadResumeController = async (req, res) => {
 
     const jobPromise = processResumeJob({
       reqId,
+      jobId,
       buffer: req.file.buffer,
       originalname: req.file.originalname,
       size: req.file.size,
@@ -47,6 +52,8 @@ const uploadResumeController = async (req, res) => {
 
     // Format output (result._dbIds contains DB generated UUIDs)
     const { _dbIds, ...parsedData } = result.data;
+
+    logInfo("request_end", { reqId, jobId, fileHash, source: "resume" });
 
     return res.status(200).json({
       success: true,
@@ -75,7 +82,7 @@ const uploadResumeController = async (req, res) => {
         message = `Processing error: ${error.message}`;
     }
 
-    logError("controller_error", error, { reqId, stage: "controller", source: "resume" });
+    logError("controller_error", error, { reqId, jobId, stage: "controller", source: "resume" });
     
     return res.status(status).json({
       success: false,

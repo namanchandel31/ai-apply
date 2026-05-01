@@ -80,8 +80,34 @@ const createJDWithParsedData = async (title, rawText, parsedJson) => {
   }
 };
 
+/**
+ * Fetch a job description by ID joined with its most recent parsed data.
+ * @param {string} jobDescriptionId 
+ * @returns {Promise<{jobDescriptionId: string, parsedJobDescriptionId: string, parsedJson: object} | null>}
+ */
+const getJDById = async (jobDescriptionId) => {
+  const { rows } = await pool.query(
+    `SELECT jd.id AS job_description_id, pjd.id AS parsed_job_description_id, pjd.parsed_json
+     FROM job_descriptions jd
+     JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
+     WHERE jd.id = $1
+     ORDER BY pjd.created_at DESC
+     LIMIT 1`,
+    [jobDescriptionId]
+  );
+
+  if (rows.length === 0) return null;
+
+  return {
+    jobDescriptionId: rows[0].job_description_id,
+    parsedJobDescriptionId: rows[0].parsed_job_description_id,
+    parsedJson: rows[0].parsed_json,
+  };
+};
+
 module.exports = {
   createJobDescription,
   saveParsedJD,
   createJDWithParsedData,
+  getJDById,
 };

@@ -113,9 +113,35 @@ const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText,
   }
 };
 
+/**
+ * Fetch a resume by ID joined with its most recent parsed data.
+ * @param {string} resumeId 
+ * @returns {Promise<{resumeId: string, parsedResumeId: string, parsedJson: object} | null>}
+ */
+const getResumeById = async (resumeId) => {
+  const { rows } = await pool.query(
+    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json
+     FROM resumes r
+     JOIN parsed_resumes pr ON pr.resume_id = r.id
+     WHERE r.id = $1
+     ORDER BY pr.created_at DESC
+     LIMIT 1`,
+    [resumeId]
+  );
+
+  if (rows.length === 0) return null;
+
+  return {
+    resumeId: rows[0].resume_id,
+    parsedResumeId: rows[0].parsed_resume_id,
+    parsedJson: rows[0].parsed_json,
+  };
+};
+
 module.exports = {
   createResume,
   saveParsedResume,
   findResumeByHash,
   createResumeWithParsedData,
+  getResumeById,
 };

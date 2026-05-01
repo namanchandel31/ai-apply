@@ -1,10 +1,11 @@
 const crypto = require("crypto");
 const { processJDJob } = require("../services/jobHandler");
 const { RetryableError } = require("../utils/errors");
-const { logError } = require("../utils/logger");
+const { logInfo, logError } = require("../utils/logger");
 
 const uploadJDController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
+  const jobId = crypto.randomUUID();
 
   try {
     const { text, title } = req.body;
@@ -20,6 +21,8 @@ const uploadJDController = async (req, res) => {
     const normalizedText = text.trim().toLowerCase().replace(/\s+/g, ' ');
     const fileHash = crypto.createHash('sha256').update(normalizedText).digest('hex');
 
+    logInfo("request_start", { reqId, jobId, fileHash, source: "jd" });
+
     // (Note: Optional JD dedup check can go here if a JD find-by-hash is added later)
 
     const timeoutPromise = new Promise((_, reject) => 
@@ -28,6 +31,7 @@ const uploadJDController = async (req, res) => {
 
     const jobPromise = processJDJob({
       reqId,
+      jobId,
       title: title || null,
       text,
       fileHash
@@ -36,6 +40,8 @@ const uploadJDController = async (req, res) => {
     const result = await Promise.race([jobPromise, timeoutPromise]);
 
     const { _dbIds, ...parsedData } = result.data;
+
+    logInfo("request_end", { reqId, jobId, fileHash, source: "jd" });
 
     return res.status(200).json({
       success: true,
@@ -62,7 +68,7 @@ const uploadJDController = async (req, res) => {
       message = `Service unavailable: ${error.message}`;
     }
 
-    logError("controller_error", error, { reqId, stage: "controller", source: "jd" });
+    logError("controller_error", error, { reqId, jobId, stage: "controller", source: "jd" });
 
     return res.status(status).json({
       success: false,

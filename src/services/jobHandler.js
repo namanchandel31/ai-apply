@@ -192,19 +192,16 @@ const inflightJobs = new Map();
 /**
  * Process a Resume
  */
-const processResumeJob = async ({ reqId, buffer, originalname, size, fileHash }) => {
+const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, fileHash }) => {
   if (inflightJobs.has(fileHash)) {
-    logInfo("concurrency_dedup_hit", { reqId, stage: "job_started", fileHash, source: "resume" });
+    logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "resume" });
     return inflightJobs.get(fileHash);
   }
 
   const jobPromise = (async () => {
-    const jobId = crypto.randomUUID();
     let rawText = null;
 
     try {
-      logInfo("job_started", { reqId, stage: "extraction", jobId, source: "resume" });
-      
       rawText = await extractText(buffer);
       if (!rawText) throw new NonRetryableError("Extraction Failed");
       const cleanedText = cleanText(rawText);
@@ -216,56 +213,63 @@ const processResumeJob = async ({ reqId, buffer, originalname, size, fileHash })
       const data = await withRetry(async (attempt) => {
         let parsedData;
         
-        const cached = getCache(fileHash);
-        if (cached) {
-          logInfo("cache_hit", { reqId, stage: "llm_parsing", attempt, fileHash });
-          parsedData = cached;
-        } else {
-          logInfo("llm_call_start", { reqId, stage: "llm_parsing", attempt, fileHash });
-          
-          if (process.env.TEST_MODE === 'true') {
-             parsedData = {
-                name: "John Doe", email: "john@example.com", phone: "1234567890", location: "India",
-                linkedin: null, github: null, portfolio: null, summary: "Mock summary",
-                skills: ["javascript", "node.js"], experience: [], education: [], projects: [], certifications: []
-             };
+        try {
+          const cached = getCache(fileHash);
+          if (cached) {
+            logInfo("cache_hit", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            parsedData = cached;
           } else {
-             if (process.env.FORCE_LLM_ERROR === 'true') {
-                 throw new RetryableError("Simulated LLM error");
-             }
-             const userPrompt = `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}`;
-             const raw = await callOpenAI(RESUME_SYSTEM_PROMPT, userPrompt);
-             
-             const parsed = safeParseJSON(raw);
-             if (!parsed) throw new NonRetryableError("JSON parse failed");
-             
-             const result = ResumeSchema.safeParse(parsed);
-             if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);
-             
-             parsedData = result.data;
-          }
-          
-          // Lightweight Sanity Checks
-          if (!parsedData.skills?.length || !parsedData.name || !parsedData.email) {
-            throw new NonRetryableError("invalid_parsed_content");
+            logInfo("llm_start", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            
+            if (process.env.TEST_MODE === 'true') {
+               parsedData = {
+                  name: "John Doe", email: "john@example.com", phone: "1234567890", location: "India",
+                  linkedin: null, github: null, portfolio: null, summary: "Mock summary",
+                  skills: ["javascript", "node.js"], experience: [], education: [], projects: [], certifications: []
+               };
+            } else {
+               if (process.env.FORCE_LLM_ERROR === 'true') {
+                   throw new RetryableError("Simulated LLM error");
+               }
+               const userPrompt = `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}`;
+               const raw = await callOpenAI(RESUME_SYSTEM_PROMPT, userPrompt);
+               
+               const parsed = safeParseJSON(raw);
+               if (!parsed) throw new NonRetryableError("JSON parse failed");
+               
+               const result = ResumeSchema.safeParse(parsed);
+               if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);
+               
+               parsedData = result.data;
+               logInfo("llm_success", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            }
+            
+            // Lightweight Sanity Checks
+            if (!parsedData.skills?.length || !parsedData.name || !parsedData.email) {
+              throw new NonRetryableError("invalid_parsed_content");
+            }
+
+            parsedData.skills = normalizeSkills(parsedData.skills);
+            
+            // Save to cache before DB persist
+            setCache(fileHash, parsedData);
           }
 
-          parsedData.skills = normalizeSkills(parsedData.skills);
+          logInfo("db_persist_start", { reqId, jobId, stage: "db_persist", attempt, fileHash });
+          const dbResult = await createResumeWithParsedData(originalname, size, fileHash, cleanedText, parsedData);
+          logInfo("db_write_success", { reqId, jobId, stage: "db_persist", attempt, fileHash });
           
-          // Save to cache before DB persist
-          setCache(fileHash, parsedData);
+          // Clear cache on DB success to prevent memory bloat
+          deleteCache(fileHash);
+          
+          return { ...parsedData, _dbIds: dbResult };
+        } catch (innerErr) {
+          if (innerErr instanceof RetryableError) {
+             logError("llm_retry", innerErr, { reqId, jobId, stage: "llm_parsing", attempt, fileHash, status: "retry" });
+          }
+          throw innerErr;
         }
-
-        logInfo("db_persist_start", { reqId, stage: "db_persist", attempt, fileHash });
-        const dbResult = await createResumeWithParsedData(originalname, size, fileHash, cleanedText, parsedData);
-        
-        // Clear cache on DB success to prevent memory bloat
-        deleteCache(fileHash);
-        
-        return { ...parsedData, _dbIds: dbResult };
       });
-
-      logInfo("job_completed", { reqId, stage: "success", jobId, fileHash });
       
       return {
         jobId,
@@ -274,13 +278,17 @@ const processResumeJob = async ({ reqId, buffer, originalname, size, fileHash })
       };
 
     } catch (err) {
-      logError("job_failed", err, { reqId, stage: "failure", jobId, fileHash });
+      logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash });
       
       // Fallback rule: only store if raw_text exists
       if (rawText) {
-        await saveFailedParse(fileHash, "resume", rawText, err.message).catch(dbErr => {
-            logError("fallback_storage_failed", dbErr, { reqId, stage: "fallback" });
-        });
+        await saveFailedParse(fileHash, "resume", rawText, err.message)
+          .then(() => {
+            logInfo("fallback_saved", { reqId, jobId, stage: "fallback", fileHash });
+          })
+          .catch(dbErr => {
+            logError("fallback_storage_failed", dbErr, { reqId, jobId, stage: "fallback", fileHash });
+          });
       }
       
       throw err;
@@ -296,76 +304,79 @@ const processResumeJob = async ({ reqId, buffer, originalname, size, fileHash })
 /**
  * Process a Job Description
  */
-const processJDJob = async ({ reqId, title, text, fileHash }) => {
+const processJDJob = async ({ reqId, jobId, title, text, fileHash }) => {
   if (inflightJobs.has(fileHash)) {
-    logInfo("concurrency_dedup_hit", { reqId, stage: "job_started", fileHash, source: "jd" });
+    logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "jd" });
     return inflightJobs.get(fileHash);
   }
 
   const jobPromise = (async () => {
-    const jobId = crypto.randomUUID();
-
     try {
-      logInfo("job_started", { reqId, stage: "extraction", jobId, source: "jd" });
-
       const cleanedText = text.trim().slice(0, MAX_INPUT_LENGTH);
 
       const data = await withRetry(async (attempt) => {
         let parsedData;
         
-        const cached = getCache(fileHash);
-        if (cached) {
-          logInfo("cache_hit", { reqId, stage: "llm_parsing", attempt, fileHash });
-          parsedData = cached;
-        } else {
-          logInfo("llm_call_start", { reqId, stage: "llm_parsing", attempt, fileHash });
-          
-          if (process.env.TEST_MODE === 'true') {
-             parsedData = {
-                job_title: "Senior React Engineer", company_name: null, contact_person: null,
-                location: "Remote", contact_email: "jobs@example.com", contact_number: null,
-                job_type: "Remote", skills: ["react", "node.js"]
-             };
+        try {
+          const cached = getCache(fileHash);
+          if (cached) {
+            logInfo("cache_hit", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            parsedData = cached;
           } else {
-              const raw = await callOpenAI(JD_SYSTEM_PROMPT, cleanedText);
-              
-              const parsed = safeParseJSON(raw);
-              if (!parsed) throw new NonRetryableError("JSON parse failed");
-              
-              const result = JDSchema.safeParse(parsed);
-              if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);
-              
-              parsedData = result.data;
-          }
-          
-          // Lightweight Sanity Checks
-          if (!parsedData.skills?.length || !parsedData.job_title) {
-            throw new NonRetryableError("invalid_parsed_content");
+            logInfo("llm_start", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            
+            if (process.env.TEST_MODE === 'true') {
+               parsedData = {
+                  job_title: "Senior React Engineer", company_name: null, contact_person: null,
+                  location: "Remote", contact_email: "jobs@example.com", contact_number: null,
+                  job_type: "Remote", skills: ["react", "node.js"]
+               };
+            } else {
+                const raw = await callOpenAI(JD_SYSTEM_PROMPT, cleanedText);
+                
+                const parsed = safeParseJSON(raw);
+                if (!parsed) throw new NonRetryableError("JSON parse failed");
+                
+                const result = JDSchema.safeParse(parsed);
+                if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);
+                
+                parsedData = result.data;
+                logInfo("llm_success", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
+            }
+            
+            // Lightweight Sanity Checks
+            if (!parsedData.skills?.length || !parsedData.job_title) {
+              throw new NonRetryableError("invalid_parsed_content");
+            }
+
+            parsedData.skills = normalizeSkills(parsedData.skills);
+            parsedData.job_title = nullifyEmpty(parsedData.job_title);
+            parsedData.company_name = nullifyEmpty(parsedData.company_name);
+            parsedData.contact_person = nullifyEmpty(parsedData.contact_person);
+            parsedData.location = nullifyEmpty(parsedData.location);
+            if (!isValidEmail(parsedData.contact_email)) parsedData.contact_email = null;
+            if (!isValidPhone(parsedData.contact_number)) parsedData.contact_number = null;
+            
+            // Save to cache before DB persist
+            setCache(fileHash, parsedData);
           }
 
-          parsedData.skills = normalizeSkills(parsedData.skills);
-          parsedData.job_title = nullifyEmpty(parsedData.job_title);
-          parsedData.company_name = nullifyEmpty(parsedData.company_name);
-          parsedData.contact_person = nullifyEmpty(parsedData.contact_person);
-          parsedData.location = nullifyEmpty(parsedData.location);
-          if (!isValidEmail(parsedData.contact_email)) parsedData.contact_email = null;
-          if (!isValidPhone(parsedData.contact_number)) parsedData.contact_number = null;
+          logInfo("db_persist_start", { reqId, jobId, stage: "db_persist", attempt, fileHash });
+          const dbResult = await createJDWithParsedData(title || null, cleanedText, parsedData);
+          logInfo("db_write_success", { reqId, jobId, stage: "db_persist", attempt, fileHash });
           
-          // Save to cache before DB persist
-          setCache(fileHash, parsedData);
+          // Clear cache on DB success
+          deleteCache(fileHash);
+          
+          return { ...parsedData, _dbIds: dbResult };
+        } catch (innerErr) {
+          if (innerErr instanceof RetryableError) {
+             logError("llm_retry", innerErr, { reqId, jobId, stage: "llm_parsing", attempt, fileHash, status: "retry" });
+          }
+          throw innerErr;
         }
-
-        logInfo("db_persist_start", { reqId, stage: "db_persist", attempt, fileHash });
-        const dbResult = await createJDWithParsedData(title || null, cleanedText, parsedData);
-        
-        // Clear cache on DB success
-        deleteCache(fileHash);
-        
-        return { ...parsedData, _dbIds: dbResult };
       });
 
-      logInfo("job_completed", { reqId, stage: "success", jobId, fileHash });
-      
       return {
         jobId,
         status: "completed",
@@ -373,12 +384,16 @@ const processJDJob = async ({ reqId, title, text, fileHash }) => {
       };
 
     } catch (err) {
-      logError("job_failed", err, { reqId, stage: "failure", jobId, fileHash });
+      logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash });
       
       // Always have rawText for JD
-      await saveFailedParse(fileHash, "jd", text, err.message).catch(dbErr => {
-          logError("fallback_storage_failed", dbErr, { reqId, stage: "fallback" });
-      });
+      await saveFailedParse(fileHash, "jd", text, err.message)
+        .then(() => {
+          logInfo("fallback_saved", { reqId, jobId, stage: "fallback", fileHash });
+        })
+        .catch(dbErr => {
+          logError("fallback_storage_failed", dbErr, { reqId, jobId, stage: "fallback", fileHash });
+        });
       
       throw err;
     } finally {
