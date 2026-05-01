@@ -1,5 +1,7 @@
-const { parseJobDescription } = require("../services/jdParserService");
-const { createJDWithParsedData } = require("../models/jdModel");
+const crypto = require("crypto");
+const { processJDJob } = require("../services/jobHandler");
+const { RetryableError } = require("../utils/errors");
+const { logError } = require("../utils/logger");
 
 const uploadJDController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -14,44 +16,53 @@ const uploadJDController = async (req, res) => {
       });
     }
 
-    console.log(`[${reqId}] Parsing Job Description...`);
-    
-    // Call the JD Parsing service
-    // Service handles: Retry logic, LLM calling, Zod schema validation, normalization
-    const parsedData = await parseJobDescription(text);
+    // JD Hash (Normalization + Hashing)
+    const normalizedText = text.trim().toLowerCase().replace(/\s+/g, ' ');
+    const fileHash = crypto.createHash('sha256').update(normalizedText).digest('hex');
 
-    console.log(`[${reqId}] Persisting parsed JD...`);
-    let dbResult;
-    try {
-      dbResult = await createJDWithParsedData(title || null, text, parsedData);
-    } catch (dbErr) {
-      console.error(`[${reqId}] DB Persistence Error:`, dbErr.message);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to store JD data",
-      });
-    }
+    // (Note: Optional JD dedup check can go here if a JD find-by-hash is added later)
+
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new RetryableError("request_timeout")), 20000)
+    );
+
+    const jobPromise = processJDJob({
+      reqId,
+      title: title || null,
+      text,
+      fileHash
+    });
+
+    const result = await Promise.race([jobPromise, timeoutPromise]);
+
+    const { _dbIds, ...parsedData } = result.data;
 
     return res.status(200).json({
       success: true,
-      jobDescriptionId: dbResult.jobDescriptionId,
-      parsedJobDescriptionId: dbResult.parsedJobDescriptionId,
+      jobId: result.jobId,
+      status: result.status,
+      jobDescriptionId: _dbIds?.jobDescriptionId,
+      parsedJobDescriptionId: _dbIds?.parsedJobDescriptionId,
       data: parsedData,
       message: "Job description processed and stored successfully",
     });
+
   } catch (error) {
-    console.error(`[${reqId}] [CRITICAL_ERROR]`, error);
-    
     let status = 500;
     let message = 'Failed to process job description due to internal error.';
 
-    if (error.name === "NonRetryableError" || error.message.includes("Schema validation")) {
+    if (error.message.includes('request_timeout')) {
+      status = 504;
+      message = 'Request timed out';
+    } else if (error.name === "NonRetryableError" || error.message.includes("invalid_parsed_content")) {
       status = 400;
-      message = error.message;
-    } else if (error.name === "RetryableError" || error.message.includes("parseJobDescription:")) {
-      status = 400;
-      message = error.message;
+      message = `Parsing failed: ${error.message}`;
+    } else if (error.name === "RetryableError") {
+      status = 503;
+      message = `Service unavailable: ${error.message}`;
     }
+
+    logError("controller_error", error, { reqId, stage: "controller", source: "jd" });
 
     return res.status(status).json({
       success: false,

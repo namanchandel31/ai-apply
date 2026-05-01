@@ -19,15 +19,15 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
  * @param {number}   options.baseDelayMs  - Base delay in ms, multiplied by attempt number (default: 500)
  * @returns {Promise<any>}
  */
-const withRetry = async (fn, { maxAttempts = 3, baseDelayMs = 500 } = {}) => {
+const withRetry = async (fn, { maxAttempts = 2, baseDelayMs = 500 } = {}) => {
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn(attempt);
     } catch (err) {
-      // Never retry permanent failures
-      if (err instanceof NonRetryableError) {
+      // ONLY retry on explicit RetryableError. All others (including unknown) fail immediately.
+      if (!(err instanceof RetryableError)) {
         throw err;
       }
 

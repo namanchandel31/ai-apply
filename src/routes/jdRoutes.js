@@ -1,5 +1,4 @@
 const express = require('express');
-const rateLimit = require('express-rate-limit');
 const { uploadJDController } = require('../controllers/jdController');
 const crypto = require('crypto');
 
@@ -11,20 +10,6 @@ const attachRequestId = (req, res, next) => {
   next();
 };
 
-// Rate limit: 20 requests per minute per IP
-const uploadRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    return res.status(429).json({
-      success: false,
-      message: 'Too many requests, please try again later',
-    });
-  },
-});
-
-router.post('/upload-jd', attachRequestId, uploadRateLimiter, uploadJDController);
+router.post('/upload-jd', attachRequestId, uploadJDController);
 
 module.exports = router;

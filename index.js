@@ -14,6 +14,21 @@ app.use(express.json());
 const resumeRoutes = require("./src/routes/resumeRoutes");
 const jdRoutes = require("./src/routes/jdRoutes");
 
+const rateLimit = require("express-rate-limit");
+const globalApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many requests, please try again later',
+    });
+  },
+});
+
+app.use('/api', globalApiLimiter);
 app.use('/api', resumeRoutes);
 app.use('/api', jdRoutes);
 

@@ -4,7 +4,7 @@ const crypto = require('crypto');
 // --- Constants ---
 const PDF_MAGIC_PREFIX = '%PDF-';
 const EOF_MARKER = '%%EOF';
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MIN_FILE_SIZE = 100; // bytes
 
 const upload = multer({
@@ -137,7 +137,7 @@ const uploadMiddleware = (req, res, next) => {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           status = 400;
-          message = 'File size exceeds limit (2MB)';
+          message = 'File size exceeds limit (5MB)';
           errorType = 'MULTER_LIMIT';
         } else {
           // Handle other multer-specific errors (e.g., NO_FILE, Unexpected Field)

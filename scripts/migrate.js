@@ -27,14 +27,22 @@ const run = async () => {
   let client;
 
   try {
-    const sql = fs.readFileSync(SQL_PATH, "utf-8");
-
     client = await pool.connect();
-    console.log("⏳ Running migration...");
+    
+    const migrationsDir = path.join(__dirname, "..", "src", "migrations");
+    const files = fs.readdirSync(migrationsDir)
+                    .filter(f => f.endsWith('.sql'))
+                    .sort(); // ensures 001 runs before 002
 
-    await client.query(sql);
+    console.log("⏳ Running migrations...");
 
-    console.log("✅ Migration completed successfully.");
+    for (const file of files) {
+      console.log(`Executing ${file}...`);
+      const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+      await client.query(sql);
+    }
+
+    console.log("✅ Migrations completed successfully.");
   } catch (err) {
     console.error("❌ Migration failed:", err.message);
     process.exit(1);
