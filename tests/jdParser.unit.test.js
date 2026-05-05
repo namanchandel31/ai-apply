@@ -29,6 +29,7 @@ jest.mock("../src/utils/retry", () => {
 // Helper — builds the response shape the service expects
 // ---------------------------------------------------------------------------
 const makeOpenAIResponse = (jsonPayload) => ({
+  output_text: typeof jsonPayload === "string" ? jsonPayload : JSON.stringify(jsonPayload),
   output: [
     {
       content: [

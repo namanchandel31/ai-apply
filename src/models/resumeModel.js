@@ -22,12 +22,12 @@ const { pool } = require("../db");
  * @param {string} fileHash - SHA-256 hex digest of the file buffer
  * @returns {Promise<{id: string, file_name: string, file_size: number, file_hash: string, uploaded_at: string}>}
  */
-const createResume = async (client, fileName, fileSize, fileHash) => {
+const createResume = async (client, fileName, fileSize, fileHash, userId = null, filePath = null) => {
   const { rows } = await client.query(
-    `INSERT INTO resumes (file_name, file_size, file_hash)
-     VALUES ($1, $2, $3)
-     RETURNING id, file_name, file_size, file_hash, uploaded_at`,
-    [fileName, fileSize, fileHash]
+    `INSERT INTO resumes (file_name, file_size, file_hash, user_id, file_path)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, file_name, file_size, file_hash, user_id, file_path, uploaded_at`,
+    [fileName, fileSize, fileHash, userId, filePath]
   );
   return rows[0];
 };
@@ -58,7 +58,7 @@ const saveParsedResume = async (client, resumeId, rawText, parsedJson) => {
  */
 const findResumeByHash = async (fileHash) => {
   const { rows } = await pool.query(
-    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json
+    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
      FROM resumes r
      JOIN parsed_resumes pr ON pr.resume_id = r.id
      WHERE r.file_hash = $1
@@ -73,6 +73,7 @@ const findResumeByHash = async (fileHash) => {
     resumeId: rows[0].resume_id,
     parsedResumeId: rows[0].parsed_resume_id,
     parsedJson: rows[0].parsed_json,
+    filePath: rows[0].file_path,
   };
 };
 
@@ -90,13 +91,13 @@ const findResumeByHash = async (fileHash) => {
  * @param {object} parsedJson - validated + normalized LLM output
  * @returns {Promise<{resumeId: string, parsedResumeId: string}>}
  */
-const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText, parsedJson) => {
+const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText, parsedJson, userId = null, filePath = null) => {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    const resume = await createResume(client, fileName, fileSize, fileHash);
+    const resume = await createResume(client, fileName, fileSize, fileHash, userId, filePath);
     const parsed = await saveParsedResume(client, resume.id, rawText, parsedJson);
 
     await client.query("COMMIT");
@@ -120,7 +121,7 @@ const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText,
  */
 const getResumeById = async (resumeId) => {
   const { rows } = await pool.query(
-    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json
+    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
      FROM resumes r
      JOIN parsed_resumes pr ON pr.resume_id = r.id
      WHERE r.id = $1
@@ -135,6 +136,7 @@ const getResumeById = async (resumeId) => {
     resumeId: rows[0].resume_id,
     parsedResumeId: rows[0].parsed_resume_id,
     parsedJson: rows[0].parsed_json,
+    filePath: rows[0].file_path,
   };
 };
 

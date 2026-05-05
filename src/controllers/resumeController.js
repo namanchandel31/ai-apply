@@ -3,6 +3,8 @@ const { processResumeJob } = require("../services/jobHandler");
 const { findResumeByHash } = require("../models/resumeModel");
 const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
+const { getUserId } = require("../utils/auth");
+const { supabase } = require("../config/supabase");
 
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -18,13 +20,15 @@ const uploadResumeController = async (req, res) => {
     }
     
     const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const userId = getUserId(req);
+    const filePath = `${userId}/${fileHash}.pdf`;
 
-    logInfo("request_start", { reqId, jobId, fileHash, source: "resume" });
+    logInfo("request_start", { reqId, jobId, fileHash, userId, source: "resume" });
     
     // Deduplication check
     const existing = await findResumeByHash(fileHash);
     if (existing) {
-      logInfo("request_end", { reqId, jobId, fileHash, cacheHit: true, source: "resume" });
+      logInfo("request_end", { reqId, jobId, fileHash, userId, cacheHit: true, source: "resume" });
       return res.status(200).json({
         success: true,
         resumeId: existing.resumeId,
@@ -39,13 +43,37 @@ const uploadResumeController = async (req, res) => {
       setTimeout(() => reject(new RetryableError("request_timeout")), 20000)
     );
 
+    // Upload to Supabase Storage
+    try {
+      const { error } = await supabase.storage
+        .from('resumes')
+        .upload(filePath, req.file.buffer, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+      
+      if (error) {
+        throw new Error(`Supabase upload failed: ${error.message}`);
+      }
+      
+      logInfo("supabase_upload_success", { reqId, jobId, fileHash, userId, filePath });
+    } catch (uploadError) {
+      logError("supabase_upload_failed", uploadError, { reqId, jobId, fileHash, userId, filePath });
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload file to storage'
+      });
+    }
+
     const jobPromise = processResumeJob({
       reqId,
       jobId,
       buffer: req.file.buffer,
       originalname: req.file.originalname,
       size: req.file.size,
-      fileHash
+      fileHash,
+      userId,
+      filePath
     });
 
     const result = await Promise.race([jobPromise, timeoutPromise]);
@@ -53,7 +81,7 @@ const uploadResumeController = async (req, res) => {
     // Format output (result._dbIds contains DB generated UUIDs)
     const { _dbIds, ...parsedData } = result.data;
 
-    logInfo("request_end", { reqId, jobId, fileHash, source: "resume" });
+    logInfo("request_end", { reqId, jobId, fileHash, userId, source: "resume" });
 
     return res.status(200).json({
       success: true,
@@ -82,7 +110,7 @@ const uploadResumeController = async (req, res) => {
         message = `Processing error: ${error.message}`;
     }
 
-    logError("controller_error", error, { reqId, jobId, stage: "controller", source: "resume" });
+    logError("controller_error", error, { reqId, jobId, stage: "controller", source: "resume", userId });
     
     return res.status(status).json({
       success: false,

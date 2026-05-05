@@ -1,6 +1,6 @@
 const OpenAI = require("openai");
 
-const { safeParseJSON } = require("../utils/json");
+const { safeParseJSON, extractOpenAIResponse } = require("../utils/openaiHelper");
 const { withRetry } = require("../utils/retry");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { isValidEmail, isValidPhone, isNonEmptyString } = require("../utils/validators");
@@ -47,11 +47,7 @@ const callOpenAI = async (rawText) => {
   const llmPromise = openai.responses.create({
     model: MODEL,
     temperature: 0,
-    text: {
-      format: {
-        type: "json_object"
-      }
-    },
+    text: { format: { type: "json_object" } },
     input: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: rawText },
@@ -68,17 +64,7 @@ const callOpenAI = async (rawText) => {
     throw new RetryableError(`OpenAI request failed: ${err.message}`);
   }
 
-  const content = response.output
-    ?.flatMap((o) => o.content || [])
-    ?.find((c) => c.type === "output_text")
-    ?.text
-    ?.trim();
-
-  if (!content) {
-    throw new RetryableError("OpenAI returned empty or malformed response");
-  }
-
-  return content;
+  return extractOpenAIResponse(response);
 };
 
 // ---------------------------------------------------------------------------
@@ -96,18 +82,19 @@ const parseJobDescription = async (rawText) => {
     async (attempt) => {
       let raw;
 
+      let parsed;
       try {
-        raw = await callOpenAI(text);
+        parsed = await callOpenAI(text);
+        raw = parsed; // For backwards compatibility with error logging
       } catch (err) {
+        // Convert JSON parsing errors to RetryableError for retry mechanism
+        if (err.message.includes("Invalid JSON response") || err.message.includes("Empty response")) {
+          const retryableErr = new RetryableError(`JSON parse failed: ${err.message}`);
+          console.error("JD_PARSE_ERROR", { attempt, error: retryableErr.message, snippet });
+          throw retryableErr;
+        }
         console.error("JD_PARSE_ERROR", { attempt, error: err.message, snippet });
         throw err; // RetryableError — withRetry will handle backoff
-      }
-
-      const parsed = safeParseJSON(raw);
-      if (!parsed) {
-        const err = new RetryableError(`JSON parse failed (attempt ${attempt}): ${raw}`);
-        console.error("JD_PARSE_ERROR", { attempt, error: err.message, snippet });
-        throw err;
       }
 
       const result = JDSchema.safeParse(parsed);

@@ -14,6 +14,8 @@ app.use(express.json());
 const resumeRoutes = require("./src/routes/resumeRoutes");
 const jdRoutes = require("./src/routes/jdRoutes");
 const applyRoutes = require("./src/routes/applyRoutes");
+const credentialRoutes = require("./src/routes/credentialRoutes");
+const sendRoutes = require("./src/routes/sendRoutes");
 
 const rateLimit = require("express-rate-limit");
 const globalApiLimiter = rateLimit({
@@ -33,6 +35,8 @@ app.use('/api', globalApiLimiter);
 app.use('/api', resumeRoutes);
 app.use('/api', jdRoutes);
 app.use('/api/apply', applyRoutes);
+app.use('/api', credentialRoutes);
+app.use('/api', sendRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

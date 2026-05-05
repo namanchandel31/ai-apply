@@ -6,7 +6,7 @@ const { withRetry } = require("../utils/retry");
 const { getCache, setCache, deleteCache } = require("../utils/cache");
 const { logInfo, logError } = require("../utils/logger");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
-const { safeParseJSON } = require("../utils/json");
+const { safeParseJSON, extractOpenAIResponse } = require("../utils/openaiHelper");
 const { normalizeSkills, nullifyEmpty } = require("../utils/normalise");
 const { isValidEmail, isValidPhone } = require("../utils/validators");
 
@@ -169,17 +169,7 @@ const callOpenAI = async (systemPrompt, userPrompt) => {
     throw new NonRetryableError(`OpenAI permanent failure: ${err.message}`);
   }
 
-  const content = response.output
-    ?.flatMap((o) => o.content || [])
-    ?.find((c) => c.type === "output_text")
-    ?.text
-    ?.trim();
-
-  if (!content) {
-    throw new NonRetryableError("OpenAI returned empty content");
-  }
-  
-  return content;
+  return extractOpenAIResponse(response);
 };
 
 // ---------------------------------------------------------------------
@@ -192,7 +182,7 @@ const inflightJobs = new Map();
 /**
  * Process a Resume
  */
-const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, fileHash }) => {
+const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, fileHash, userId = null, filePath = null }) => {
   if (inflightJobs.has(fileHash)) {
     logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "resume" });
     return inflightJobs.get(fileHash);
@@ -232,10 +222,7 @@ const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, file
                    throw new RetryableError("Simulated LLM error");
                }
                const userPrompt = `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}`;
-               const raw = await callOpenAI(RESUME_SYSTEM_PROMPT, userPrompt);
-               
-               const parsed = safeParseJSON(raw);
-               if (!parsed) throw new NonRetryableError("JSON parse failed");
+               const parsed = await callOpenAI(RESUME_SYSTEM_PROMPT, userPrompt);
                
                const result = ResumeSchema.safeParse(parsed);
                if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);
@@ -256,7 +243,7 @@ const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, file
           }
 
           logInfo("db_persist_start", { reqId, jobId, stage: "db_persist", attempt, fileHash });
-          const dbResult = await createResumeWithParsedData(originalname, size, fileHash, cleanedText, parsedData);
+          const dbResult = await createResumeWithParsedData(originalname, size, fileHash, cleanedText, parsedData, userId, filePath);
           logInfo("db_write_success", { reqId, jobId, stage: "db_persist", attempt, fileHash });
           
           // Clear cache on DB success to prevent memory bloat
@@ -332,10 +319,7 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash }) => {
                   job_type: "Remote", skills: ["react", "node.js"]
                };
             } else {
-                const raw = await callOpenAI(JD_SYSTEM_PROMPT, cleanedText);
-                
-                const parsed = safeParseJSON(raw);
-                if (!parsed) throw new NonRetryableError("JSON parse failed");
+                const parsed = await callOpenAI(JD_SYSTEM_PROMPT, cleanedText);
                 
                 const result = JDSchema.safeParse(parsed);
                 if (!result.success) throw new NonRetryableError(`Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`);

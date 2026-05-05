@@ -1,0 +1,27 @@
+// Mock Supabase for tests
+jest.mock('../src/config/supabase', () => ({
+  supabase: {
+    storage: {
+      from: jest.fn(() => ({
+        upload: jest.fn().mockResolvedValue({ error: null }),
+        download: jest.fn().mockResolvedValue({ 
+          data: { arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) },
+          error: null 
+        })
+      }))
+    }
+  }
+}));
+
+// Mock encryption utility for tests
+jest.mock('../src/utils/encryption', () => ({
+  encrypt: jest.fn((text) => `encrypted_${text}`),
+  decrypt: jest.fn((encrypted) => encrypted.replace('encrypted_', ''))
+}));
+
+// Set test environment variables
+process.env.NODE_ENV = 'test';
+process.env.TEST_MODE = 'true';
+process.env.ENCRYPTION_KEY = '1234567890123456789012345678901234567890123456789012345678901234';
+process.env.SUPABASE_URL = 'http://localhost:54321';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
