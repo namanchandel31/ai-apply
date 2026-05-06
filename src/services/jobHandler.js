@@ -291,7 +291,7 @@ const processResumeJob = async ({ reqId, jobId, buffer, originalname, size, file
 /**
  * Process a Job Description
  */
-const processJDJob = async ({ reqId, jobId, title, text, fileHash }) => {
+const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null }) => {
   if (inflightJobs.has(fileHash)) {
     logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "jd" });
     return inflightJobs.get(fileHash);
@@ -346,7 +346,7 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash }) => {
           }
 
           logInfo("db_persist_start", { reqId, jobId, stage: "db_persist", attempt, fileHash });
-          const dbResult = await createJDWithParsedData(title || null, cleanedText, parsedData);
+          const dbResult = await createJDWithParsedData(title || null, cleanedText, parsedData, userId);
           logInfo("db_write_success", { reqId, jobId, stage: "db_persist", attempt, fileHash });
           
           // Clear cache on DB success

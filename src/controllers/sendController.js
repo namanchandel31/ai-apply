@@ -2,6 +2,7 @@ const { pool } = require('../db');
 const { sendApplicationEmail } = require('../services/mailService');
 const { getUserId } = require('../utils/auth');
 const { logInfo, logError } = require('../utils/logger');
+const { error, ok, ERROR_CODES } = require('../utils/response');
 
 const sendApplicationController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -17,15 +18,12 @@ const sendApplicationController = async (req, res) => {
        FROM applications a
        JOIN job_descriptions jd ON jd.id = a.jd_id
        LEFT JOIN resumes r ON r.id = a.resume_id
-       WHERE a.id = $1`,
-      [applicationId]
+       WHERE a.id = $1 AND a.user_id = $2`,
+      [applicationId, userId]
     );
 
     if (apps.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Application not found'
-      });
+      return error(res, 404, 'Application not found', ERROR_CODES.NOT_FOUND);
     }
 
     const application = apps[0];
@@ -105,38 +103,37 @@ const sendApplicationController = async (req, res) => {
         application.file_path
       );
 
-      // 6. Update application status to sent (atomic update)
+      // 6. Update application status to sent (atomic update with user_id safety)
       const { rows: updateRows } = await pool.query(
         `UPDATE applications 
          SET status = 'sent', sent_at = NOW(), error = NULL
-         WHERE id = $1 AND status != 'sent'
+         WHERE id = $1 AND user_id = $2 AND status != 'sent'
          RETURNING id, status, sent_at`,
-        [applicationId]
+        [applicationId, userId]
       );
 
       if (updateRows.length === 0) {
         // Application was already sent by another request
         logInfo("send_application_duplicate_send", { reqId, applicationId, userId, stage: "validation" });
-        return res.status(200).json({
-          success: true,
-          message: 'Application already sent',
-          data: {
-            status: 'sent',
-            sentAt: application.sent_at
-          }
+        return ok(res, {
+          status: 'sent',
+          sentAt: application.sent_at,
+          message: 'Application already sent'
         });
       }
 
-      logInfo("send_application_success", { reqId, applicationId, userId, recipientEmail, stage: "smtp" });
+      // Mask email for security logging
+      const maskedEmail = recipientEmail ? 
+        recipientEmail.charAt(0) + '***' + recipientEmail.substring(recipientEmail.lastIndexOf('@')) : 
+        'unknown';
+      
+      logInfo("send_application_success", { reqId, applicationId, userId, recipientEmail: maskedEmail, stage: "smtp" });
 
-      return res.status(200).json({
-        success: true,
-        message: 'Application sent successfully',
-        data: {
-          messageId: emailResult.messageId,
-          status: 'sent',
-          sentAt: updateRows[0].sent_at
-        }
+      return ok(res, {
+        messageId: emailResult.messageId,
+        status: 'sent',
+        sentAt: updateRows[0].sent_at,
+        message: 'Application sent successfully'
       });
 
     } catch (emailError) {
@@ -150,25 +147,24 @@ const sendApplicationController = async (req, res) => {
       await pool.query(
         `UPDATE applications 
          SET status = 'failed', error = $1
-         WHERE id = $2`,
-        [JSON.stringify(errorData), applicationId]
+         WHERE id = $2 AND user_id = $3`,
+        [JSON.stringify(errorData), applicationId, userId]
       );
 
-      logError("send_application_failed", emailError, { reqId, applicationId, userId, recipientEmail, stage: emailError.stage });
+      // Mask email for security logging
+      const maskedEmail = recipientEmail ? 
+        recipientEmail.charAt(0) + '***' + recipientEmail.substring(recipientEmail.lastIndexOf('@')) : 
+        'unknown';
+      
+      logError("send_application_failed", emailError, { reqId, applicationId, userId, recipientEmail: maskedEmail, stage: emailError.stage });
 
-      return res.status(500).json({
-        success: false,
-        message: `Failed to send application: ${emailError.message}`
-      });
+      return error(res, 500, `Failed to send application: ${emailError.message}`, ERROR_CODES.INTERNAL_ERROR);
     }
 
   } catch (error) {
     logError("send_application_error", error, { reqId, applicationId, userId });
     
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send application'
-    });
+    return error(res, 500, 'Failed to send application', ERROR_CODES.INTERNAL_ERROR);
   }
 };
 

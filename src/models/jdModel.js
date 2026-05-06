@@ -18,12 +18,12 @@ const { pool } = require("../db");
  * @param {string} rawText
  * @returns {Promise<{id: string, title: string|null, created_at: string}>}
  */
-const createJobDescription = async (client, title, rawText) => {
+const createJobDescription = async (client, title, rawText, userId = null) => {
   const { rows } = await client.query(
-    `INSERT INTO job_descriptions (title, raw_text)
-     VALUES ($1, $2)
+    `INSERT INTO job_descriptions (title, raw_text, user_id)
+     VALUES ($1, $2, $3)
      RETURNING id, title, created_at`,
-    [title || null, rawText]
+    [title || null, rawText, userId]
   );
   return rows[0];
 };
@@ -57,13 +57,13 @@ const saveParsedJD = async (client, jobDescriptionId, parsedJson) => {
  * @param {object} parsedJson - validated + normalized LLM output
  * @returns {Promise<{jobDescriptionId: string, parsedJobDescriptionId: string}>}
  */
-const createJDWithParsedData = async (title, rawText, parsedJson) => {
+const createJDWithParsedData = async (title, rawText, parsedJson, userId = null) => {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    const jd = await createJobDescription(client, title, rawText);
+    const jd = await createJobDescription(client, title, rawText, userId);
     const parsed = await saveParsedJD(client, jd.id, parsedJson);
 
     await client.query("COMMIT");
@@ -85,16 +85,25 @@ const createJDWithParsedData = async (title, rawText, parsedJson) => {
  * @param {string} jobDescriptionId 
  * @returns {Promise<{jobDescriptionId: string, parsedJobDescriptionId: string, parsedJson: object} | null>}
  */
-const getJDById = async (jobDescriptionId) => {
-  const { rows } = await pool.query(
-    `SELECT jd.id AS job_description_id, pjd.id AS parsed_job_description_id, pjd.parsed_json
-     FROM job_descriptions jd
-     JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
-     WHERE jd.id = $1
-     ORDER BY pjd.created_at DESC
-     LIMIT 1`,
-    [jobDescriptionId]
-  );
+const getJDById = async (jobDescriptionId, userId = null, client = null) => {
+  const queryClient = client || pool;
+  const query = userId
+    ? `SELECT jd.id AS job_description_id, pjd.id AS parsed_job_description_id, pjd.parsed_json
+       FROM job_descriptions jd
+       JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
+       WHERE jd.id = $1 AND jd.user_id = $2
+       ORDER BY pjd.created_at DESC
+       LIMIT 1`
+    : `SELECT jd.id AS job_description_id, pjd.id AS parsed_job_description_id, pjd.parsed_json
+       FROM job_descriptions jd
+       JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
+       WHERE jd.id = $1
+       ORDER BY pjd.created_at DESC
+       LIMIT 1`;
+  
+  const params = userId ? [jobDescriptionId, userId] : [jobDescriptionId];
+
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
 

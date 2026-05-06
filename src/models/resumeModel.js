@@ -54,18 +54,28 @@ const saveParsedResume = async (client, resumeId, rawText, parsedJson) => {
  * Look up an existing resume by its file hash (dedup).
  * Returns the resume row + the most recent parsed_resume id, or null.
  * @param {string} fileHash
+ * @param {string} userId
  * @returns {Promise<{resumeId: string, parsedResumeId: string, parsedJson: object} | null>}
  */
-const findResumeByHash = async (fileHash) => {
-  const { rows } = await pool.query(
-    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
-     FROM resumes r
-     JOIN parsed_resumes pr ON pr.resume_id = r.id
-     WHERE r.file_hash = $1
-     ORDER BY pr.created_at DESC
-     LIMIT 1`,
-    [fileHash]
-  );
+const findResumeByHash = async (fileHash, userId = null, client = null) => {
+  const queryClient = client || pool;
+  const query = userId 
+    ? `SELECT a.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes a
+       LEFT JOIN parsed_resumes pr ON pr.resume_id = a.id
+       WHERE a.file_hash = $1 AND a.user_id = $2
+       ORDER BY pr.created_at DESC
+       LIMIT 1`
+    : `SELECT a.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes a
+       LEFT JOIN parsed_resumes pr ON pr.resume_id = a.id
+       WHERE a.file_hash = $1
+       ORDER BY pr.created_at DESC
+       LIMIT 1`;
+  
+  const params = userId ? [fileHash, userId] : [fileHash];
+  
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
 
@@ -119,16 +129,25 @@ const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText,
  * @param {string} resumeId 
  * @returns {Promise<{resumeId: string, parsedResumeId: string, parsedJson: object} | null>}
  */
-const getResumeById = async (resumeId) => {
-  const { rows } = await pool.query(
-    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
-     FROM resumes r
-     JOIN parsed_resumes pr ON pr.resume_id = r.id
-     WHERE r.id = $1
-     ORDER BY pr.created_at DESC
-     LIMIT 1`,
-    [resumeId]
-  );
+const getResumeById = async (resumeId, userId = null, client = null) => {
+  const queryClient = client || pool;
+  const query = userId
+    ? `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes r
+       JOIN parsed_resumes pr ON pr.resume_id = r.id
+       WHERE r.id = $1 AND r.user_id = $2
+       ORDER BY pr.created_at DESC
+       LIMIT 1`
+    : `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes r
+       JOIN parsed_resumes pr ON pr.resume_id = r.id
+       WHERE r.id = $1
+       ORDER BY pr.created_at DESC
+       LIMIT 1`;
+
+  const params = userId ? [resumeId, userId] : [resumeId];
+
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
 

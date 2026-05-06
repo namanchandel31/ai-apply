@@ -1,5 +1,5 @@
 function getUserId(req) {
-  return req.body.userId;
+  return req.user.id;
 }
 
 module.exports = { getUserId };

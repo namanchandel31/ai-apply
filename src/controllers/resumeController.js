@@ -5,6 +5,7 @@ const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
 const { getUserId } = require("../utils/auth");
 const { supabase } = require("../config/supabase");
+const { error, ok, ERROR_CODES } = require("../utils/response");
 
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -12,25 +13,24 @@ const uploadResumeController = async (req, res) => {
 
   try {
     if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ success: false, message: 'No file' });
+      return error(res, 400, 'No file', ERROR_CODES.BAD_REQUEST);
     }
     // MIME type and size checks are handled by upload middleware, but we double-check sanity
     if (req.file.mimetype !== 'application/pdf') {
-      return res.status(400).json({ success: false, message: 'Invalid mimetype' });
+      return error(res, 400, 'Invalid mimetype', ERROR_CODES.BAD_REQUEST);
     }
     
     const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
-    const userId = getUserId(req);
+    const userId = req.user.id;
     const filePath = `${userId}/${fileHash}.pdf`;
 
     logInfo("request_start", { reqId, jobId, fileHash, userId, source: "resume" });
     
     // Deduplication check
-    const existing = await findResumeByHash(fileHash);
+    const existing = await findResumeByHash(fileHash, userId);
     if (existing) {
       logInfo("request_end", { reqId, jobId, fileHash, userId, cacheHit: true, source: "resume" });
-      return res.status(200).json({
-        success: true,
+      return ok(res, {
         resumeId: existing.resumeId,
         parsedResumeId: existing.parsedResumeId,
         data: existing.parsedJson,
@@ -59,10 +59,7 @@ const uploadResumeController = async (req, res) => {
       logInfo("supabase_upload_success", { reqId, jobId, fileHash, userId, filePath });
     } catch (uploadError) {
       logError("supabase_upload_failed", uploadError, { reqId, jobId, fileHash, userId, filePath });
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to upload file to storage'
-      });
+      return error(res, 500, 'Failed to upload file to storage', ERROR_CODES.INTERNAL_ERROR);
     }
 
     const jobPromise = processResumeJob({
@@ -72,7 +69,7 @@ const uploadResumeController = async (req, res) => {
       originalname: req.file.originalname,
       size: req.file.size,
       fileHash,
-      userId,
+      userId: req.user.id,
       filePath
     });
 
@@ -83,8 +80,7 @@ const uploadResumeController = async (req, res) => {
 
     logInfo("request_end", { reqId, jobId, fileHash, userId, source: "resume" });
 
-    return res.status(200).json({
-      success: true,
+    return ok(res, {
       jobId: result.jobId,
       status: result.status,
       resumeId: _dbIds?.resumeId,
@@ -112,10 +108,12 @@ const uploadResumeController = async (req, res) => {
 
     logError("controller_error", error, { reqId, jobId, stage: "controller", source: "resume", userId });
     
-    return res.status(status).json({
-      success: false,
-      message: message,
-    });
+    const errorCode = status === 400 ? ERROR_CODES.BAD_REQUEST :
+                      status === 504 ? 'TIMEOUT' :
+                      status === 503 ? 'SERVICE_UNAVAILABLE' :
+                      ERROR_CODES.INTERNAL_ERROR;
+    
+    return error(res, status, message, errorCode);
   }
 };
 

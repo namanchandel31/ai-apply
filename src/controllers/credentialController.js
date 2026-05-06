@@ -1,8 +1,8 @@
 const nodemailer = require('nodemailer');
 const { pool } = require('../db');
 const { encrypt } = require('../utils/encryption');
-const { getUserId } = require('../utils/auth');
 const { logInfo, logError } = require('../utils/logger');
+const { error, ok, ERROR_CODES } = require('../utils/response');
 
 const saveEmailCredentialsController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -11,10 +11,7 @@ const saveEmailCredentialsController = async (req, res) => {
     const { email, appPassword } = req.body;
 
     if (!email || !appPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and app password are required'
-      });
+      return error(res, 400, 'Email and app password are required', ERROR_CODES.BAD_REQUEST);
     }
 
     // Validate and normalize email
@@ -22,23 +19,17 @@ const saveEmailCredentialsController = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     
     if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
+      return error(res, 400, 'Invalid email format', ERROR_CODES.BAD_REQUEST);
     }
 
     // Normalize appPassword
     const normalizedPassword = appPassword.replace(/\s+/g, '');
     
     if (normalizedPassword.length !== 16) {
-      return res.status(400).json({
-        success: false,
-        message: 'App password must be 16 characters long'
-      });
+      return error(res, 400, 'App password must be 16 characters long', ERROR_CODES.BAD_REQUEST);
     }
 
-    const userId = getUserId(req);
+    const userId = req.user.id;
 
     logInfo("credential_save_start", { reqId, userId, email: normalizedEmail });
 
@@ -58,10 +49,7 @@ const saveEmailCredentialsController = async (req, res) => {
       logInfo("smtp_verification_success", { reqId, userId, email: normalizedEmail });
     } catch (verifyError) {
       logError("smtp_verification_failed", verifyError, { reqId, userId, email: normalizedEmail });
-      return res.status(400).json({
-        success: false,
-        message: 'Email credentials verification failed. Please check your email and app password.'
-      });
+      return error(res, 400, 'Email credentials verification failed. Please check your email and app password.', ERROR_CODES.BAD_REQUEST);
     }
 
     // Encrypt password
@@ -88,14 +76,10 @@ const saveEmailCredentialsController = async (req, res) => {
 
       logInfo("credential_save_success", { reqId, userId, email: normalizedEmail });
 
-      return res.status(200).json({
-        success: true,
-        message: 'Email credentials saved successfully',
-        data: {
-          userId: rows[0].user_id,
-          email: rows[0].email,
-          updatedAt: rows[0].updated_at
-        }
+      return ok(res, {
+        userId: rows[0].user_id,
+        email: rows[0].email,
+        updatedAt: rows[0].updated_at
       });
 
     } catch (dbError) {
@@ -108,10 +92,7 @@ const saveEmailCredentialsController = async (req, res) => {
   } catch (error) {
     logError("credential_save_error", error, { reqId });
     
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to save email credentials'
-    });
+    return error(res, 500, 'Failed to save email credentials', ERROR_CODES.INTERNAL_ERROR);
   }
 };
 

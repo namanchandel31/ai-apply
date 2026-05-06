@@ -1,5 +1,6 @@
 const express = require('express');
 const { uploadJDController } = require('../controllers/jdController');
+const authMiddleware = require('../middlewares/authMiddleware');
 const crypto = require('crypto');
 
 const router = express.Router();
@@ -10,6 +11,6 @@ const attachRequestId = (req, res, next) => {
   next();
 };
 
-router.post('/upload-jd', attachRequestId, uploadJDController);
+router.post('/upload-jd', authMiddleware, attachRequestId, uploadJDController);
 
 module.exports = router;

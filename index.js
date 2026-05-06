@@ -3,6 +3,11 @@ const express = require("express");
 const cors = require("cors");
 const { testConnection } = require("./src/db");
 
+// Fail-fast check for JWT_SECRET
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET missing from environment variables");
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -11,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+const authRoutes = require("./src/routes/authRoutes");
 const resumeRoutes = require("./src/routes/resumeRoutes");
 const jdRoutes = require("./src/routes/jdRoutes");
 const applyRoutes = require("./src/routes/applyRoutes");
@@ -32,6 +38,7 @@ const globalApiLimiter = rateLimit({
 });
 
 app.use('/api', globalApiLimiter);
+app.use('/auth', authRoutes);
 app.use('/api', resumeRoutes);
 app.use('/api', jdRoutes);
 app.use('/api/apply', applyRoutes);

@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { processJDJob } = require("../services/jobHandler");
 const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
+const { error, ok, ERROR_CODES } = require("../utils/response");
 
 const uploadJDController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -11,10 +12,7 @@ const uploadJDController = async (req, res) => {
     const { text, title } = req.body;
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Request body must contain a non-empty 'text' field",
-      });
+      return error(res, 400, "Request body must contain a non-empty 'text' field", ERROR_CODES.BAD_REQUEST);
     }
 
     // JD Hash (Normalization + Hashing)
@@ -34,7 +32,8 @@ const uploadJDController = async (req, res) => {
       jobId,
       title: title || null,
       text,
-      fileHash
+      fileHash,
+      userId: req.user.id
     });
 
     const result = await Promise.race([jobPromise, timeoutPromise]);
@@ -43,8 +42,7 @@ const uploadJDController = async (req, res) => {
 
     logInfo("request_end", { reqId, jobId, fileHash, source: "jd" });
 
-    return res.status(200).json({
-      success: true,
+    return ok(res, {
       jobId: result.jobId,
       status: result.status,
       jobDescriptionId: _dbIds?.jobDescriptionId,
@@ -70,10 +68,12 @@ const uploadJDController = async (req, res) => {
 
     logError("controller_error", error, { reqId, jobId, stage: "controller", source: "jd" });
 
-    return res.status(status).json({
-      success: false,
-      message: message,
-    });
+    const errorCode = status === 400 ? ERROR_CODES.BAD_REQUEST :
+                      status === 504 ? 'TIMEOUT' :
+                      status === 503 ? 'SERVICE_UNAVAILABLE' :
+                      ERROR_CODES.INTERNAL_ERROR;
+
+    return error(res, status, message, errorCode);
   }
 };
 

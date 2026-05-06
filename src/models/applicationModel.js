@@ -7,16 +7,25 @@ const { pool } = require("../db");
  * @param {string} jobDescriptionId 
  * @returns {Promise<Object|null>}
  */
-const getApplicationByResumeAndJD = async (resumeId, jobDescriptionId) => {
-  const { rows } = await pool.query(
-    `SELECT a.id, a.match_score, a.email_subject, a.email_body, a.status, a.created_at, a.updated_at, a.sent_at, a.error,
+const getApplicationByResumeAndJD = async (resumeId, jobDescriptionId, userId = null, client = null) => {
+  const queryClient = client || pool;
+  const query = userId
+    ? `SELECT a.id, a.match_score, a.email_subject, a.email_body, a.status, a.created_at, a.updated_at, a.sent_at, a.error,
             r.file_path
-     FROM applications a
-     LEFT JOIN resumes r ON r.id = a.resume_id
-     WHERE a.resume_id = $1 AND a.job_description_id = $2
-     LIMIT 1`,
-    [resumeId, jobDescriptionId]
-  );
+       FROM applications a
+       LEFT JOIN resumes r ON r.id = a.resume_id
+       WHERE a.resume_id = $1 AND a.job_description_id = $2 AND a.user_id = $3
+       LIMIT 1`
+    : `SELECT a.id, a.match_score, a.email_subject, a.email_body, a.status, a.created_at, a.updated_at, a.sent_at, a.error,
+            r.file_path
+       FROM applications a
+       LEFT JOIN resumes r ON r.id = a.resume_id
+       WHERE a.resume_id = $1 AND a.job_description_id = $2
+       LIMIT 1`;
+
+  const params = userId ? [resumeId, jobDescriptionId, userId] : [resumeId, jobDescriptionId];
+
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
   return rows[0];
@@ -35,19 +44,27 @@ const getApplicationByResumeAndJD = async (resumeId, jobDescriptionId) => {
  * @param {string} data.emailBody
  * @returns {Promise<Object>}
  */
-const createApplication = async ({ id, resumeId, jobDescriptionId, matchScore, emailSubject, emailBody }) => {
-  const { rows } = await pool.query(
+const createApplication = async ({ id, resumeId, jobDescriptionId, matchScore, emailSubject, emailBody, userId = null, client = null }) => {
+  const queryClient = client || pool;
+  
+  const { rows } = await queryClient.query(
     `INSERT INTO applications (
-        id, resume_id, job_description_id, match_score, email_subject, email_body, status
+        id, resume_id, job_description_id, match_score, email_subject, email_body, status, user_id
      )
-     VALUES ($1, $2, $3, $4, $5, $6, 'draft')
-     ON CONFLICT (resume_id, job_description_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7)
+     ON CONFLICT (user_id, resume_id, job_description_id)
      DO UPDATE SET updated_at = NOW()
      RETURNING id, match_score, email_subject, email_body, status, created_at, updated_at`,
-    [id, resumeId, jobDescriptionId, matchScore, emailSubject, emailBody]
+    [id, resumeId, jobDescriptionId, matchScore, emailSubject, emailBody, userId]
   );
   
-  return rows[0];
+  // Check if this was an existing application (idempotent case)
+  const isExisting = rows[0].created_at.getTime() !== rows[0].updated_at.getTime();
+  
+  return {
+    ...rows[0],
+    idempotent: isExisting
+  };
 };
 
 /**
@@ -55,15 +72,23 @@ const createApplication = async ({ id, resumeId, jobDescriptionId, matchScore, e
  * @param {string} applicationId
  * @returns {Promise<Object|null>}
  */
-const getApplicationById = async (applicationId) => {
-  const { rows } = await pool.query(
-    `SELECT a.*, jd.contact_email as jd_contact_email, r.file_path
-     FROM applications a
-     JOIN job_descriptions jd ON jd.id = a.jd_id
-     LEFT JOIN resumes r ON r.id = a.resume_id
-     WHERE a.id = $1`,
-    [applicationId]
-  );
+const getApplicationById = async (applicationId, userId = null, client = null) => {
+  const queryClient = client || pool;
+  const query = userId
+    ? `SELECT a.*, jd.contact_email as jd_contact_email, r.file_path
+       FROM applications a
+       JOIN job_descriptions jd ON jd.id = a.jd_id
+       LEFT JOIN resumes r ON r.id = a.resume_id
+       WHERE a.id = $1 AND a.user_id = $2`
+    : `SELECT a.*, jd.contact_email as jd_contact_email, r.file_path
+       FROM applications a
+       JOIN job_descriptions jd ON jd.id = a.jd_id
+       LEFT JOIN resumes r ON r.id = a.resume_id
+       WHERE a.id = $1`;
+
+  const params = userId ? [applicationId, userId] : [applicationId];
+
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
   return rows[0];
@@ -76,7 +101,8 @@ const getApplicationById = async (applicationId) => {
  * @param {Object|null} error
  * @returns {Promise<Object|null>}
  */
-const updateApplicationStatus = async (applicationId, status, error = null) => {
+const updateApplicationStatus = async (applicationId, status, error = null, userId = null, client = null) => {
+  const queryClient = client || pool;
   const validStages = ["smtp", "validation", "storage", "unknown"];
   
   if (error && error.stage && !validStages.includes(error.stage)) {
@@ -85,13 +111,19 @@ const updateApplicationStatus = async (applicationId, status, error = null) => {
 
   const errorJson = error ? JSON.stringify(error) : null;
   
-  const { rows } = await pool.query(
-    `UPDATE applications 
-     SET status = $1, error = $2, sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END
-     WHERE id = $3
-     RETURNING id, status, sent_at, error`,
-    [status, errorJson, applicationId]
-  );
+  const query = userId
+    ? `UPDATE applications 
+       SET status = $1, error = $2, sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END
+       WHERE id = $3 AND user_id = $4
+       RETURNING id, status, sent_at, error`
+    : `UPDATE applications 
+       SET status = $1, error = $2, sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END
+       WHERE id = $3
+       RETURNING id, status, sent_at, error`;
+  
+  const params = userId ? [status, errorJson, applicationId, userId] : [status, errorJson, applicationId];
+
+  const { rows } = await queryClient.query(query, params);
 
   if (rows.length === 0) return null;
   return rows[0];
