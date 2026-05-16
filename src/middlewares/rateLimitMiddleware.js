@@ -1,61 +1,65 @@
-const { rateLimiter, RATE_LIMITS } = require('../utils/rateLimiter');
-const { error, ERROR_CODES } = require('../utils/response');
+const { rateLimiter, RATE_LIMITS } = require("../utils/rateLimiter");
+const { error, ERROR_CODES } = require("../utils/response");
 
 /**
- * Create rate limiting middleware
- * @param {string} type - Type of rate limit ('apply' or 'send')
- * @returns {Function} Express middleware
+ * Factory: create a rate limit middleware for a named tier.
+ *
+ * Key resolution: req.user?.id (per-user bucket when authenticated) with a
+ * shared IP_GLOBAL fallback ceiling applied on every request regardless of auth.
+ *
+ * On limit exceeded, responds with:
+ *   { success: false, error: "RATE_LIMIT_EXCEEDED", retryAfterSeconds: N }
+ * and sets the Retry-After header.
  */
-const createRateLimit = (type) => {
+const createRateLimit = (userLimitKey) => {
+  const userCfg = RATE_LIMITS[userLimitKey];
+  const ipCfg   = RATE_LIMITS.IP_GLOBAL;
+
+  if (!userCfg) throw new Error(`Unknown rate limit tier: ${userLimitKey}`);
+
   return (req, res, next) => {
-    const userKey = req.user ? `user:${req.user.id}` : null;
-    const ipKey = `ip:${req.ip || req.connection.remoteAddress}`;
-    
-    let userLimit, ipLimit;
-    
-    if (type === 'apply') {
-      userLimit = RATE_LIMITS.USER_APPLY;
-      ipLimit = RATE_LIMITS.IP_APPLY;
-    } else if (type === 'send') {
-      userLimit = RATE_LIMITS.USER_SEND;
-      ipLimit = RATE_LIMITS.IP_SEND;
-    } else {
-      return next(new Error('Invalid rate limit type'));
-    }
-    
-    // Check user rate limit (if authenticated)
-    if (userKey && !rateLimiter.check(userKey, userLimit.limit, userLimit.windowSeconds)) {
+    const userId = req.user?.id;
+    const ip     = req.ip || req.connection?.remoteAddress || "unknown";
+
+    // ── Per-IP global ceiling (always checked, regardless of auth) ───────
+    const ipKey = `ip:${ip}`;
+    if (!rateLimiter.check(ipKey, ipCfg.limit, ipCfg.windowSeconds)) {
+      const resetTime = rateLimiter.getResetTime(ipKey);
+      const retryAfter = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : ipCfg.windowSeconds;
+      res.setHeader("Retry-After", retryAfter);
       return error(
-        res, 
-        429, 
-        `Rate limit exceeded: ${userLimit.limit} requests per ${userLimit.windowSeconds} seconds per user`,
-        'RATE_LIMIT_EXCEEDED'
+        res, 429,
+        `Rate limit exceeded: ${ipCfg.limit} requests per ${ipCfg.windowSeconds}s per IP`,
+        "RATE_LIMIT_EXCEEDED"
       );
     }
-    
-    // Check IP rate limit (always)
-    if (!rateLimiter.check(ipKey, ipLimit.limit, ipLimit.windowSeconds)) {
-      return error(
-        res, 
-        429, 
-        `Rate limit exceeded: ${ipLimit.limit} requests per ${ipLimit.windowSeconds} seconds per IP`,
-        'RATE_LIMIT_EXCEEDED'
-      );
+
+    // ── Per-user tier (only when authenticated) ──────────────────────────
+    if (userId) {
+      const userKey = `user:${userId}:${userLimitKey}`;
+      if (!rateLimiter.check(userKey, userCfg.limit, userCfg.windowSeconds)) {
+        const resetTime = rateLimiter.getResetTime(userKey);
+        const retryAfter = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : userCfg.windowSeconds;
+        res.setHeader("Retry-After", retryAfter);
+        return error(
+          res, 429,
+          `Rate limit exceeded: ${userCfg.limit} requests per ${userCfg.windowSeconds}s`,
+          "RATE_LIMIT_EXCEEDED"
+        );
+      }
+
+      // Informational headers for client-side adaptive throttling
+      const userKey2 = `user:${userId}:${userLimitKey}`;
+      res.setHeader("X-RateLimit-Limit", userCfg.limit);
+      res.setHeader("X-RateLimit-Remaining", rateLimiter.getRemaining(userKey2, userCfg.limit));
     }
-    
-    // Add rate limit headers for client info
-    res.set({
-      'X-RateLimit-Limit-User': userLimit.limit,
-      'X-RateLimit-Remaining-User': userKey ? rateLimiter.getRemaining(userKey, userLimit.limit) : 'N/A',
-      'X-RateLimit-Limit-IP': ipLimit.limit,
-      'X-RateLimit-Remaining-IP': rateLimiter.getRemaining(ipKey, ipLimit.limit)
-    });
-    
+
     next();
   };
 };
 
 module.exports = {
-  applyRateLimit: createRateLimit('apply'),
-  sendRateLimit: createRateLimit('send')
+  applyRateLimit:  createRateLimit("USER_APPLY_SEND"),
+  uploadRateLimit: createRateLimit("USER_UPLOAD"),
+  readRateLimit:   createRateLimit("USER_READ"),
 };

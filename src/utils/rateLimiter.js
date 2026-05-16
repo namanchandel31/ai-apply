@@ -139,18 +139,22 @@ class RateLimiter {
 // Singleton instance
 const rateLimiter = new RateLimiter();
 
-// Rate limit configurations
+// Rate limit configurations — v1 SaaS tiers.
+// Key is resolved as req.user?.id || req.ip (per-user bucket; IP fallback for unauth).
+//
+// Rationale:
+//   APPLY_SEND  10/min — Each apply/send call takes 5-15s; 10/min prevents burst abuse
+//                        without blocking real user sessions (5-10 jobs per session).
+//   UPLOAD      20/min — Re-uploads and test uploads are routine; 20/min is generous
+//                        but upload middleware already enforces 10MB + PDF-only.
+//   READ       120/min — Status polling and list fetches; 2 req/sec, plenty for any UI.
+//   IP_GLOBAL  200/min — Hard ceiling per IP regardless of auth state.
 const RATE_LIMITS = {
-  // Per-user limits
-  USER_APPLY: { limit: 10, windowSeconds: 60 }, // 10 applies per minute per user
-  USER_SEND: { limit: 5, windowSeconds: 60 },   // 5 sends per minute per user
-  
-  // Per-IP fallback limits
-  IP_APPLY: { limit: 50, windowSeconds: 60 },   // 50 applies per minute per IP
-  IP_SEND: { limit: 20, windowSeconds: 60 },    // 20 sends per minute per IP
+  USER_APPLY_SEND: { limit: 10,  windowSeconds: 60 },
+  USER_UPLOAD:     { limit: 20,  windowSeconds: 60 },
+  USER_READ:       { limit: 120, windowSeconds: 60 },
+  IP_GLOBAL:       { limit: 200, windowSeconds: 60 },
 };
 
-module.exports = {
-  rateLimiter,
-  RATE_LIMITS
-};
+module.exports = { rateLimiter, RATE_LIMITS };
+

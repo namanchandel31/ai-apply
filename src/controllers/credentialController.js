@@ -89,9 +89,9 @@ const saveEmailCredentialsController = async (req, res) => {
       client.release();
     }
 
-  } catch (error) {
-    logError("credential_save_error", error, { reqId });
-    
+  } catch (err) {
+    logError("credential_save_error", err, { reqId });
+
     return error(res, 500, 'Failed to save email credentials', ERROR_CODES.INTERNAL_ERROR);
   }
 };

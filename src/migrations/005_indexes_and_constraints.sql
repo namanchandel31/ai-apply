@@ -31,11 +31,14 @@ END;
 $$ language 'plpgsql';
 
 -- Apply trigger to tables with updated_at column
+DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_failed_parses_updated_at ON failed_parses;
 CREATE TRIGGER update_failed_parses_updated_at BEFORE UPDATE ON failed_parses
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_user_email_credentials_updated_at ON user_email_credentials;
 CREATE TRIGGER update_user_email_credentials_updated_at BEFORE UPDATE ON user_email_credentials
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
