@@ -53,6 +53,28 @@ const applyRoutes      = require("./src/routes/applyRoutes");
 const credentialRoutes = require("./src/routes/credentialRoutes");
 const sendRoutes       = require("./src/routes/sendRoutes");
 
+// ---------------------------------------------------------------------------
+// Swagger UI — development only
+// Playground: http://localhost:5000/docs
+// OpenAPI spec: http://localhost:5000/openapi.json
+// ---------------------------------------------------------------------------
+
+if (process.env.NODE_ENV !== "production") {
+  const { swaggerUi, swaggerSpec } = require("./src/docs/swagger");
+
+  // Swagger UI playground — searchable, JWT persists across page refreshes
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    swaggerOptions: { persistAuthorization: true },
+  }));
+
+  // Raw OpenAPI JSON spec — import into Postman, SDK generators, AI tooling
+  app.get("/openapi.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(swaggerSpec);
+  });
+}
+
 // Auth (no rate limit — handled internally)
 app.use("/auth", authRoutes);
 
@@ -71,6 +93,24 @@ app.use("/api", credentialRoutes);
 // Health check (no auth, no rate limit, suppressed from logs above)
 // ---------------------------------------------------------------------------
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     operationId: healthCheck
+ *     tags: [System]
+ *     summary: Service liveness check
+ *     description: Returns service health status. Used by deployment probes and uptime monitors.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: "ok"
+ *               timestamp: "2026-05-16T08:30:00.000Z"
+ */
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
