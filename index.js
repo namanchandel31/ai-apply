@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const pinoHttp = require("pino-http");
@@ -8,9 +9,11 @@ const tracingMiddleware = require("./src/middlewares/tracing");
 const { recoverStaleProcessing } = require("./src/models/applicationModel");
 
 // Fail-fast checks for required environment variables
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET missing from environment variables");
-}
+["JWT_SECRET", "REDIS_URL", "INTERNAL_API_KEY"].forEach(key => {
+  if (!process.env[key]) {
+    throw new Error(`${key} missing from environment variables`);
+  }
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,7 +43,7 @@ app.use(express.json());
 // Rate limit middleware (tiered)
 // ---------------------------------------------------------------------------
 
-const { applyRateLimit, uploadRateLimit, readRateLimit } = require("./src/middlewares/rateLimitMiddleware");
+const { applyRateLimit, uploadRateLimit, readRateLimit, autoApplyRateLimit } = require("./src/middlewares/rateLimitMiddleware");
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -52,6 +55,8 @@ const jdRoutes         = require("./src/routes/jdRoutes");
 const applyRoutes      = require("./src/routes/applyRoutes");
 const credentialRoutes = require("./src/routes/credentialRoutes");
 const sendRoutes       = require("./src/routes/sendRoutes");
+const autoApplyRoutes  = require("./src/routes/autoApplyRoutes");
+const userRoutes       = require("./src/routes/userRoutes");
 
 // ---------------------------------------------------------------------------
 // Swagger UI — development only
@@ -89,6 +94,27 @@ app.use("/api",       applyRateLimit, sendRoutes);
 // Credential management — read tier (relatively cheap)
 app.use("/api", credentialRoutes);
 
+// Auto-Apply + User Defaults
+app.use("/api", autoApplyRateLimit, autoApplyRoutes);
+app.use("/api", readRateLimit, userRoutes);
+
+// Internal Queue Health
+app.get("/internal/queue-health", async (req, res) => {
+  const apiKey = req.headers["x-internal-api-key"];
+  if (apiKey !== process.env.INTERNAL_API_KEY) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+  
+  try {
+    const { getQueueHealth } = require("./src/services/queueHealthService");
+    const health = await getQueueHealth();
+    return res.json({ success: true, health });
+  } catch (err) {
+    logError("QUEUE_HEALTH_ERROR", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch queue health" });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Health check (no auth, no rate limit, suppressed from logs above)
 // ---------------------------------------------------------------------------
@@ -116,6 +142,18 @@ app.get("/health", (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Web UI (static SPA)
+// ---------------------------------------------------------------------------
+
+const { SPA_FALLBACK_PATTERN } = require("./src/utils/spaFallback");
+const publicDir = path.join(__dirname, "public");
+app.use(express.static(publicDir));
+
+app.get(SPA_FALLBACK_PATTERN, (_req, res) => {
+  res.sendFile(path.join(publicDir, "index.html"));
+});
+
+// ---------------------------------------------------------------------------
 // Global error handler — catch-all for unhandled errors thrown by middleware
 // ---------------------------------------------------------------------------
 
@@ -125,30 +163,16 @@ app.use((err, req, res, _next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Stale processing recovery scheduler
-//
-// Runs every 5 minutes. Finds jobs stuck in 'processing' > 10 min and resets
-// them to 'pending' (or 'abandoned' if retry_count >= MAX_RETRIES).
-//
-// Multi-instance safe: PostgreSQL row-level atomicity ensures each row is
-// updated by exactly one instance even under concurrent recovery runs.
-// The scheduler can be migrated to pg-cron / Railway Cron in the future
-// by moving recoverStaleProcessing() to a worker entrypoint — no code changes
-// to the function itself are required.
+// Worker & Recovery
 // ---------------------------------------------------------------------------
 
-const STALE_RECOVERY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Inline worker — dev ONLY, hard-guarded
+if (process.env.WORKER_MODE === "inline" && process.env.NODE_ENV !== "production") {
+  require("./src/workers/sendApplication.worker");
+  logInfo("inline_worker_started", { queue: "send-application" });
+}
 
-const runStaleRecovery = async () => {
-  try {
-    const recovered = await recoverStaleProcessing();
-    if (recovered.length > 0) {
-      logInfo("stale_recovery_complete", { count: recovered.length, recovered });
-    }
-  } catch (err) {
-    logError("stale_recovery_error", err, {});
-  }
-};
+const { recoveryLoop } = require("./src/jobs/recovery.job");
 
 // ---------------------------------------------------------------------------
 // Server startup
@@ -159,10 +183,10 @@ if (require.main === module) {
     logInfo("server_start", { port: PORT });
     await testConnection();
 
-    // Run stale recovery once at startup to clear any jobs orphaned by a crash,
-    // then schedule it on the recurring interval.
-    await runStaleRecovery();
-    setInterval(runStaleRecovery, STALE_RECOVERY_INTERVAL_MS);
+    // Start auto-apply recovery loop (fire-and-forget, P0 fix)
+    recoveryLoop().catch(err => {
+      logError("RECOVERY_BOOT_ERROR", err);
+    });
   });
 }
 

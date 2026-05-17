@@ -30,8 +30,9 @@ const sendApplicationController = async (req, res) => {
     // Full ownership check is enforced inside getApplicationById (user_id in WHERE).
     const { pool } = require("../db");
     const { rows: apps } = await pool.query(
-      `SELECT a.email_subject, a.email_body, a.email_status, a.file_path,
-              jd.contact_email as jd_contact_email
+      `SELECT a.email_subject, a.email_body, a.email_status,
+              r.file_path,
+              jd.contact_email AS jd_contact_email
        FROM applications a
        JOIN job_descriptions jd ON jd.id = a.job_description_id
        LEFT JOIN resumes r ON r.id = a.resume_id

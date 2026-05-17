@@ -24,6 +24,8 @@ const options = {
       { name: "Auth",         description: "Register and authenticate users"           },
       { name: "Upload",       description: "Resume and job description ingestion"       },
       { name: "Applications", description: "Apply and send application emails"          },
+      { name: "AutoApply",    description: "One-click automated job applications"       },
+      { name: "User",         description: "User profile and defaults"                  },
       { name: "Credentials",  description: "Manage SMTP email credentials"              },
       { name: "System",       description: "Health and infrastructure endpoints"        },
     ],

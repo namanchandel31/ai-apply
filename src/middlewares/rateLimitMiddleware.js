@@ -58,8 +58,53 @@ const createRateLimit = (userLimitKey) => {
   };
 };
 
+/**
+ * Factory: create a rate limit middleware that checks two tiers sequentially (e.g. hourly + daily).
+ */
+const createDualRateLimit = (tier1Key, tier2Key) => {
+  const tier1Cfg = RATE_LIMITS[tier1Key];
+  const tier2Cfg = RATE_LIMITS[tier2Key];
+  const ipCfg = RATE_LIMITS.IP_GLOBAL;
+
+  if (!tier1Cfg || !tier2Cfg) throw new Error(`Unknown rate limit tiers: ${tier1Key}, ${tier2Key}`);
+
+  return (req, res, next) => {
+    const userId = req.user?.id;
+    const ip = req.ip || req.connection?.remoteAddress || "unknown";
+
+    // Global IP check
+    const ipKey = `ip:${ip}`;
+    if (!rateLimiter.check(ipKey, ipCfg.limit, ipCfg.windowSeconds)) {
+      const resetTime = rateLimiter.getResetTime(ipKey);
+      res.setHeader("Retry-After", resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : ipCfg.windowSeconds);
+      return error(res, 429, `Rate limit exceeded per IP`, "RATE_LIMIT_EXCEEDED");
+    }
+
+    if (userId) {
+      // Tier 1 check
+      const t1Key = `user:${userId}:${tier1Key}`;
+      if (!rateLimiter.check(t1Key, tier1Cfg.limit, tier1Cfg.windowSeconds)) {
+        const resetTime = rateLimiter.getResetTime(t1Key);
+        res.setHeader("Retry-After", resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : tier1Cfg.windowSeconds);
+        return error(res, 429, `Hourly rate limit exceeded`, "RATE_LIMIT_EXCEEDED");
+      }
+
+      // Tier 2 check
+      const t2Key = `user:${userId}:${tier2Key}`;
+      if (!rateLimiter.check(t2Key, tier2Cfg.limit, tier2Cfg.windowSeconds)) {
+        const resetTime = rateLimiter.getResetTime(t2Key);
+        res.setHeader("Retry-After", resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : tier2Cfg.windowSeconds);
+        return error(res, 429, `Daily rate limit exceeded`, "RATE_LIMIT_EXCEEDED");
+      }
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   applyRateLimit:  createRateLimit("USER_APPLY_SEND"),
   uploadRateLimit: createRateLimit("USER_UPLOAD"),
   readRateLimit:   createRateLimit("USER_READ"),
+  autoApplyRateLimit: createDualRateLimit("USER_AUTO_APPLY_HOURLY", "USER_AUTO_APPLY_DAILY"),
 };

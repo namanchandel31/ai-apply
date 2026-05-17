@@ -18,12 +18,24 @@ const { pool } = require("../db");
  * @param {string} rawText
  * @returns {Promise<{id: string, title: string|null, created_at: string}>}
  */
-const createJobDescription = async (client, title, rawText, userId = null) => {
+const createJobDescription = async (client, title, rawText, userId = null, extracted = {}) => {
   const { rows } = await client.query(
-    `INSERT INTO job_descriptions (title, raw_text, user_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO job_descriptions (
+       title, raw_text, user_id,
+       company_name, contact_person, contact_email, location, job_type
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, title, created_at`,
-    [title || null, rawText, userId]
+    [
+      title || extracted.job_title || null,
+      rawText,
+      userId,
+      extracted.company_name || null,
+      extracted.contact_person || null,
+      extracted.contact_email || null,
+      extracted.location || null,
+      extracted.job_type || null,
+    ]
   );
   return rows[0];
 };
@@ -63,7 +75,7 @@ const createJDWithParsedData = async (title, rawText, parsedJson, userId = null)
   try {
     await client.query("BEGIN");
 
-    const jd = await createJobDescription(client, title, rawText, userId);
+    const jd = await createJobDescription(client, title, rawText, userId, parsedJson);
     const parsed = await saveParsedJD(client, jd.id, parsedJson);
 
     await client.query("COMMIT");
@@ -92,13 +104,13 @@ const getJDById = async (jobDescriptionId, userId = null, client = null) => {
        FROM job_descriptions jd
        JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
        WHERE jd.id = $1 AND jd.user_id = $2
-       ORDER BY pjd.created_at DESC
+       ORDER BY pjd.created_at DESC NULLS LAST
        LIMIT 1`
     : `SELECT jd.id AS job_description_id, pjd.id AS parsed_job_description_id, pjd.parsed_json
        FROM job_descriptions jd
        JOIN parsed_job_descriptions pjd ON pjd.job_description_id = jd.id
        WHERE jd.id = $1
-       ORDER BY pjd.created_at DESC
+       ORDER BY pjd.created_at DESC NULLS LAST
        LIMIT 1`;
   
   const params = userId ? [jobDescriptionId, userId] : [jobDescriptionId];

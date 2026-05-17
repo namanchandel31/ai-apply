@@ -9,6 +9,7 @@
  */
 
 const { pool } = require("../db");
+const { logError } = require("../utils/logger");
 
 // ---------------------------------------------------------------------------
 // Low-level insert functions (operate on a provided client for tx control)
@@ -59,32 +60,42 @@ const saveParsedResume = async (client, resumeId, rawText, parsedJson) => {
  */
 const findResumeByHash = async (fileHash, userId = null, client = null) => {
   const queryClient = client || pool;
-  const query = userId 
-    ? `SELECT a.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
-       FROM resumes a
-       LEFT JOIN parsed_resumes pr ON pr.resume_id = a.id
-       WHERE a.file_hash = $1 AND a.user_id = $2
-       ORDER BY pr.created_at DESC
+  const query = userId
+    ? `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes r
+       LEFT JOIN parsed_resumes pr ON pr.resume_id = r.id
+       WHERE r.file_hash = $1 AND r.user_id = $2
+       ORDER BY pr.created_at DESC NULLS LAST
        LIMIT 1`
-    : `SELECT a.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
-       FROM resumes a
-       LEFT JOIN parsed_resumes pr ON pr.resume_id = a.id
-       WHERE a.file_hash = $1
-       ORDER BY pr.created_at DESC
+    : `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+       FROM resumes r
+       LEFT JOIN parsed_resumes pr ON pr.resume_id = r.id
+       WHERE r.file_hash = $1
+       ORDER BY pr.created_at DESC NULLS LAST
        LIMIT 1`;
-  
+
   const params = userId ? [fileHash, userId] : [fileHash];
-  
-  const { rows } = await queryClient.query(query, params);
 
-  if (rows.length === 0) return null;
+  try {
+    const { rows } = await queryClient.query(query, params);
 
-  return {
-    resumeId: rows[0].resume_id,
-    parsedResumeId: rows[0].parsed_resume_id,
-    parsedJson: rows[0].parsed_json,
-    filePath: rows[0].file_path,
-  };
+    if (rows.length === 0) return null;
+
+    return {
+      resumeId: rows[0].resume_id,
+      parsedResumeId: rows[0].parsed_resume_id,
+      parsedJson: rows[0].parsed_json,
+      filePath: rows[0].file_path,
+    };
+  } catch (err) {
+    logError("find_resume_by_hash_failed", err, {
+      fileHash,
+      userId,
+      pgCode: err.code,
+      detail: err.detail,
+    });
+    throw err;
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -136,13 +147,13 @@ const getResumeById = async (resumeId, userId = null, client = null) => {
        FROM resumes r
        JOIN parsed_resumes pr ON pr.resume_id = r.id
        WHERE r.id = $1 AND r.user_id = $2
-       ORDER BY pr.created_at DESC
+       ORDER BY pr.created_at DESC NULLS LAST
        LIMIT 1`
     : `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
        FROM resumes r
        JOIN parsed_resumes pr ON pr.resume_id = r.id
        WHERE r.id = $1
-       ORDER BY pr.created_at DESC
+       ORDER BY pr.created_at DESC NULLS LAST
        LIMIT 1`;
 
   const params = userId ? [resumeId, userId] : [resumeId];
