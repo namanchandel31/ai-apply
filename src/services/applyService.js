@@ -98,7 +98,7 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
             jobTitle,
             matchResult.matchedSkills,
             matchResult.score,
-            { reqId, resumeId, jobDescriptionId }
+            { reqId, userId, resumeId, jobDescriptionId }
           );
 
           logInfo("email_generation_success", { reqId, resumeId, jobDescriptionId, attempt });

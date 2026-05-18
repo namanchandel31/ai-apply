@@ -207,7 +207,7 @@ describe('Resume Controller Production-Grade Unit Tests', () => {
         const MAX_INPUT_LENGTH = 10000;
 
         it('should preserve exactly accurate 60% front and ~40% tail boundaries properly adjusting for separators', () => {
-            const longText = 'F'.repeat(15000) + 'T'.repeat(5000);
+            const longText = 'F'.repeat(45000) + 'T'.repeat(5000);
             const result = cleanText(longText);
 
             const expectedKeepStart = 6000;

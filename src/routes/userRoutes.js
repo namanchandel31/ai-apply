@@ -1,6 +1,7 @@
 const express = require('express');
 const { getUserDefaultsController, setUserDefaultsController } = require('../controllers/userDefaultsController');
-const { authenticateToken } = require('../middlewares/auth');
+const { getSetupStatusController } = require('../controllers/userController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ const router = express.Router();
  *       200:
  *         description: User defaults fetched
  */
-router.get('/user/defaults', authenticateToken, getUserDefaultsController);
+router.get('/user/defaults', authMiddleware, getUserDefaultsController);
 
 /**
  * @openapi
@@ -41,6 +42,21 @@ router.get('/user/defaults', authenticateToken, getUserDefaultsController);
  *       200:
  *         description: User defaults updated
  */
-router.put('/user/defaults', authenticateToken, setUserDefaultsController);
+router.put('/user/defaults', authMiddleware, setUserDefaultsController);
+
+/**
+ * @openapi
+ * /api/user/setup-status:
+ *   get:
+ *     tags:
+ *       - User
+ *     summary: Get user setup status (hasResume, hasEmailSetup)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Setup status returned successfully
+ */
+router.get('/user/setup-status', authMiddleware, getSetupStatusController);
 
 module.exports = router;

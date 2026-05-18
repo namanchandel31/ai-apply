@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { processApplication } = require("../controllers/applyController");
+const { getApplicationsController } = require("../controllers/applicationController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
 
@@ -54,5 +55,20 @@ const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
  *         $ref: '#/components/responses/InternalServerError'
  */
 router.post("/", authMiddleware, applyRateLimit, processApplication);
+
+/**
+ * @openapi
+ * /api/apply:
+ *   get:
+ *     operationId: getApplications
+ *     tags: [Applications]
+ *     summary: Get all job applications for the logged-in user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of applications returned successfully
+ */
+router.get("/", authMiddleware, getApplicationsController);
 
 module.exports = router;

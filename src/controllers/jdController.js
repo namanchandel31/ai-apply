@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { processJDJob } = require("../services/jobHandler");
+const { enqueueJDParsing } = require("../services/jobHandler");
 const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
 const { error, ok, ERROR_CODES } = require("../utils/response");
@@ -23,20 +23,32 @@ const uploadJDController = async (req, res) => {
 
     // (Note: Optional JD dedup check can go here if a JD find-by-hash is added later)
 
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new RetryableError("request_timeout")), 20000)
-    );
+    // Wrap the handler with a 90s timeout guard
+    // TODO(async-migration): Current synchronous HTTP flow is acceptable temporarily,
+    // but long-term scalability should migrate to:
+    // Upload -> Queue -> Background Worker -> Polling/WebSocket status updates.
+    // Do NOT implement async orchestration yet; focus on stabilizing retries first.
+    const abortController = new AbortController();
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        abortController.abort("request_timeout");
+        reject(new RetryableError("request_timeout"));
+      }, 90000);
+    });
 
-    const jobPromise = processJDJob({
+    const jobPromise = enqueueJDParsing({
       reqId,
       jobId,
       title: title || null,
       text,
       fileHash,
-      userId: req.user.id
+      userId: req.user.id,
+      signal: abortController.signal
     });
 
     const result = await Promise.race([jobPromise, timeoutPromise]);
+    clearTimeout(timeoutId);
 
     const { _dbIds, ...parsedData } = result.data;
 

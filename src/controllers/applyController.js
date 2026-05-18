@@ -1,10 +1,9 @@
-const crypto = require("crypto");
 const { processApplyJob } = require("../services/applyService");
 const { logInfo, logError } = require("../utils/logger");
 const { error, ok, ERROR_CODES } = require("../utils/response");
 
 const processApplication = async (req, res) => {
-  const reqId = crypto.randomBytes(6).toString("hex");
+  const reqId = req.requestId || "UNKNOWN";
   const { resumeId, jobDescriptionId } = req.body;
 
   logInfo("request_start", { reqId, stage: "unknown", source: "apply" });

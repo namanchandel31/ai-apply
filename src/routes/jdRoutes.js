@@ -1,15 +1,8 @@
 const express = require('express');
 const { uploadJDController } = require('../controllers/jdController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const crypto = require('crypto');
 
 const router = express.Router();
-
-// Generate request ID for correlation, similar to uploadMiddleware
-const attachRequestId = (req, res, next) => {
-  req.requestId = crypto.randomBytes(6).toString('hex');
-  next();
-};
 
 /**
  * @openapi
@@ -65,6 +58,6 @@ const attachRequestId = (req, res, next) => {
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/upload-jd', authMiddleware, attachRequestId, uploadJDController);
+router.post('/upload-jd', authMiddleware, uploadJDController);
 
 module.exports = router;

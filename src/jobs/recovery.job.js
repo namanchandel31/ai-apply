@@ -8,14 +8,21 @@ const { markAbandoned } = require("../models/applicationModel");
  */
 async function recoverStuckQueued(client) {
   const { rows } = await client.query(
-    `SELECT id, user_id, recipient_email 
-     FROM applications
-     WHERE email_status = 'queued' 
-       AND processing_started_at IS NULL 
-       AND created_at < NOW() - interval '5 minutes'`
+    `SELECT a.id, a.user_id, jd.contact_email AS recipient_email 
+     FROM applications a
+     LEFT JOIN job_descriptions jd ON a.job_description_id = jd.id
+     WHERE a.email_status = 'queued' 
+       AND a.processing_started_at IS NULL 
+       AND a.created_at < NOW() - interval '5 minutes'`
   );
 
   for (const row of rows) {
+    if (!row.recipient_email) {
+      logInfo("APPLICATION_RECOVERY_SKIPPED_NO_CONTACT_EMAIL", { applicationId: row.id, reason: "Missing contact_email in job_descriptions" });
+      await markAbandoned(row.id, "missing_contact_email_recovery");
+      continue;
+    }
+
     try {
       await enqueueSendJob(row.id, row.user_id, row.recipient_email);
       logInfo("RECOVERY_QUEUED_REENQUEUED", { applicationId: row.id });

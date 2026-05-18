@@ -2,7 +2,7 @@ const { getResumeById } = require("../models/resumeModel");
 const { getUserDefaults } = require("../models/userModel");
 const { createJDWithParsedData } = require("../models/jdModel");
 const { createApplication, findRecentDuplicate } = require("../models/applicationModel");
-const { parseJobDescription } = require("./jdParserService");
+const { parseJobDescription } = require("./jdParseService");
 const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail } = require("./emailService");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
@@ -48,7 +48,7 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   // 4. Parse Job Description
   let parsedJd;
   try {
-    parsedJd = await parseJobDescription(jobDescriptionText);
+    parsedJd = await parseJobDescription(jobDescriptionText, userId, { reqId });
     logInfo("JD_PARSED", { reqId, userId });
   } catch (error) {
     error.stage = "jd_parse";
@@ -86,7 +86,7 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
       jobTitle,
       matchResult.matchedSkills,
       matchResult.score,
-      { reqId, resumeId, jobDescriptionId: "auto" }
+      { reqId, userId, resumeId, jobDescriptionId: "auto" }
     );
     logInfo("EMAIL_GENERATED", { reqId, userId });
   } catch (error) {

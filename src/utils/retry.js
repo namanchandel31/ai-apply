@@ -17,12 +17,17 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
  * @param {object}   options
  * @param {number}   options.maxAttempts  - Max number of attempts (default: 3)
  * @param {number}   options.baseDelayMs  - Base delay in ms, multiplied by attempt number (default: 500)
+ * @param {AbortSignal} options.signal    - Optional AbortSignal to cancel retries
  * @returns {Promise<any>}
  */
-const withRetry = async (fn, { maxAttempts = 2, baseDelayMs = 500 } = {}) => {
+const withRetry = async (fn, { maxAttempts = 2, baseDelayMs = 500, signal } = {}) => {
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (signal?.aborted) {
+      throw new NonRetryableError("Request cancelled before attempt " + attempt);
+    }
+
     try {
       return await fn(attempt);
     } catch (err) {
@@ -34,6 +39,10 @@ const withRetry = async (fn, { maxAttempts = 2, baseDelayMs = 500 } = {}) => {
       lastError = err;
 
       if (attempt === maxAttempts) break;
+
+      if (signal?.aborted) {
+        throw new NonRetryableError("Request cancelled during retry backoff");
+      }
 
       // Exponential backoff mapping simulating deep retries natively
       // Added random jitter (up to 30% of base delay) to prevent thundering herd / retry storms

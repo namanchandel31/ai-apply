@@ -114,6 +114,139 @@ export const api = {
       body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
     });
   },
+
+  getSetupStatus() {
+    return request<{
+      success: boolean;
+      data: {
+        hasResume: boolean;
+        hasEmailSetup: boolean;
+        hasAiSetup?: boolean;
+        activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
+        email?: string | null;
+        activeAiProvider?: {
+          id?: string;
+          provider: string;
+          selectedModel?: string | null;
+          label?: string | null;
+          providerType?: string;
+          allowPlatformFallback?: boolean;
+          healthStatus?: string;
+          inFallbackChain?: boolean;
+          priority?: number;
+        } | null;
+        aiCredentialChain?: AiCredentialSummary[];
+      };
+    }>("/api/user/setup-status", { method: "GET" });
+  },
+
+  getAiProviders() {
+    return request<{
+      success: boolean;
+      data: { providers: Array<{ id: string; providerType: string; capabilities: Record<string, boolean> }> };
+    }>("/api/ai/providers", { method: "GET" });
+  },
+
+  listAiCredentials() {
+    return request<{ success: boolean; data: AiCredentialSummary[] }>("/api/ai/credentials", {
+      method: "GET",
+    });
+  },
+
+  reorderAiCredentialChain(orderedIds: string[]) {
+    return request<{ success: boolean; data: { credentials: AiCredentialSummary[] } }>(
+      "/api/ai/credentials/chain",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      }
+    );
+  },
+
+  patchAiCredential(
+    id: string,
+    body: { inFallbackChain?: boolean; label?: string; selectedModel?: string }
+  ) {
+    return request(`/api/ai/credentials/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  healthCheckAiCredential(id: string) {
+    return request<{ success: boolean; data: { ok: boolean; error?: string } }>(
+      `/api/ai/credentials/${id}/health-check`,
+      { method: "POST" }
+    );
+  },
+
+  saveAiCredential(body: {
+    provider: string;
+    apiKey?: string;
+    selectedModel?: string;
+    baseUrl?: string;
+    label?: string;
+    allowPlatformFallback?: boolean;
+    providerType?: string;
+    role?: "primary" | "backup";
+  }) {
+    return request<{ success: boolean; data: unknown }>("/api/ai/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  testAiCredential(body: {
+    provider: string;
+    apiKey?: string;
+    selectedModel?: string;
+    baseUrl?: string;
+    providerType?: string;
+  }) {
+    return request<{ success: boolean; data: { ok: boolean; error?: string } }>("/api/ai/credentials/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  activateAiCredential(id: string) {
+    return request(`/api/ai/credentials/${id}/activate`, { method: "POST" });
+  },
+
+  deleteAiCredential(id: string) {
+    return request(`/api/ai/credentials/${id}`, { method: "DELETE" });
+  },
+
+  getApplications() {
+    return request<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        status: string;
+        createdAt: string;
+        sentAt?: string | null;
+        role?: string | null;
+        company?: string | null;
+      }>;
+    }>("/api/apply/", { method: "GET" });
+  },
+};
+
+export type AiCredentialSummary = {
+  id: string;
+  provider: string;
+  selectedModel?: string | null;
+  label?: string | null;
+  providerType?: string;
+  allowPlatformFallback?: boolean;
+  priority: number;
+  healthStatus?: string;
+  inFallbackChain?: boolean;
+  hasApiKey?: boolean;
 };
 
 export type ParsedResume = {

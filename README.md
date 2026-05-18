@@ -35,7 +35,13 @@ cp .env.example .env
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Random secret for JWT signing |
-| `OPENAI_API_KEY` | OpenAI API key |
+| `OPENAI_API_KEY` | Platform fallback OpenAI key (when user has no BYOK) |
+| `DEFAULT_AI_PROVIDER` | Default provider id (default `openai`) |
+| `DEFAULT_AI_MODEL` | Default model when not set on credential |
+| `AI_PLATFORM_FALLBACK_PROVIDERS` | Comma-separated platform fallback chain |
+| `HEALTH_CHECK_TIMEOUT_MS` | Cheap health probe timeout (default 5000) |
+
+See [docs/AI_GATEWAY.md](docs/AI_GATEWAY.md) for BYOK architecture.
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-side storage) |
 | `ENCRYPTION_KEY` | 32-byte hex key for credential encryption |

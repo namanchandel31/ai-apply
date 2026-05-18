@@ -1,0 +1,220 @@
+const { ok, error, ERROR_CODES } = require("../utils/response");
+const { logInfo, logError } = require("../utils/logger");
+const { listAllProviders } = require("../providers");
+const aiCredentialService = require("../services/aiCredentialService");
+const { healthCheck } = require("../services/aiGateway");
+const { validateModelForProvider } = require("../services/modelValidation");
+const { getProvider } = require("../providers");
+
+const listProvidersController = async (_req, res) => {
+  return ok(res, { providers: listAllProviders() });
+};
+
+const listCredentialsController = async (req, res) => {
+  try {
+    const rows = await aiCredentialService.listCredentials(req.user.id);
+    return ok(res, rows);
+  } catch (err) {
+    logError("AI_CREDENTIALS_LIST_ERROR", err, { userId: req.user.id, reqId: req.requestId });
+    return error(res, 500, "Failed to list AI credentials", ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const saveCredentialController = async (req, res) => {
+  const reqId = req.requestId || "UNKNOWN";
+  try {
+    const {
+      provider,
+      apiKey,
+      selectedModel,
+      baseUrl,
+      label,
+      allowPlatformFallback,
+      providerType,
+      role,
+    } = req.body;
+
+    if (!provider) {
+      return error(res, 400, "provider is required", ERROR_CODES.BAD_REQUEST);
+    }
+
+    const adapter = getProvider(provider);
+    const pType = providerType || adapter.providerType;
+
+    const validation = validateModelForProvider({
+      provider,
+      model: selectedModel,
+      providerType: pType,
+      task: pType === "local" ? null : "resume_parse",
+    });
+    if (!validation.valid) {
+      return error(res, 400, validation.message, validation.code || ERROR_CODES.BAD_REQUEST);
+    }
+
+    const health = await healthCheck({
+      userId: req.user.id,
+      provider,
+      model: selectedModel,
+      apiKey: pType === "remote" ? apiKey : undefined,
+      baseUrl,
+      providerType: pType,
+    });
+
+    if (!health.ok) {
+      return error(res, 400, health.error || "Connection test failed", "CONNECTION_TEST_FAILED");
+    }
+
+    const saved = await aiCredentialService.saveCredential(req.user.id, {
+      provider,
+      apiKey,
+      selectedModel: selectedModel || validation.model,
+      baseUrl,
+      label,
+      allowPlatformFallback,
+      providerType: pType,
+      role: role || "primary",
+    });
+
+    logInfo("AI_CREDENTIAL_SAVED", { reqId, userId: req.user.id, provider, role: role || "primary" });
+    return ok(res, saved);
+  } catch (err) {
+    logError("AI_CREDENTIAL_SAVE_ERROR", err, { userId: req.user.id, reqId });
+    const code = err.code || ERROR_CODES.INTERNAL_ERROR;
+    const status = code === "API_KEY_REQUIRED" || code === "INVALID_MODEL_FOR_PROVIDER" ? 400 : 500;
+    return error(res, status, err.message, code);
+  }
+};
+
+const testCredentialController = async (req, res) => {
+  try {
+    const { provider, apiKey, selectedModel, baseUrl, providerType } = req.body;
+    if (!provider) {
+      return error(res, 400, "provider is required", ERROR_CODES.BAD_REQUEST);
+    }
+
+    const adapter = getProvider(provider);
+    const pType = providerType || adapter.providerType;
+
+    const validation = validateModelForProvider({
+      provider,
+      model: selectedModel,
+      providerType: pType,
+      task: pType === "local" ? null : "resume_parse",
+    });
+    if (!validation.valid) {
+      return error(res, 400, validation.message, validation.code || ERROR_CODES.BAD_REQUEST);
+    }
+
+    const health = await healthCheck({
+      userId: req.user.id,
+      provider,
+      model: selectedModel,
+      apiKey: pType === "remote" ? apiKey : undefined,
+      baseUrl,
+      providerType: pType,
+    });
+
+    return ok(res, health);
+  } catch (err) {
+    return error(res, 500, err.message, ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const reorderChainController = async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds) || !orderedIds.length) {
+      return error(res, 400, "orderedIds array is required", ERROR_CODES.BAD_REQUEST);
+    }
+    const rows = await aiCredentialService.reorderCredentialChain(req.user.id, orderedIds);
+    return ok(res, { credentials: rows.map(({ encryptedApiKey, ...r }) => r) });
+  } catch (err) {
+    const status = err.code === "INVALID_CHAIN_ORDER" ? 400 : 500;
+    return error(res, status, err.message, err.code || ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const patchCredentialController = async (req, res) => {
+  try {
+    const { inFallbackChain, label, selectedModel } = req.body;
+    const { id } = req.params;
+
+    if (inFallbackChain !== undefined) {
+      const row = await aiCredentialService.setInFallbackChain(
+        req.user.id,
+        id,
+        inFallbackChain
+      );
+      if (!row) {
+        return error(res, 404, "Credential not found", ERROR_CODES.NOT_FOUND);
+      }
+    }
+
+    return ok(res, { updated: true });
+  } catch (err) {
+    return error(res, 500, "Failed to update credential", ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const healthCheckCredentialController = async (req, res) => {
+  try {
+    const aiCredentialModel = require("../models/aiCredentialModel");
+    const row = await aiCredentialModel.getById(req.params.id, req.user.id);
+    if (!row) {
+      return error(res, 404, "Credential not found", ERROR_CODES.NOT_FOUND);
+    }
+
+    const { rowToCredential } = require("../services/aiCredentialService");
+    const creds = rowToCredential(row);
+
+    const health = await healthCheck({
+      userId: req.user.id,
+      provider: creds.provider,
+      credentialId: row.id,
+      model: creds.model,
+      apiKey: creds.apiKey,
+      baseUrl: creds.baseUrl,
+      providerType: creds.providerType,
+    });
+
+    return ok(res, health);
+  } catch (err) {
+    return error(res, 500, err.message, ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const activateCredentialController = async (req, res) => {
+  try {
+    const row = await aiCredentialService.activateCredential(req.user.id, req.params.id);
+    if (!row) {
+      return error(res, 404, "Credential not found", ERROR_CODES.NOT_FOUND);
+    }
+    return ok(res, { activated: true, credential: row });
+  } catch (err) {
+    return error(res, 500, "Failed to activate credential", ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+const deleteCredentialController = async (req, res) => {
+  try {
+    const deleted = await aiCredentialService.removeCredential(req.user.id, req.params.id);
+    if (!deleted) {
+      return error(res, 404, "Credential not found", ERROR_CODES.NOT_FOUND);
+    }
+    return ok(res, { deleted: true });
+  } catch (err) {
+    return error(res, 500, "Failed to delete credential", ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
+module.exports = {
+  listProvidersController,
+  listCredentialsController,
+  saveCredentialController,
+  testCredentialController,
+  reorderChainController,
+  patchCredentialController,
+  healthCheckCredentialController,
+  activateCredentialController,
+  deleteCredentialController,
+};

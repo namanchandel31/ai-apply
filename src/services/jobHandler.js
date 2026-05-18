@@ -1,5 +1,6 @@
-const OpenAI = require("openai");
 const pdfParse = require("pdf-parse");
+const fs = require("fs");
+const path = require("path");
 
 const { withRetry } = require("../utils/retry");
 const { getCache, setCache, deleteCache } = require("../utils/cache");
@@ -9,6 +10,7 @@ const { normalizeSkills, nullifyEmpty } = require("../utils/normalise");
 const { isValidEmail, isValidPhone } = require("../utils/validators");
 const { sanitizeTextForLlm, sanitizeTextForStorage, sanitizeErrorMessage } = require("../utils/textSanitize");
 const { callOpenAIJson } = require("./llmClient");
+const { SYSTEM_PROMPT: JD_SYSTEM_PROMPT } = require("../prompts/jdParsePrompt");
 const {
   LLM_MAX_ATTEMPTS,
   LLM_RETRY_BASE_DELAY_MS,
@@ -77,49 +79,36 @@ SCHEMA:
 "certifications": string[]
 }`;
 
-const JD_SYSTEM_PROMPT = `You are a precise job description parser. Extract information ONLY from what is explicitly stated in the text.
-
-Return a single valid JSON object with exactly these fields:
-{
-  "job_title": string or null,
-  "company_name": string or null,
-  "contact_person": string or null,
-  "location": string or null,
-  "contact_email": string or null,
-  "contact_number": string or null,
-  "job_type": "Remote" | "Hybrid" | "Onsite" | "Unknown" | null,
-  "skills": []
-}
-
-Rules (follow strictly):
-- Return ONLY the JSON object. No markdown, no explanation, no extra text.
-- Do NOT infer or guess any value. If not explicitly stated → null.
-- job_type: use "Remote", "Hybrid", or "Onsite" only if explicitly mentioned. Use "Unknown" if work-mode is referenced but unclear. Use null if not mentioned at all.
-- skills: extract only explicitly listed skills/technologies. Return as an array of strings. Empty array if none found.
-- contact_email: must be a valid-looking email or null.
-- contact_number: must be an actual phone number or null.`;
-
 // ---------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------
 
 const extractText = async (buffer) => {
   try {
+    const startTime = Date.now();
     let text = "";
-    if (typeof pdfParse === "function") {
-      const data = await pdfParse(buffer);
-      text = data.text || "";
-    } else if (pdfParse && typeof pdfParse.default === "function") {
-      const data = await pdfParse.default(buffer);
-      text = data.text || "";
-    } else {
-      text = buffer.toString("utf-8");
-    }
+
+    const data = await pdfParse(buffer);
+    text = data.text || "";
+
+    logInfo("PDF_TEXT_EXTRACTED", {
+      extractedTextChars: text.length,
+      first200CharsPreview: text.substring(0, 500).replace(/\n/g, " ").trim()
+    });
+
+    const extractDurationMs = Date.now() - startTime;
+
+    const sanitizeStart = Date.now();
     const sanitized = sanitizeTextForStorage(text);
-    logInfo("pdf_extract_complete", { rawChars: text.length, sanitizedChars: sanitized.length });
-    return sanitized;
+    const sanitizationDurationMs = Date.now() - sanitizeStart;
+
+    return { raw: text, sanitized, extractDurationMs, sanitizationDurationMs };
   } catch (error) {
-    throw new NonRetryableError("PDF Text Extraction Failed");
+    logError("PDF_EXTRACTION_ERROR", error, {
+      message: error.message
+    });
+    // Preserve original error message and stack trace for debugging
+    throw new NonRetryableError(`PDF Text Extraction Failed: ${error.message}`);
   }
 };
 
@@ -151,7 +140,9 @@ const llmRetryOptions = {
 const inflightJobs = new Map();
 
 /**
- * Process a Resume (decoupled from HTTP — may run in background job registry).
+ * Process a Resume.
+ * Note: This executes the parsing job synchronously within the current process.
+ * In a future scaling phase, this will become the background worker logic.
  */
 const processResumeJob = async ({
   reqId,
@@ -162,6 +153,7 @@ const processResumeJob = async ({
   fileHash,
   userId = null,
   filePath = null,
+  signal,
 }) => {
   if (inflightJobs.has(fileHash)) {
     logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "resume" });
@@ -172,10 +164,69 @@ const processResumeJob = async ({
     let sanitizedRaw = null;
 
     try {
-      sanitizedRaw = await extractText(buffer);
+      logInfo("PDF_EXTRACTION_STARTED", { reqId, jobId, fileHash });
+      const extractResult = await extractText(buffer);
+      const rawText = extractResult.raw;
+      sanitizedRaw = extractResult.sanitized;
+
+      logInfo("PDF_EXTRACTION_COMPLETED", { reqId, jobId, fileHash, elapsedMs: extractResult.extractDurationMs });
+      logInfo("PDF_RAW_TEXT_LENGTH", { reqId, jobId, rawChars: rawText.length });
+      logInfo("PDF_SANITIZED_TEXT_LENGTH", { reqId, jobId, sanitizedChars: sanitizedRaw.length });
+
       if (!sanitizedRaw) throw new NonRetryableError("Extraction Failed");
 
       const cleanedText = sanitizeTextForLlm(sanitizedRaw, MAX_LLM_INPUT_CHARS);
+
+      const isTimingsEnabled = process.env.DEBUG_LLM_TIMINGS === "true";
+      const isExtractionOnlyEnabled = process.env.DEBUG_RESUME_EXTRACTION_ONLY === "true";
+
+      if (isTimingsEnabled || isExtractionOnlyEnabled) {
+        try {
+          const debugDir = path.join(process.cwd(), "debug", "resume-extraction");
+          fs.mkdirSync(debugDir, { recursive: true });
+
+          const rawPath = path.join(debugDir, `${reqId}_raw.txt`);
+          fs.writeFileSync(rawPath, rawText, "utf-8");
+          const rawSize = fs.statSync(rawPath).size;
+          logInfo("PDF_RAW_FILE_WRITTEN", { absolutePath: rawPath, reqId, size: rawSize });
+
+          const sanitizedPath = path.join(debugDir, `${reqId}_sanitized.txt`);
+          fs.writeFileSync(sanitizedPath, cleanedText, "utf-8");
+          const sanitizedSize = fs.statSync(sanitizedPath).size;
+          logInfo("PDF_SANITIZED_FILE_WRITTEN", { absolutePath: sanitizedPath, reqId, size: sanitizedSize });
+
+          const metrics = {
+            rawCharCount: rawText.length,
+            sanitizedCharCount: cleanedText.length,
+            pageCount: rawText.split('\f').length,
+            extractionDurationMs: extractResult.extractDurationMs,
+            sanitizationDurationMs: extractResult.sanitizationDurationMs,
+          };
+
+          const metricsPath = path.join(debugDir, `${reqId}_metrics.json`);
+          fs.writeFileSync(metricsPath, JSON.stringify(metrics, null, 2));
+          const metricsSize = fs.statSync(metricsPath).size;
+          logInfo("PDF_METRICS_FILE_WRITTEN", { absolutePath: metricsPath, reqId, size: metricsSize });
+
+          logInfo("PDF_DEBUG_FILES_WRITTEN", { reqId, jobId, fileHash, debugDir });
+
+        } catch (debugErr) {
+          logError("PDF_DEBUG_METRICS_ERROR", debugErr, { reqId, jobId });
+        }
+      }
+
+      // SHORT CIRCUIT PIPELINE
+      if (isExtractionOnlyEnabled) {
+        return {
+          jobId,
+          status: "completed",
+          data: {
+            success: true,
+            debugMode: true,
+            message: "Resume extraction debug files generated."
+          }
+        };
+      }
 
       logInfo("resume_text_prepared", {
         reqId,
@@ -227,7 +278,12 @@ const processResumeJob = async ({
             };
           } else {
             if (process.env.FORCE_LLM_ERROR === "true") {
-              throw new RetryableError("Simulated LLM error");
+              if (process.env.NODE_ENV === "development") {
+                logInfo("LLM_FORCE_ERROR_TEST_MODE_ENABLED", { reqId, jobId, message: "Simulating LLM error for testing" });
+                throw new RetryableError("Simulated LLM error");
+              } else {
+                logError("LLM_FORCE_ERROR_PRODUCTION_WARNING", new Error("FORCE_LLM_ERROR is set in production"), { reqId, jobId });
+              }
             }
 
             const userPrompt = `Please parse the following resume text and return a single JSON object strictly adhering to the provided schema. Resume Text:\n\n---\n\n${cleanedText}`;
@@ -238,6 +294,8 @@ const processResumeJob = async ({
               jobId,
               source: "resume",
               attempt,
+              signal,
+              userId,
             });
 
             const result = ResumeSchema.safeParse(parsed);
@@ -286,7 +344,7 @@ const processResumeJob = async ({
           }
           throw innerErr;
         }
-      }, llmRetryOptions);
+      }, { ...llmRetryOptions, signal });
 
       return {
         jobId,
@@ -311,9 +369,11 @@ const processResumeJob = async ({
 };
 
 /**
- * Process a Job Description
+ * Process a Job Description.
+ * Note: This executes the parsing job synchronously within the current process.
+ * In a future scaling phase, this will become the background worker logic.
  */
-const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null }) => {
+const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null, signal }) => {
   if (inflightJobs.has(fileHash)) {
     logInfo("concurrency_dedup_hit", { reqId, jobId, stage: "job_started", fileHash, source: "jd" });
     return inflightJobs.get(fileHash);
@@ -355,6 +415,8 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
               jobId,
               source: "jd",
               attempt,
+              signal,
+              userId,
             });
 
             const result = JDSchema.safeParse(parsed);
@@ -401,7 +463,7 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
           }
           throw innerErr;
         }
-      }, llmRetryOptions);
+      }, { ...llmRetryOptions, signal });
 
       return {
         jobId,
@@ -421,8 +483,29 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
   return jobPromise;
 };
 
+/**
+ * Orchestration Abstractions
+ * 
+ * TODO: In the future, these methods should place the job payload onto dedicated queues:
+ * - Resume Parsing Queue
+ * - JD Parsing Queue
+ * - Email Generation Queue
+ * 
+ * Currently, they execute synchronously to maintain the existing architecture,
+ * but abstract the orchestration boundary from the HTTP controllers.
+ */
+const enqueueResumeParsing = (params) => {
+  return processResumeJob(params);
+};
+
+const enqueueJDParsing = (params) => {
+  return processJDJob(params);
+};
+
 module.exports = {
   processResumeJob,
   processJDJob,
+  enqueueResumeParsing,
+  enqueueJDParsing,
   extractText,
 };

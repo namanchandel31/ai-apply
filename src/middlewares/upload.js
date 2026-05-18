@@ -1,5 +1,4 @@
 const multer = require('multer');
-const crypto = require('crypto');
 
 // --- Constants ---
 const PDF_MAGIC_PREFIX = '%PDF-';
@@ -88,12 +87,6 @@ const isPdfValid = (buffer, req) => {
 };
 
 /**
- * Generates a short random request ID for log correlation.
- * @returns {string}
- */
-const generateRequestId = () => crypto.randomBytes(6).toString('hex');
-
-/**
  * Validates that the incoming request has multipart/form-data content type.
  * @param {import('express').Request} req
  * @returns {boolean}
@@ -104,9 +97,6 @@ const isMultipartRequest = (req) => {
 };
 
 const uploadMiddleware = (req, res, next) => {
-  // Attach a request ID for log correlation
-  req.requestId = generateRequestId();
-  
   // 0. Initialize validation tracking checkpoints
   req.validationFlags = {
     headerChecked: false,

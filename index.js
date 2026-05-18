@@ -57,6 +57,7 @@ const credentialRoutes = require("./src/routes/credentialRoutes");
 const sendRoutes       = require("./src/routes/sendRoutes");
 const autoApplyRoutes  = require("./src/routes/autoApplyRoutes");
 const userRoutes       = require("./src/routes/userRoutes");
+const aiRoutes         = require("./src/routes/aiRoutes");
 
 // ---------------------------------------------------------------------------
 // Swagger UI — development only
@@ -97,6 +98,7 @@ app.use("/api", credentialRoutes);
 // Auto-Apply + User Defaults
 app.use("/api", autoApplyRateLimit, autoApplyRoutes);
 app.use("/api", readRateLimit, userRoutes);
+app.use("/api", readRateLimit, aiRoutes);
 
 // Internal Queue Health
 app.get("/internal/queue-health", async (req, res) => {
@@ -112,6 +114,36 @@ app.get("/internal/queue-health", async (req, res) => {
   } catch (err) {
     logError("QUEUE_HEALTH_ERROR", err);
     return res.status(500).json({ success: false, message: "Failed to fetch queue health" });
+  }
+});
+
+// Lightweight cache for provider health (2s TTL)
+// Note: Eventual consistency is acceptable for this operational endpoint.
+// The cache prevents aggressive polling from consuming CPU resources.
+let cachedProviderHealth = null;
+let lastProviderHealthFetch = 0;
+
+// Internal Provider Health (LLM Circuit Breaker & Metrics)
+app.get("/internal/provider-health", (req, res) => {
+  const apiKey = req.headers["x-internal-api-key"];
+  if (apiKey !== process.env.INTERNAL_API_KEY) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  const now = Date.now();
+  if (cachedProviderHealth && (now - lastProviderHealthFetch < 2000)) {
+    return res.json({ success: true, version: 1, cached: true, health: cachedProviderHealth });
+  }
+
+  try {
+    const llmProtection = require("./src/services/llmProtection");
+    cachedProviderHealth = llmProtection.getMetrics();
+    lastProviderHealthFetch = now;
+    
+    return res.json({ success: true, version: 1, cached: false, health: cachedProviderHealth });
+  } catch (err) {
+    logError("PROVIDER_HEALTH_ERROR", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch provider health" });
   }
 });
 
@@ -181,6 +213,20 @@ const { recoveryLoop } = require("./src/jobs/recovery.job");
 if (require.main === module) {
   app.listen(PORT, async () => {
     logInfo("server_start", { port: PORT });
+    
+    logInfo("LLM_PROTECTION_INITIALIZED", { 
+      retryBudget: process.env.LLM_GLOBAL_RETRY_BUDGET || 100,
+      circuitThreshold: process.env.LLM_CIRCUIT_BREAKER_THRESHOLD || 10,
+      cooldownDurationMs: process.env.LLM_CIRCUIT_BREAKER_COOLDOWN_MS || 30000,
+      mode: "process-local"
+    });
+
+    logInfo("TIMEOUT_CONFIG_INITIALIZED", {
+      controllerTimeoutMs: 90000,
+      llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "20000", 10),
+      maxRetryAttempts: 3
+    });
+
     await testConnection();
 
     // Start auto-apply recovery loop (fire-and-forget, P0 fix)
