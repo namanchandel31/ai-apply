@@ -1,6 +1,4 @@
--- Enum extensions (no ordering modifiers)
-ALTER TYPE app_email_status ADD VALUE IF NOT EXISTS 'queued';
-ALTER TYPE app_email_status ADD VALUE IF NOT EXISTS 'needs_review';
+-- Enum values added in 006b_app_email_status_enum.sql (separate commit required by PostgreSQL).
 
 -- User defaults (no default_credential_id — one cred per user via PK)
 ALTER TABLE users

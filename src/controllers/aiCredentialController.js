@@ -54,7 +54,7 @@ const saveCredentialController = async (req, res) => {
     const health = await healthCheck({
       userId: req.user.id,
       provider,
-      model: selectedModel,
+      model: validation.model,
       apiKey: pType === "remote" ? apiKey : undefined,
       baseUrl,
       providerType: pType,
@@ -67,7 +67,7 @@ const saveCredentialController = async (req, res) => {
     const saved = await aiCredentialService.saveCredential(req.user.id, {
       provider,
       apiKey,
-      selectedModel: selectedModel || validation.model,
+      selectedModel: validation.model,
       baseUrl,
       label,
       allowPlatformFallback,
@@ -75,12 +75,27 @@ const saveCredentialController = async (req, res) => {
       role: role || "primary",
     });
 
-    logInfo("AI_CREDENTIAL_SAVED", { reqId, userId: req.user.id, provider, role: role || "primary" });
-    return ok(res, saved);
+    logInfo("AI_CREDENTIAL_SAVED", {
+      reqId,
+      userId: req.user.id,
+      provider,
+      role: role || "primary",
+      model: validation.model,
+    });
+    return ok(res, {
+      ...saved,
+      ...(validation.normalizedFrom ? { normalizedFrom: validation.normalizedFrom } : {}),
+    });
   } catch (err) {
     logError("AI_CREDENTIAL_SAVE_ERROR", err, { userId: req.user.id, reqId });
     const code = err.code || ERROR_CODES.INTERNAL_ERROR;
-    const status = code === "API_KEY_REQUIRED" || code === "INVALID_MODEL_FOR_PROVIDER" ? 400 : 500;
+    const status =
+      code === "API_KEY_REQUIRED" ||
+      code === "MODEL_REQUIRED" ||
+      code === "INVALID_MODEL_FORMAT" ||
+      code === "INVALID_PROVIDER"
+        ? 400
+        : 500;
     return error(res, status, err.message, code);
   }
 };
@@ -108,13 +123,17 @@ const testCredentialController = async (req, res) => {
     const health = await healthCheck({
       userId: req.user.id,
       provider,
-      model: selectedModel,
+      model: validation.model,
       apiKey: pType === "remote" ? apiKey : undefined,
       baseUrl,
       providerType: pType,
     });
 
-    return ok(res, health);
+    return ok(res, {
+      ...health,
+      model: validation.model,
+      ...(validation.normalizedFrom ? { normalizedFrom: validation.normalizedFrom } : {}),
+    });
   } catch (err) {
     return error(res, 500, err.message, ERROR_CODES.INTERNAL_ERROR);
   }

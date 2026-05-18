@@ -1,5 +1,5 @@
 const { REGISTRY } = require("../providers");
-const { DEFAULT_MODELS, MODEL_PREFIXES } = require("../providers/providerUtils");
+const { normalizeModelInput } = require("../utils/normalizeModelInput");
 
 const TASK_CAPABILITIES = {
   resume_parse: ["supportsStructuredJson"],
@@ -7,13 +7,6 @@ const TASK_CAPABILITIES = {
   email_generate: ["supportsStructuredJson"],
   health_check: [],
 };
-
-function modelMatchesProvider(provider, model) {
-  if (!model || typeof model !== "string") return false;
-  const prefixes = MODEL_PREFIXES[provider];
-  if (!prefixes) return model.length >= 2;
-  return prefixes.some((p) => model.startsWith(p) || model.includes(p));
-}
 
 function validateModelForProvider({ provider, model, providerType, task }) {
   if (!provider || !REGISTRY[provider]) {
@@ -27,20 +20,16 @@ function validateModelForProvider({ provider, model, providerType, task }) {
   }
 
   if (providerType === "local" && !task) {
-    return { valid: true, model: model || null };
+    const localNorm = normalizeModelInput(model, { required: false });
+    if (!localNorm.ok) {
+      return { valid: false, code: localNorm.code, message: localNorm.message };
+    }
+    return { valid: true, model: localNorm.model };
   }
 
-  const resolvedModel = model || DEFAULT_MODELS[provider];
-  if (!resolvedModel) {
-    return { valid: false, code: "MODEL_REQUIRED", message: "Model is required for this provider" };
-  }
-
-  if (!modelMatchesProvider(provider, resolvedModel)) {
-    return {
-      valid: false,
-      code: "INVALID_MODEL_FOR_PROVIDER",
-      message: `Model "${resolvedModel}" is not valid for provider "${provider}"`,
-    };
+  const normalized = normalizeModelInput(model, { required: true });
+  if (!normalized.ok) {
+    return { valid: false, code: normalized.code, message: normalized.message };
   }
 
   if (task && TASK_CAPABILITIES[task]) {
@@ -55,11 +44,14 @@ function validateModelForProvider({ provider, model, providerType, task }) {
     }
   }
 
-  return { valid: true, model: resolvedModel };
+  return {
+    valid: true,
+    model: normalized.model,
+    ...(normalized.normalizedFrom ? { normalizedFrom: normalized.normalizedFrom } : {}),
+  };
 }
 
 module.exports = {
   validateModelForProvider,
-  modelMatchesProvider,
   TASK_CAPABILITIES,
 };

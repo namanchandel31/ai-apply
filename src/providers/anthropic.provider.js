@@ -1,4 +1,6 @@
 const { REMOTE_PARSE_CAPABILITIES } = require("./capabilities");
+const { normalizeModelInput } = require("../utils/normalizeModelInput");
+const { logInfo, logError } = require("../utils/logger");
 const {
   parseJsonFromText,
   normalizeUsage,
@@ -90,9 +92,16 @@ module.exports = {
     };
   },
 
-  async healthCheck({ credentials }) {
+  async healthCheck({ credentials, model }) {
     const apiKey = credentials?.apiKey;
     if (!apiKey) return { ok: false, error: "Missing API key" };
+    const normalized = normalizeModelInput(model ?? credentials?.model, { required: true });
+    if (!normalized.ok) {
+      return { ok: false, error: normalized.message, code: normalized.code, estimatedCost: 0 };
+    }
+    const probeModel = normalized.model;
+    logInfo("AI_MODEL_HEALTH_CHECK", { provider: "anthropic", model: probeModel, method: "minimal_message" });
+
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -107,15 +116,39 @@ module.exports = {
           "anthropic-version": ANTHROPIC_VERSION,
         },
         body: JSON.stringify({
-          model: credentials?.model || DEFAULT_MODELS.anthropic,
+          model: probeModel,
           max_tokens: 1,
           messages: [{ role: "user", content: "hi" }],
         }),
         signal: controller.signal,
       });
-      return { ok: res.ok || res.status === 400, method: "minimal_message", estimatedCost: 0 };
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return { ok: true, method: "minimal_message", model: probeModel, estimatedCost: 0 };
+      }
+      const message = data.error?.message || res.statusText;
+      logError("AI_MODEL_PROVIDER_ERROR", new Error(message), {
+        provider: "anthropic",
+        model: probeModel,
+        statusCode: res.status,
+        providerCode: data.error?.type,
+      });
+      const isModelError =
+        res.status === 404 ||
+        message.toLowerCase().includes("model") ||
+        data.error?.type === "not_found_error";
+      if (isModelError) {
+        logInfo("AI_MODEL_INVALID", { provider: "anthropic", model: probeModel });
+      }
+      return {
+        ok: false,
+        error: message,
+        code: isModelError ? "AI_MODEL_INVALID" : "PROVIDER_ERROR",
+        model: probeModel,
+        estimatedCost: 0,
+      };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return { ok: false, error: err.message, model: probeModel, estimatedCost: 0 };
     } finally {
       clearTimeout(timeout);
     }

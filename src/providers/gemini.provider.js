@@ -1,4 +1,6 @@
 const { REMOTE_PARSE_CAPABILITIES } = require("./capabilities");
+const { normalizeModelInput } = require("../utils/normalizeModelInput");
+const { logInfo, logError } = require("../utils/logger");
 const {
   parseJsonFromText,
   normalizeUsage,
@@ -91,21 +93,49 @@ module.exports = {
     return { ...result, parsed: null, text: JSON.stringify(result.parsed) };
   },
 
-  async healthCheck({ credentials }) {
+  async healthCheck({ credentials, model }) {
     const apiKey = credentials?.apiKey;
     if (!apiKey) return { ok: false, error: "Missing API key" };
-    const model = credentials?.model || DEFAULT_MODELS.gemini;
+    const normalized = normalizeModelInput(model ?? credentials?.model, { required: true });
+    if (!normalized.ok) {
+      return { ok: false, error: normalized.message, code: normalized.code, estimatedCost: 0 };
+    }
+    const probeModel = normalized.model;
+    logInfo("AI_MODEL_HEALTH_CHECK", { provider: "gemini", model: probeModel, method: "minimal_generate" });
+
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
       parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || "5000", 10)
     );
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-      const res = await fetch(url, { signal: controller.signal });
-      return { ok: res.ok, method: "models_list", estimatedCost: 0 };
+      await geminiGenerate({
+        apiKey,
+        model: probeModel,
+        userPrompt: "hi",
+        jsonMode: false,
+        signal: controller.signal,
+      });
+      return { ok: true, method: "minimal_generate", model: probeModel, estimatedCost: 0 };
     } catch (err) {
-      return { ok: false, error: err.message };
+      logError("AI_MODEL_PROVIDER_ERROR", err, {
+        provider: "gemini",
+        model: probeModel,
+        statusCode: err.status,
+      });
+      const isModelError =
+        err.status === 404 ||
+        err.message?.toLowerCase().includes("model");
+      if (isModelError) {
+        logInfo("AI_MODEL_INVALID", { provider: "gemini", model: probeModel });
+      }
+      return {
+        ok: false,
+        error: err.message,
+        code: isModelError ? "AI_MODEL_INVALID" : "PROVIDER_ERROR",
+        model: probeModel,
+        estimatedCost: 0,
+      };
     } finally {
       clearTimeout(timeout);
     }

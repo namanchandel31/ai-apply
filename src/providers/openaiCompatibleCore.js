@@ -1,4 +1,6 @@
 const { extractOpenAIResponse } = require("../utils/openaiHelper");
+const { normalizeModelInput } = require("../utils/normalizeModelInput");
+const { logInfo, logError } = require("../utils/logger");
 const {
   buildOpenAICompatibleClient,
   normalizeUsage,
@@ -115,6 +117,13 @@ function createOpenAICompatibleProvider({ id, providerType = "remote", defaultBa
     async healthCheck({ credentials, model }) {
       const apiKey = credentials?.apiKey;
       const baseUrl = credentials?.baseUrl || defaultBaseUrl;
+      const normalized = normalizeModelInput(model ?? credentials?.model, { required: true });
+      if (!normalized.ok) {
+        return { ok: false, error: normalized.message, code: normalized.code, estimatedCost: 0 };
+      }
+      const probeModel = normalized.model;
+      logInfo("AI_MODEL_HEALTH_CHECK", { provider: id, model: probeModel, method: "minimal_completion" });
+
       const client = buildOpenAICompatibleClient({ apiKey, baseUrl });
       const controller = new AbortController();
       const timeout = setTimeout(
@@ -122,21 +131,37 @@ function createOpenAICompatibleProvider({ id, providerType = "remote", defaultBa
         parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || "5000", 10)
       );
       try {
-        if (typeof client.models?.list === "function") {
-          await client.models.list({ signal: controller.signal });
-          return { ok: true, method: "models_list", estimatedCost: 0 };
-        }
         await client.responses.create(
           {
-            model: model || credentials?.model,
+            model: probeModel,
             max_output_tokens: 1,
             input: [{ role: "user", content: "ping" }],
           },
           { signal: controller.signal }
         );
-        return { ok: true, method: "minimal_completion", estimatedCost: 0 };
+        return { ok: true, method: "minimal_completion", model: probeModel, estimatedCost: 0 };
       } catch (err) {
-        return { ok: false, error: err.message, estimatedCost: 0 };
+        const classified = classifyProviderError(err);
+        logError("AI_MODEL_PROVIDER_ERROR", classified, {
+          provider: id,
+          model: probeModel,
+          statusCode: err.status,
+          providerCode: err.code || err.error?.code,
+        });
+        const isModelError =
+          err.status === 404 ||
+          err.message?.toLowerCase().includes("model") ||
+          err.error?.code === "model_not_found";
+        if (isModelError) {
+          logInfo("AI_MODEL_INVALID", { provider: id, model: probeModel });
+        }
+        return {
+          ok: false,
+          error: classified.message || err.message,
+          code: isModelError ? "AI_MODEL_INVALID" : classified.name,
+          model: probeModel,
+          estimatedCost: 0,
+        };
       } finally {
         clearTimeout(timeout);
       }

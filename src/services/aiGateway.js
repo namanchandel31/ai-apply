@@ -8,6 +8,7 @@ const { getProvider } = require("../providers");
 const { estimateCost } = require("../config/providerPricing");
 const { computePromptHash } = require("../providers/providerUtils");
 const { validateModelForProvider } = require("./modelValidation");
+const { normalizeModelInput } = require("../utils/normalizeModelInput");
 const {
   resolveCredentialsForUser,
   resolveCredentialChainForUser,
@@ -235,12 +236,13 @@ async function executeWithFallback({
   for (let i = 0; i < attempts.length; i++) {
     const attemptCreds = attempts[i];
 
+    const chainModel = attemptCreds.model;
     logInfo("AI_CHAIN_ATTEMPT", {
       reqId,
       jobId,
       credentialId: attemptCreds.credentialId,
       provider: attemptCreds.provider,
-      model: attemptCreds.model,
+      model: chainModel,
       fallbackIndex: i,
       credentialSource: attemptCreds.credentialSource,
       healthStatus: attemptCreds.healthStatus,
@@ -248,6 +250,14 @@ async function executeWithFallback({
 
     try {
       const resolvedModel = validateExecutionRequest(attemptCreds, task, model);
+      logInfo("AI_MODEL_EXECUTION", {
+        reqId,
+        jobId,
+        task,
+        provider: attemptCreds.provider,
+        model: resolvedModel,
+        credentialId: attemptCreds.credentialId,
+      });
       const result = await executeOnProvider({
         credentials: { ...attemptCreds, model: resolvedModel },
         task,
@@ -280,11 +290,21 @@ async function executeWithFallback({
       const hasMoreUser = i < attempts.length - 1;
       const canRetry = classified.retryable && hasMoreUser && llmProtection.consumeRetryBudget();
 
+      logInfo("AI_MODEL_PROVIDER_ERROR", {
+        reqId,
+        provider: attemptCreds.provider,
+        model: attemptCreds.model,
+        logCode: classified.logCode,
+        retryable: classified.retryable,
+      });
+
       if (hasMoreUser && canRetry) {
         logInfo("AI_CHAIN_FALLBACK", {
           reqId,
           fromCredentialId: attemptCreds.credentialId,
           toCredentialId: attempts[i + 1]?.credentialId,
+          fromModel: attemptCreds.model,
+          toModel: attempts[i + 1]?.model,
           reason: classified.logCode,
           retryable: classified.retryable,
         });
@@ -415,12 +435,21 @@ async function healthCheck({ userId, provider, credentialId, model, apiKey, base
   }
 
   let credentials;
+  let probeModel = model;
+  if (probeModel != null) {
+    const normalized = normalizeModelInput(probeModel, { required: providerType !== "local" });
+    if (!normalized.ok) {
+      return { ok: false, error: normalized.message, code: normalized.code, estimatedCost: 0 };
+    }
+    probeModel = normalized.model;
+  }
+
   if (apiKey !== undefined || baseUrl) {
     credentials = {
       provider,
       providerType: providerType || "remote",
       apiKey: apiKey || null,
-      model,
+      model: probeModel,
       baseUrl,
     };
   } else if (userId && credentialId) {
@@ -436,7 +465,23 @@ async function healthCheck({ userId, provider, credentialId, model, apiKey, base
   }
 
   const adapter = getProvider(credentials.provider);
-  const result = await adapter.healthCheck({ credentials, model: model || credentials.model });
+  let resolvedProbe = probeModel;
+  if (!resolvedProbe && credentials.model) {
+    const credNorm = normalizeModelInput(credentials.model, {
+      required: credentials.providerType !== "local",
+    });
+    if (!credNorm.ok) {
+      return { ok: false, error: credNorm.message, code: credNorm.code, estimatedCost: 0 };
+    }
+    resolvedProbe = credNorm.model;
+  }
+  if (credentials.providerType !== "local" && !resolvedProbe) {
+    return { ok: false, error: "Model is required", code: "MODEL_REQUIRED", estimatedCost: 0 };
+  }
+  const result = await adapter.healthCheck({
+    credentials: { ...credentials, model: resolvedProbe },
+    model: resolvedProbe,
+  });
 
   if (userId && credentialId && result.ok) {
     await updateCredentialHealth(credentialId, userId, "healthy", {

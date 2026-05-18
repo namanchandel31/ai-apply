@@ -44,10 +44,17 @@ Providers evolve independently:
 
 1. Implement `generateStructuredJson`, `generateText`, `healthCheck`, `estimateCost` (delegate pricing to `config/providerPricing.js`)
 2. Set explicit `capabilities` flags in `capabilities.js` — do not default all to `true`
-3. Use cheap health probes (models list preferred; no full completions for setup tests)
+3. Use cheap health probes with the **exact** user model (minimal completion/generate); provider APIs validate model IDs
 4. Map errors to `RetryableError` / `NonRetryableError` via `providerUtils.classifyProviderError`
 5. Register in `index.js`
-6. Add model prefix rules to `providerUtils.MODEL_PREFIXES` and pricing to `providerPricing.js`
+6. Add pricing to `providerPricing.js` (use lowercase model keys)
+
+## Model identifier policy
+
+- Model IDs are **infrastructure identifiers**, normalized by `src/utils/normalizeModelInput.js`
+- Allowed charset (printable ASCII): `a-z`, `0-9`, `/`, `-`, `_`, `.`, `:`
+- Stored and logged in **lowercase** everywhere; provider APIs are the source of truth for validity
+- Do **not** add `MODEL_PREFIXES` or hardcoded model whitelists in adapters
 
 ## Remote vs local
 

@@ -92,6 +92,19 @@ Adapters normalize:
 
 See [src/providers/README.md](../src/providers/README.md) for adapter versioning policy.
 
+## Model identifier normalization
+
+All BYOK model strings pass through `src/utils/normalizeModelInput.js` before save, health check, and gateway execution.
+
+| Rule | Detail |
+|------|--------|
+| Charset | Printable ASCII only: `a-z`, `0-9`, `/`, `-`, `_`, `.`, `:` |
+| Casing | Plain `toLowerCase()` after charset validation (canonical form) |
+| Validity | Provider APIs (`healthCheck`, `generate*`) — no local prefix lists or whitelists |
+| `DEFAULT_MODELS` | UI suggested-model hints only — never silent substitution on save/test/gateway |
+
+Legacy mixed-case rows are re-normalized at gateway/health boundaries (idempotent).
+
 ## Provider adapter versioning (P1+)
 
 Upstream APIs change independently. Future patterns:
@@ -171,7 +184,16 @@ Classification: `src/services/aiRetryPolicy.js`. Health updates must not auto-cl
 
 ### Observability events
 
-`AI_CHAIN_RESOLVED`, `AI_CHAIN_ATTEMPT`, `AI_CHAIN_SKIP`, `AI_CHAIN_FALLBACK`, `AI_CHAIN_HEALTH_TRANSITION`, `AI_CHAIN_EXHAUSTED` — include `credentialId`, `fallbackIndex`, `skipReason`.
+`AI_CHAIN_RESOLVED`, `AI_CHAIN_ATTEMPT`, `AI_CHAIN_SKIP`, `AI_CHAIN_FALLBACK`, `AI_CHAIN_HEALTH_TRANSITION`, `AI_CHAIN_EXHAUSTED` — include `credentialId`, `fallbackIndex`, `skipReason`, canonical lowercase `model`.
+
+Model-specific events (always use canonical lowercase `model`):
+
+| Event | When |
+|-------|------|
+| `AI_MODEL_HEALTH_CHECK` | Adapter health probe started |
+| `AI_MODEL_EXECUTION` | Gateway attempt before provider call |
+| `AI_MODEL_PROVIDER_ERROR` | Classified provider failure |
+| `AI_MODEL_INVALID` | Provider rejected model id (404 / model-not-found) |
 
 ## P2 roadmap
 

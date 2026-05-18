@@ -25,12 +25,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
 const REMOTE_PROVIDERS = [
-  { id: "openai", label: "OpenAI" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "gemini", label: "Gemini" },
-  { id: "grok", label: "Grok" },
-  { id: "nvidia", label: "NVIDIA NIM" },
+  { id: "openai", label: "OpenAI", defaultModel: "gpt-4.1-mini" },
+  { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini" },
+  { id: "anthropic", label: "Anthropic", defaultModel: "claude-3-5-haiku-20241022" },
+  { id: "gemini", label: "Gemini", defaultModel: "gemini-2.0-flash" },
+  { id: "grok", label: "Grok", defaultModel: "grok-2-latest" },
+  { id: "nvidia", label: "NVIDIA NIM", defaultModel: "meta/llama-3.1-8b-instruct" },
 ];
 
 function healthBadge(status?: string) {
@@ -428,10 +428,25 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
             <Label htmlFor="ai-model">Model</Label>
             <Input
               id="ai-model"
-              placeholder="e.g. gpt-4.1-mini"
+              placeholder="e.g. gpt-4.1-mini or openai/gpt-4o-mini"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Model IDs are stored in lowercase for consistency (e.g. OpenAI/GPT-4O → openai/gpt-4o).
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => {
+                const hint = REMOTE_PROVIDERS.find((p) => p.id === provider)?.defaultModel;
+                if (hint) setSelectedModel(hint);
+              }}
+            >
+              Use suggested model
+            </Button>
           </div>
 
           <div className="space-y-2">

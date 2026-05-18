@@ -69,15 +69,6 @@ const DEFAULT_MODELS = {
   nvidia: "meta/llama-3.1-8b-instruct",
 };
 
-const MODEL_PREFIXES = {
-  openai: ["gpt-", "o1", "o3", "o4"],
-  openrouter: ["openai/", "anthropic/", "google/", "meta/", "mistralai/"],
-  anthropic: ["claude-"],
-  gemini: ["gemini-"],
-  grok: ["grok-"],
-  nvidia: ["meta/", "nvidia/", "mistralai/"],
-};
-
 module.exports = {
   parseJsonFromText,
   buildOpenAICompatibleClient,
@@ -85,5 +76,4 @@ module.exports = {
   computePromptHash,
   classifyProviderError,
   DEFAULT_MODELS,
-  MODEL_PREFIXES,
 };
