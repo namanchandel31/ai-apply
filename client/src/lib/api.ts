@@ -124,17 +124,7 @@ export const api = {
         hasAiSetup?: boolean;
         activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
         email?: string | null;
-        activeAiProvider?: {
-          id?: string;
-          provider: string;
-          selectedModel?: string | null;
-          label?: string | null;
-          providerType?: string;
-          allowPlatformFallback?: boolean;
-          healthStatus?: string;
-          inFallbackChain?: boolean;
-          priority?: number;
-        } | null;
+        activeAiProvider?: AiCredentialSummary | null;
         aiCredentialChain?: AiCredentialSummary[];
       };
     }>("/api/user/setup-status", { method: "GET" });
