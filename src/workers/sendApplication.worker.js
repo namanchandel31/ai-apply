@@ -109,15 +109,10 @@ const processor = async (job) => {
     const arrayBuffer = await data.arrayBuffer();
     fileBuffer = Buffer.from(arrayBuffer);
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: { user: credentials.email, pass: credentials.password },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
-    });
+    const { createTransportOptions } = require("../config/mail.config");
+    const transporter = nodemailer.createTransport(
+      createTransportOptions({ user: credentials.email, pass: credentials.password })
+    );
 
     const smtpResult = await transporter.sendMail({
       from: credentials.email,
@@ -193,7 +188,7 @@ const processor = async (job) => {
 
 const worker = new Worker(QUEUE_NAME, processor, {
   connection,
-  concurrency: parseInt(process.env.WORKER_CONCURRENCY || "3", 10),
+  concurrency: require("../config").queue.WORKER_CONCURRENCY.send,
 });
 
 attachWorkerLifecycle(worker, {

@@ -1,4 +1,5 @@
 const { Queue } = require("bullmq");
+const config = require("../config");
 const { connection } = require("./connection");
 const { SEND_APPLICATION_QUEUE } = require("./queueConstants");
 
@@ -7,7 +8,7 @@ const QUEUE_NAME = SEND_APPLICATION_QUEUE;
 const sendApplicationQueue = new Queue(QUEUE_NAME, {
   connection,
   defaultJobOptions: {
-    attempts: parseInt(process.env.MAX_PROCESSING_ATTEMPTS || "5"),
+    attempts: config.queue.SEND_JOB_MAX_ATTEMPTS,
     backoff: {
       type: "exponential",
       delay: 5000,

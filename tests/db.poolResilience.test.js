@@ -9,18 +9,20 @@ jest.mock("../src/utils/logger", () => ({
   logError: jest.fn(),
 }));
 
+const config = require("../src/config");
 const { logger } = require("../src/utils/logger");
 const { buildPoolConfig, attachPoolErrorHandler } = require("../src/db");
 const { isTransientPgError } = require("../src/utils/pgErrors");
 
 describe("buildPoolConfig", () => {
-  it("returns production-safe defaults", () => {
-    const config = buildPoolConfig();
-    expect(config.max).toBe(10);
-    expect(config.idleTimeoutMillis).toBe(30000);
-    expect(config.connectionTimeoutMillis).toBe(10000);
-    expect(config.keepAlive).toBe(true);
-    expect(config.ssl).toEqual({ rejectUnauthorized: false });
+  it("returns pool sizing defaults wired from database config", () => {
+    const poolConfig = buildPoolConfig();
+    expect(poolConfig.max).toBe(10);
+    expect(poolConfig.idleTimeoutMillis).toBe(30000);
+    expect(poolConfig.connectionTimeoutMillis).toBe(10000);
+    expect(poolConfig.keepAlive).toBe(true);
+    expect(poolConfig.connectionString).toBe(config.database.databaseUrl);
+    expect(poolConfig.ssl).toBe(config.database.ssl);
   });
 });
 
@@ -38,9 +40,10 @@ describe("attachPoolErrorHandler", () => {
       expect.objectContaining({
         event: "PG_POOL_ERROR",
         err,
-        pgCode: "ECONNRESET",
+        error_type: "Error",
+        error_message: "Connection terminated unexpectedly",
       }),
-      "Unexpected PostgreSQL pool error"
+      "Unexpected error on idle PostgreSQL client"
     );
   });
 });

@@ -4,7 +4,8 @@ const { logInfo } = require("../utils/logger");
 const { metrics } = require("../observability/orchestrationMetrics");
 const { broadcastToUser } = require("./sseConnectionRegistry");
 
-const HEARTBEAT_MS = parseInt(process.env.SSE_HEARTBEAT_MS || "25000", 10);
+const config = require("../config");
+const HEARTBEAT_MS = config.realtime.SSE_HEARTBEAT_MS;
 
 let gatewayStarted = false;
 let busHandler = null;

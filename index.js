@@ -1,4 +1,5 @@
 require("dotenv").config();
+const config = require("./src/config");
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
@@ -19,15 +20,9 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 const tracingMiddleware = require("./src/middlewares/tracing");
-// Fail-fast checks for required environment variables
-["JWT_SECRET", "REDIS_URL", "INTERNAL_API_KEY"].forEach(key => {
-  if (!process.env[key]) {
-    throw new Error(`${key} missing from environment variables`);
-  }
-});
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = config.server.port;
 
 // ---------------------------------------------------------------------------
 // Global middleware — order matters
@@ -79,7 +74,7 @@ const aiRoutes         = require("./src/routes/aiRoutes");
 // OpenAPI spec: http://localhost:5000/openapi.json
 // ---------------------------------------------------------------------------
 
-if (process.env.NODE_ENV !== "production") {
+if (!config.server.isProduction) {
   const { swaggerUi, swaggerSpec } = require("./src/docs/swagger");
 
   // Swagger UI playground — searchable, JWT persists across page refreshes
@@ -120,10 +115,10 @@ app.use("/api", readRateLimit, aiRoutes);
 // Internal Queue Health
 app.get("/internal/queue-health", async (req, res) => {
   const apiKey = req.headers["x-internal-api-key"];
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
+  if (apiKey !== config.auth.internalApiKey) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
-  
+
   try {
     const { getQueueHealth } = require("./src/services/queueHealthService");
     const health = await getQueueHealth();
@@ -143,7 +138,7 @@ let lastProviderHealthFetch = 0;
 // Internal Provider Health (LLM Circuit Breaker & Metrics)
 app.get("/internal/provider-health", (req, res) => {
   const apiKey = req.headers["x-internal-api-key"];
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
+  if (apiKey !== config.auth.internalApiKey) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
@@ -234,20 +229,13 @@ app.use((err, req, res, next) => {
 // Worker & Recovery
 // ---------------------------------------------------------------------------
 
-// Default inline workers in local dev when WORKER_MODE is unset (avoids silent "queued forever")
-if (!process.env.WORKER_MODE && process.env.NODE_ENV !== "production") {
-  process.env.WORKER_MODE = "inline";
-}
+const workersInlineEnabled = config.queue.shouldRunInlineWorkers();
 
-const workersInlineEnabled =
-  process.env.WORKER_MODE === "inline" && process.env.NODE_ENV !== "production";
-
-// Inline workers — dev ONLY, hard-guarded (both process + send must run or jobs stay queued)
 if (workersInlineEnabled) {
   require("./src/workers/processApplication.worker");
   require("./src/workers/sendApplication.worker");
   logInfo("inline_workers_started", {
-    workerMode: process.env.WORKER_MODE,
+    workerMode: config.queue.workerDeploymentMode(),
     queues: ["process-application", "send-application"],
   });
 }
@@ -265,22 +253,22 @@ if (require.main === module) {
   app.listen(PORT, async () => {
     logInfo("server_start", {
       port: PORT,
-      workerMode: process.env.WORKER_MODE || "separate",
+      workerMode: config.queue.workerDeploymentMode(),
       workersInlineEnabled,
       workersRequired: ["process-application", "send-application"],
     });
-    
-    logInfo("LLM_PROTECTION_INITIALIZED", { 
-      retryBudget: process.env.LLM_GLOBAL_RETRY_BUDGET || 100,
-      circuitThreshold: process.env.LLM_CIRCUIT_BREAKER_THRESHOLD || 10,
-      cooldownDurationMs: process.env.LLM_CIRCUIT_BREAKER_COOLDOWN_MS || 30000,
-      mode: "process-local"
+
+    logInfo("LLM_PROTECTION_INITIALIZED", {
+      retryBudget: config.ai.LLM_GLOBAL_RETRY_BUDGET,
+      circuitThreshold: config.ai.LLM_CIRCUIT_BREAKER_THRESHOLD,
+      cooldownDurationMs: config.ai.LLM_CIRCUIT_BREAKER_COOLDOWN_MS,
+      mode: "process-local",
     });
 
     logInfo("TIMEOUT_CONFIG_INITIALIZED", {
       controllerTimeoutMs: 90000,
-      llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "20000", 10),
-      maxRetryAttempts: 3
+      llmTimeoutMs: config.ai.LLM_TIMEOUT_MS,
+      maxRetryAttempts: config.ai.LLM_MAX_ATTEMPTS,
     });
 
     await testConnection();
@@ -290,7 +278,7 @@ if (require.main === module) {
       await validateQueueSystem({ role: "api" });
     } catch (queueErr) {
       logError("QUEUE_SYSTEM_VALIDATION_FAILED", queueErr);
-      if (process.env.STRICT_QUEUE_VALIDATION === "1") {
+      if (config.queue.queueValidationStrict()) {
         process.exit(1);
       }
     }

@@ -19,7 +19,7 @@
  */
 function fail(res, status, { message, code, retryable = false }) {
   let errorMessage = message;
-  if (status === 500 && process.env.NODE_ENV === "production") {
+  if (status === 500 && require("../config").server.isProduction) {
     errorMessage = "Internal server error";
   }
   return res.status(status).json({
@@ -33,7 +33,7 @@ function fail(res, status, { message, code, retryable = false }) {
 function error(res, status, message, code) {
   // Hide internal error details in production
   let errorMessage = message;
-  if (status === 500 && process.env.NODE_ENV === 'production') {
+  if (status === 500 && require("../config").server.isProduction) {
     errorMessage = "Internal server error";
   }
 

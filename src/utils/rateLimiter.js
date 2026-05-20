@@ -153,13 +153,13 @@ const RATE_LIMITS = {
   USER_APPLY_SEND: { limit: 10,  windowSeconds: 60 },
   USER_UPLOAD:     { limit: 20,  windowSeconds: 60 },
   USER_READ:       { limit: 120, windowSeconds: 60 },
-  USER_AUTO_APPLY_HOURLY: { 
-    limit: parseInt(process.env.AUTO_APPLY_HOURLY_LIMIT || "10", 10), 
-    windowSeconds: 3600 
+  USER_AUTO_APPLY_HOURLY: {
+    limit: require("../config").product.autoApplyHourlyLimit,
+    windowSeconds: 3600,
   },
-  USER_AUTO_APPLY_DAILY: { 
-    limit: parseInt(process.env.AUTO_APPLY_DAILY_LIMIT || "50", 10), 
-    windowSeconds: 86400 
+  USER_AUTO_APPLY_DAILY: {
+    limit: require("../config").product.autoApplyDailyLimit,
+    windowSeconds: 86400,
   },
   IP_GLOBAL:       { limit: 200, windowSeconds: 60 },
 };

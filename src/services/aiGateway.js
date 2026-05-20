@@ -3,6 +3,7 @@
  * Business logic must NEVER import provider SDKs; only this module invokes providers.
  */
 
+const config = require("../config");
 const { pool } = require("../db");
 const { getProvider } = require("../providers");
 const { estimateCost } = require("../config/providerPricing");
@@ -127,11 +128,9 @@ async function buildUserCredentialAttempts(userId, executionContext, task) {
 }
 
 function buildPlatformFallbackChain() {
-  const raw = process.env.AI_PLATFORM_FALLBACK_PROVIDERS || "";
-  const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const list = config.ai.AI_PLATFORM_FALLBACK_PROVIDERS.filter(Boolean);
   if (list.length) return list;
-  const primary = process.env.DEFAULT_AI_PROVIDER || "openai";
-  return [primary];
+  return [config.ai.DEFAULT_AI_PROVIDER];
 }
 
 function getPlatformCredentialForProvider(provider) {
@@ -620,7 +619,7 @@ async function runGatewayRequest(params, structured = true) {
 
     recordTelemetry({
       userId,
-      provider: model ? undefined : process.env.DEFAULT_AI_PROVIDER,
+      provider: model ? undefined : config.ai.DEFAULT_AI_PROVIDER,
       model,
       endpoint: endpoint || task,
       credentialSource: "unknown",

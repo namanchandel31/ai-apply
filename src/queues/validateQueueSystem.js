@@ -1,3 +1,4 @@
+const config = require("../config");
 const { connection } = require("./connection");
 const { processApplicationQueue } = require("./processApplicationQueue");
 const { sendApplicationQueue } = require("./sendApplicationQueue");
@@ -38,12 +39,9 @@ async function getAllQueueCounts() {
   };
 }
 
-/**
- * Validate Redis + queue registry. Logs QUEUE_SYSTEM_READY or throws when strict.
- */
 async function validateQueueSystem({ role = "api" } = {}) {
-  const workerMode = process.env.WORKER_MODE || "separate";
-  const strict = process.env.STRICT_QUEUE_VALIDATION === "1";
+  const workerMode = config.queue.workerDeploymentMode();
+  const strict = config.queue.queueValidationStrict();
 
   const redisOk = await pingRedis();
   if (!redisOk) {
@@ -83,7 +81,7 @@ async function validateQueueSystem({ role = "api" } = {}) {
 
   logInfo("QUEUE_SYSTEM_READY", summary);
 
-  if (workerMode !== "inline" && role === "api") {
+  if (workerMode === "separate" && role === "api") {
     logInfo("WORKER_MODE_SEPARATE", {
       message:
         "BullMQ workers are not started by the API process. Run `npm run worker` in a separate terminal.",

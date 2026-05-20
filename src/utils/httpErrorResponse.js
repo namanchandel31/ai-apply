@@ -3,7 +3,7 @@
  */
 function sendError(res, { status = 500, code, message, retryable = false, meta = undefined }) {
   let safeMessage = message;
-  if (status >= 500 && process.env.NODE_ENV === "production") {
+  if (status >= 500 && require("../config").server.isProduction) {
     safeMessage = "Internal server error";
   }
 

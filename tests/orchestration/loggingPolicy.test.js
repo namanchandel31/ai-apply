@@ -18,13 +18,18 @@ describe("orchestration logging policy", () => {
     expect(gateway).toContain("orchestration.sse.event_sent");
   });
 
-  it("centralizes DEBUG_ORCHESTRATION_* in debugFlags.js", () => {
+  it("uses DEBUG scope allowlist in logging.config.js", () => {
     const src = fs.readFileSync(
+      path.join(root, "src/config/logging.config.js"),
+      "utf8"
+    );
+    expect(src).toContain("orchestration");
+    expect(src).toContain("isOrchestrationDebugEnabled");
+    const debugFlags = fs.readFileSync(
       path.join(root, "src/utils/debugFlags.js"),
       "utf8"
     );
-    expect(src).toContain("DEBUG_ORCHESTRATION_REALTIME");
-    expect(src).toContain("isDebugEnabled");
+    expect(debugFlags).not.toContain("DEBUG_ORCHESTRATION_REALTIME");
   });
 
   it("removes routine STATUS_POLL info logs from controller", () => {

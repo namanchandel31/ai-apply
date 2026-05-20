@@ -34,15 +34,10 @@ const saveEmailCredentialsController = async (req, res) => {
     logInfo("credential_save_start", { reqId, userId, email: normalizedEmail });
 
     // Verify SMTP credentials before saving
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: normalizedEmail,
-        pass: normalizedPassword
-      }
-    });
+    const { createTransportOptions } = require('../config/mail.config');
+    const transporter = nodemailer.createTransport(
+      createTransportOptions({ user: normalizedEmail, pass: normalizedPassword })
+    );
 
     try {
       await transporter.verify();

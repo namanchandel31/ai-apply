@@ -8,7 +8,7 @@ async function getQueueHealth() {
   const counts = await getAllQueueCounts();
   return {
     queues: [PROCESS_APPLICATION_QUEUE, SEND_APPLICATION_QUEUE],
-    workerMode: process.env.WORKER_MODE || "separate",
+    workerMode: require("../config").queue.workerDeploymentMode(),
     counts,
   };
 }

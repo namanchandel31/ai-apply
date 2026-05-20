@@ -3,18 +3,11 @@ const { isDebugEnabled } = require("./debugFlags");
 const { orchestrationDedupe } = require("./logDedupe");
 const { metrics } = require("../observability/orchestrationMetrics");
 const { orchestrationLogContext } = require("./orchestrationLogContext");
+const config = require("../config");
 
-const REPEATED_THRESHOLD = Number(process.env.VERSION_REGRESSION_WARN_THRESHOLD) || 3;
+const REPEATED_THRESHOLD = config.realtime.VERSION_REGRESSION_WARN_THRESHOLD;
 const repeatTrack = new Map();
 
-/**
- * @typedef {'harmless_replay'|'repeated_stale'|'monotonic_violation'} RegressionType
- */
-
-/**
- * Classify client-side stale observation (no DB write).
- * @param {object} params
- */
 function classifyClientStale(params) {
   const { applicationId, staleBy, replayDetected = true } = params;
   const key = `${applicationId}:${staleBy}`;
@@ -35,9 +28,6 @@ function classifyClientStale(params) {
   });
 }
 
-/**
- * DB monotonic check after version/epoch bump.
- */
 function reportMonotonicViolation(params) {
   const {
     applicationId,
@@ -71,9 +61,6 @@ function reportMonotonicViolation(params) {
   );
 }
 
-/**
- * @param {object} params
- */
 function surfaceRegression(params) {
   const {
     regressionType,

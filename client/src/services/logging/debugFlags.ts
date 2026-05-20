@@ -1,3 +1,5 @@
+import loggingConfig from "@/config/logging.config";
+
 export type OrchestrationComponent =
   | "realtime"
   | "reconciliation"
@@ -6,22 +8,7 @@ export type OrchestrationComponent =
   | "leader"
   | "poll";
 
-const COMPONENT_ENV: Record<OrchestrationComponent, string> = {
-  realtime: "VITE_DEBUG_ORCHESTRATION_REALTIME",
-  reconciliation: "VITE_DEBUG_ORCHESTRATION_RECONCILIATION",
-  hydration: "VITE_DEBUG_ORCHESTRATION_HYDRATION",
-  transport: "VITE_DEBUG_ORCHESTRATION_TRANSPORT",
-  leader: "VITE_DEBUG_ORCHESTRATION_LEADER",
-  poll: "VITE_DEBUG_ORCHESTRATION_POLL",
-};
-
-function truthy(val: unknown): boolean {
-  if (val == null) return false;
-  const s = String(val).trim().toLowerCase();
-  return s === "1" || s === "true" || s === "yes";
-}
-
-export function isDebugEnabled(component: OrchestrationComponent): boolean {
-  const key = COMPONENT_ENV[component];
-  return truthy(import.meta.env[key as keyof ImportMetaEnv]);
+/** Frozen allowlist: orchestration | query | llm — parsed from VITE_DEBUG */
+export function isDebugEnabled(_component?: OrchestrationComponent): boolean {
+  return loggingConfig.isOrchestrationDebugEnabled(_component);
 }

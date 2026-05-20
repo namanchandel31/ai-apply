@@ -7,17 +7,19 @@ const { NonRetryableError } = require("../utils/errors");
 const { canAutoRecoverHealth, isTerminalHealth } = require("./aiRetryPolicy");
 const { logInfo } = require("../utils/logger");
 
+const config = require("../config");
+
 function resolvePlatformCredentials() {
-  const provider = process.env.DEFAULT_AI_PROVIDER || "openai";
-  const apiKey = process.env.OPENAI_API_KEY || process.env[`${provider.toUpperCase()}_API_KEY`];
+  const provider = config.ai.DEFAULT_AI_PROVIDER;
+  const apiKey = config.ai.openaiApiKey;
   if (!apiKey && provider === "openai") {
     return null;
   }
   return {
     provider,
     providerType: "remote",
-    apiKey: apiKey || process.env.OPENAI_API_KEY,
-    model: process.env.DEFAULT_AI_MODEL || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai,
+    apiKey,
+    model: config.ai.DEFAULT_AI_MODEL || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai,
     baseUrl: null,
     credentialSource: "platform",
     allowPlatformFallback: true,

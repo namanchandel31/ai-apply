@@ -1,10 +1,10 @@
 const IORedis = require("ioredis");
+const config = require("../config");
 const { EVENT_APPLICATION_UPDATED } = require("../contracts/applicationEvents");
 const { logInfo, logError } = require("../utils/logger");
 const { broadcastToUser } = require("./sseConnectionRegistry");
 const { formatSseEvent } = require("./sseFormat");
 const {
-  REDIS_CHANNEL,
   redisRealtimeEnabled,
   ensureRealtimePublisher,
   fanOutRealtimePayload,
@@ -17,15 +17,15 @@ function startRedisRealtimeBridge() {
   if (!redisRealtimeEnabled() || bridgeStarted) return;
   bridgeStarted = true;
 
-  subscriber = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+  subscriber = new IORedis(config.redis.redisUrl, { maxRetriesPerRequest: null });
   subscriber.on("error", (err) => logError("REALTIME_REDIS_SUBSCRIBER_ERROR", err));
 
-  subscriber.subscribe(REDIS_CHANNEL, (err) => {
+  subscriber.subscribe(config.redis.realtimeChannel, (err) => {
     if (err) {
       logError("REALTIME_REDIS_SUBSCRIBE_FAILED", err);
       return;
     }
-    logInfo("REALTIME_REDIS_BRIDGE_STARTED", { channel: REDIS_CHANNEL });
+    logInfo("REALTIME_REDIS_BRIDGE_STARTED", { channel: config.redis.realtimeChannel });
   });
 
   subscriber.on("message", (_channel, message) => {
@@ -52,5 +52,5 @@ module.exports = {
   startRedisRealtimeBridge,
   ensureRealtimePublisher,
   fanOutRealtimePayload,
-  CHANNEL: REDIS_CHANNEL,
+  CHANNEL: config.redis.realtimeChannel,
 };

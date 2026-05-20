@@ -2,7 +2,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const { auth } = require("../config");
+const JWT_SECRET = auth.jwtSecret;
 
 async function signup(email, password) {
   const hash = await bcrypt.hash(password, 10);

@@ -7,8 +7,8 @@ async function runMigration() {
     
     // Create a new pool with SSL disabled for local migration
     const migrationPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      connectionString: require("../config").database.databaseUrl,
+      ssl: require("../config").database.ssl,
     });
     
     console.log('Running Phase 3 migration...');

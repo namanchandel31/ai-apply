@@ -1,0 +1,31 @@
+const { validateStartup } = require("./env");
+
+validateStartup();
+
+const server = require("./server.config");
+const database = require("./database.config");
+const redis = require("./redis.config");
+const queue = require("./queue.config");
+const ai = require("./ai.config");
+const auth = require("./auth.config");
+const mail = require("./mail.config");
+const logging = require("./logging.config");
+const storage = require("./storage.config");
+const product = require("./product.config");
+const realtime = require("./realtime.config");
+
+const config = Object.freeze({
+  server,
+  database,
+  redis,
+  queue,
+  ai,
+  auth,
+  mail,
+  logging,
+  storage,
+  product,
+  realtime,
+});
+
+module.exports = config;

@@ -53,7 +53,7 @@ async function recoverStuckJobs(client) {
   }
 
   const processing = await findRecoverableStuckProcessingJobs(15, client);
-  const MAX = parseInt(process.env.MAX_PROCESSING_ATTEMPTS || "5", 10);
+  const MAX = require("../config").queue.SEND_JOB_MAX_ATTEMPTS;
 
   for (const row of processing) {
     const ctx = buildLogContext({

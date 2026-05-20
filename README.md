@@ -1,200 +1,69 @@
 # AI Apply
 
-Automated job application backend with a built-in web UI. Upload a resume and job description, get an AI-generated match score and outreach email, then send it via your Gmail account.
+Automated job application platform: parse resume and job description, generate a tailored outreach email, send via Gmail. Async-first architecture with BullMQ workers and realtime status updates.
 
-## Features
+## Documentation
 
-- **Auth** — JWT signup/login with per-user data isolation
-- **Resume parsing** — PDF upload, OpenAI extraction, Supabase storage
-- **JD parsing** — Structured fields (title, company, contact, skills)
-- **Matching** — Deterministic skill overlap score
-- **Email generation** — LLM-drafted subject and body
-- **Send** — Gmail SMTP with encrypted app-password storage and send state machine
-- **Web UI** — React + shadcn/ui + Tailwind CSS at `http://localhost:5000`
+**Full engineering docs:** [docs/README.md](docs/README.md)
+
+| Audience | Start here |
+|----------|------------|
+| New developer | [docs/README.md](docs/README.md) → role-based paths |
+| Backend | [docs/architecture/system-overview.md](docs/architecture/system-overview.md) |
+| Frontend | [docs/frontend/README.md](docs/frontend/README.md) |
+| DevOps / on-call | [docs/deployment/production-startup-order.md](docs/deployment/production-startup-order.md) |
 
 ## Quick start
 
-### 1. Prerequisites
-
-- Node.js 18+
-- PostgreSQL (or Supabase Postgres)
-- [OpenAI API key](https://platform.openai.com/)
-- [Supabase](https://supabase.com/) project with a `resumes` storage bucket
-- Gmail account with a [16-character app password](https://support.google.com/accounts/answer/185833)
-
-### 2. Install
-
 ```bash
 npm install
-cp .env.example .env
-```
-
-### 3. Configure `.env`
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Random secret for JWT signing |
-| `OPENAI_API_KEY` | Platform fallback OpenAI key (when user has no BYOK) |
-| `DEFAULT_AI_PROVIDER` | Default provider id (default `openai`) |
-| `DEFAULT_AI_MODEL` | Default model when not set on credential |
-| `AI_PLATFORM_FALLBACK_PROVIDERS` | Comma-separated platform fallback chain |
-| `HEALTH_CHECK_TIMEOUT_MS` | Credential test / health probe timeout (default 20000) |
-| `LOCAL_HEALTH_CHECK_TIMEOUT_MS` | Local provider reachability probe (default 5000) |
-| `PARSE_LLM_TIMEOUT_MS` / `LLM_TIMEOUT_MS` | Runtime generation timeout (default 45000) |
-
-See [docs/AI_GATEWAY.md](docs/AI_GATEWAY.md) for BYOK architecture.
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-side storage) |
-| `ENCRYPTION_KEY` | 32-byte hex key for credential encryption |
-
-Generate `ENCRYPTION_KEY`:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### 4. Run migrations
-
-```bash
+cp .env.example .env   # DATABASE_URL, REDIS_URL, JWT_SECRET, ENCRYPTION_KEY, Supabase, etc.
 npm run migrate
-```
-
-Runs all SQL files in `src/migrations/` in order (`001` … `007`).
-
-### 5. Supabase storage
-
-Create a **public or private** bucket named `resumes`. The API uploads PDFs to `{userId}/{fileHash}.pdf`.
-
-### 6. Build the UI
-
-```bash
 cd client && npm install && cd ..
 npm run build:ui
+npm run dev            # API + inline workers (development)
 ```
 
-The Vite build outputs to `public/`. Re-run after UI changes.
+Open **http://localhost:5000**. Details: [docs/development/local-setup.md](docs/development/local-setup.md).
 
-### 7. Start the server
+Production workers: `npm run worker` (separate process). See [docs/workers/bootstrap-and-isolation.md](docs/workers/bootstrap-and-isolation.md).
 
-```bash
-npm run dev
-```
+## Environment
 
-Open **http://localhost:5000** for the UI, or **http://localhost:5000/docs** for Swagger (non-production only).
-
-**UI development** (hot reload, API proxied to port 5000):
-
-```bash
-# terminal 1
-npm run dev
-
-# terminal 2
-npm run dev:client
-```
-
-Open **http://localhost:5173**
-
-## API overview
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/auth/signup` | No | Register |
-| `POST` | `/auth/login` | No | Login → JWT |
-| `POST` | `/api/upload-resume` | Yes | PDF multipart field `resume` |
-| `POST` | `/api/upload-jd` | Yes | JSON `{ text, title? }` |
-| `POST` | `/api/apply` | Yes | JSON `{ resumeId, jobDescriptionId }` |
-| `POST` | `/api/send-application/:applicationId` | Yes | JSON `{ recipientEmail? }` |
-| `POST` | `/api/save-email-credentials` | Yes | JSON `{ email, appPassword }` |
-| `GET` | `/health` | No | Liveness check |
-
-All authenticated routes use `Authorization: Bearer <token>`.
-
-## Database schema
-
-```
-users
-├── id (UUID PK)
-├── email (unique, case-insensitive)
-└── password_hash
-
-resumes
-├── id, user_id → users
-├── file_name, file_size, file_hash, file_path
-└── uploaded_at
-
-parsed_resumes
-├── resume_id → resumes
-├── raw_text, parsed_json (JSONB)
-└── created_at
-
-job_descriptions
-├── id, user_id → users
-├── title, raw_text
-├── company_name, contact_person, contact_email, location, job_type  ← denormalized (007)
-└── created_at
-
-parsed_job_descriptions
-├── job_description_id → job_descriptions
-├── parsed_json (JSONB)
-└── created_at
-
-applications
-├── id, user_id, resume_id, job_description_id (unique per user)
-├── match_score (0–100)
-├── email_subject, email_body
-├── status ('draft' | 'sent' | 'failed')
-├── email_status ('pending' | 'processing' | 'sent' | 'failed' | 'abandoned')
-├── retry_count, last_error, smtp_message_id, llm_raw_output
-└── processing_started_at, sent_at, failed_at, created_at, updated_at
-
-user_email_credentials
-├── user_id → users (PK)
-├── email, encrypted_app_password
-└── created_at, updated_at
-
-failed_parses
-├── file_hash (unique), source_type ('resume' | 'jd')
-└── raw_text, error_message
-```
-
-Migration **007** copies parsed contact fields onto `job_descriptions` so send/list queries can use `jd.contact_email` without JSONB joins.
-
-## Project structure
-
-```
-index.js              Express entry + static UI
-client/               React UI (Vite + shadcn + Tailwind)
-  src/components/ui/  shadcn components
-public/               Built UI assets (from `npm run build:ui`)
-src/
-  controllers/        Route handlers
-  services/           Business logic (LLM, mail, apply)
-  models/             Database access
-  migrations/         SQL migrations
-  middlewares/        Auth, upload, rate limits
-  routes/
-scripts/migrate.js    Migration runner
-tests/
-```
+See [`.env.example`](.env.example) and [docs/development/environment.md](docs/development/environment.md). AI defaults (`openai`, `gpt-4.1-mini`) and worker concurrency are **code constants**, not env vars.
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start API with nodemon |
-| `npm run dev:client` | Vite dev server (port 5173) |
-| `npm run build:ui` | Build React UI to `public/` |
-| `npm start` | Production start |
-| `npm run migrate` | Run SQL migrations |
-| `npm test` | Jest test suite |
+| `npm run dev` | API + inline workers (dev) |
+| `npm run dev:client` | Vite dev server (5173) |
+| `npm run build:ui` | Build UI to `public/` |
+| `npm start` | Production API |
+| `npm run worker` | BullMQ workers |
+| `npm run migrate` | SQL migrations |
+| `npm test` | Jest |
 
-## Security notes
+## API
 
-- JWTs are stateless (7-day expiry); see `docs/security/replay-attack-limitation.md`
-- SMTP app passwords are encrypted at rest with `ENCRYPTION_KEY`
-- All resource queries are scoped by `user_id`
-- Rate limits apply to upload, apply, and send routes
+Dev OpenAPI: **http://localhost:5000/docs**. Reference: [docs/api/README.md](docs/api/README.md).
+
+## Architecture (summary)
+
+```txt
+applications       = business truth
+application_jobs   = execution truth
+application_events = audit truth
+uiStatus           = derived truth
+```
+
+[docs/architecture/state-model.md](docs/architecture/state-model.md)
+
+## Security
+
+- JWT auth (7-day expiry) — [docs/security/replay-attack-limitation.md](docs/security/replay-attack-limitation.md)
+- Encrypted credentials (`ENCRYPTION_KEY`)
+- Per-user data isolation
 
 ## License
 

@@ -9,11 +9,10 @@ const STATUS_QUERY_NAMES = new Set([
   "status_fingerprint",
 ]);
 
+const logging = require("../config/logging.config");
+
 function queryShapeLoggingEnabled() {
-  return (
-    process.env.LOG_QUERY_SHAPE === "1" ||
-    process.env.DEBUG_QUERY_SHAPE === "1"
-  );
+  return logging.hasDebugScope("query");
 }
 
 function getPoolMetrics(pool) {
@@ -189,7 +188,7 @@ async function instrumentedQuery(client, queryName, text, values, poolForMetrics
     });
   } else if (isSlow) {
     logQueryEvent("DB_QUERY_SLOW", meta);
-  } else if (isStatusPath || process.env.LOG_DB_QUERIES === "1") {
+  } else if (isStatusPath || logging.hasDebugScope("query")) {
     logQueryEvent("DB_QUERY", meta);
   }
 
@@ -296,7 +295,8 @@ let poolMetricsInterval = null;
 
 function startPoolMetricsLogging(pool, intervalMs = 60_000) {
   if (poolMetricsInterval) return;
-  if (process.env.NODE_ENV === "production" && process.env.LOG_POOL_METRICS !== "1") {
+  const config = require("../config");
+  if (config.server.isProduction && !logging.hasDebugScope("query")) {
     return;
   }
 

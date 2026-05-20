@@ -1,20 +1,19 @@
 const IORedis = require("ioredis");
+const config = require("../config");
 const { EVENT_APPLICATION_UPDATED } = require("../contracts/applicationEvents");
 const { realtimeBus } = require("../events/realtimeBus");
 const { logError } = require("../utils/logger");
 
-const REDIS_CHANNEL = process.env.REALTIME_REDIS_CHANNEL || "ai-apply:realtime";
-
 let redisPublisher = null;
 
 function redisRealtimeEnabled() {
-  return Boolean(process.env.REDIS_URL && process.env.REALTIME_REDIS !== "0");
+  return config.redis.realtimeRedisEnabled();
 }
 
 function getPublisher() {
   if (!redisRealtimeEnabled()) return null;
   if (!redisPublisher) {
-    redisPublisher = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+    redisPublisher = new IORedis(config.redis.redisUrl, { maxRetriesPerRequest: null });
     redisPublisher.on("error", (err) => logError("REALTIME_REDIS_PUBLISHER_ERROR", err));
   }
   return redisPublisher;
@@ -24,7 +23,7 @@ async function publishToRedis(payload) {
   const pub = getPublisher();
   if (!pub) return;
   try {
-    await pub.publish(REDIS_CHANNEL, JSON.stringify(payload));
+    await pub.publish(config.redis.realtimeChannel, JSON.stringify(payload));
   } catch (err) {
     logError("REALTIME_REDIS_PUBLISH_FAILED", err, {
       applicationId: payload.applicationId,
@@ -45,7 +44,7 @@ function ensureRealtimePublisher() {
 }
 
 module.exports = {
-  REDIS_CHANNEL,
+  REDIS_CHANNEL: config.redis.realtimeChannel,
   redisRealtimeEnabled,
   fanOutRealtimePayload,
   ensureRealtimePublisher,

@@ -233,7 +233,7 @@ async function processor(job) {
 
 const worker = new Worker(QUEUE_NAME, processor, {
   connection,
-  concurrency: parseInt(process.env.PROCESS_WORKER_CONCURRENCY || "2", 10),
+  concurrency: require("../config").queue.WORKER_CONCURRENCY.process,
 });
 
 attachWorkerLifecycle(worker, {

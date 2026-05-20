@@ -1,16 +1,12 @@
 const IORedis = require("ioredis");
-const { logError } = require("../utils/logger");
+const config = require("../config");
 
-if (!process.env.REDIS_URL) {
-  throw new Error("REDIS_URL environment variable is missing.");
+if (!config.redis.redisUrl) {
+  throw new Error("REDIS_URL environment variable is required");
 }
 
-const connection = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null, // Required by BullMQ
-});
-
-connection.on("error", (err) => {
-  logError("redis_connection_error", err);
+const connection = new IORedis(config.redis.redisUrl, {
+  maxRetriesPerRequest: null,
 });
 
 module.exports = { connection };

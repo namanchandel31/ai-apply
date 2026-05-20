@@ -177,8 +177,9 @@ const processResumeJob = async ({
 
       const cleanedText = sanitizeTextForLlm(sanitizedRaw, MAX_LLM_INPUT_CHARS);
 
-      const isTimingsEnabled = process.env.DEBUG_LLM_TIMINGS === "true";
-      const isExtractionOnlyEnabled = process.env.DEBUG_RESUME_EXTRACTION_ONLY === "true";
+      const config = require("../config");
+      const isTimingsEnabled = config.logging.hasDebugScope("llm");
+      const isExtractionOnlyEnabled = config.logging.hasDebugScope("llm");
 
       if (isTimingsEnabled || isExtractionOnlyEnabled) {
         try {
@@ -260,7 +261,7 @@ const processResumeJob = async ({
 
           let parsedData;
 
-          if (process.env.TEST_MODE === "true") {
+          if (config.server.testMode) {
             parsedData = {
               name: "John Doe",
               email: "john@example.com",
@@ -277,8 +278,8 @@ const processResumeJob = async ({
               certifications: [],
             };
           } else {
-            if (process.env.FORCE_LLM_ERROR === "true") {
-              if (process.env.NODE_ENV === "development") {
+            if (config.server.forceLlmError) {
+              if (config.server.isDevelopment) {
                 logInfo("LLM_FORCE_ERROR_TEST_MODE_ENABLED", { reqId, jobId, message: "Simulating LLM error for testing" });
                 throw new RetryableError("Simulated LLM error");
               } else {
@@ -396,7 +397,7 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
 
           let parsedData;
 
-          if (process.env.TEST_MODE === "true") {
+          if (config.server.testMode) {
             parsedData = {
               job_title: "Senior React Engineer",
               company_name: null,

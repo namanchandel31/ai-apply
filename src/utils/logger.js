@@ -3,7 +3,8 @@
  */
 
 const pino = require("pino");
-const { isDebugEnabled } = require("./debugFlags");
+const config = require("../config");
+const logging = config.logging;
 
 const OPENAI_RATES = {
   "gpt-4.1-mini": { input: 0.40 / 1_000_000, output: 1.60 / 1_000_000 },
@@ -12,14 +13,14 @@ const OPENAI_RATES = {
 const computeEstimatedCost = (model, tokensIn, tokensOut) => {
   const rates = OPENAI_RATES[model];
   if (!rates || typeof tokensIn !== "number" || typeof tokensOut !== "number") return undefined;
-  return parseFloat(((tokensIn * rates.input) + (tokensOut * tokens.output)).toFixed(6));
+  return parseFloat(((tokensIn * rates.input) + (tokensOut * rates.output)).toFixed(6));
 };
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
+  level: logging.logLevel,
   base: null,
   timestamp: pino.stdTimeFunctions.isoTime,
-  transport: process.env.NODE_ENV === "development"
+  transport: logging.logPretty
     ? { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:standard" } }
     : undefined,
 });
@@ -68,12 +69,12 @@ const logWarn = (event, metadata = {}) => {
 /**
  * @param {string} event
  * @param {object} [metadata]
- * @param {import('./debugFlags').OrchestrationComponent} [component]
+ * @param {string} [component] orchestration sub-component (maps to orchestration debug scope)
  */
 const logDebug = (event, metadata = {}, component) => {
   const comp = component || metadata.component;
-  if (comp && !isDebugEnabled(comp)) return;
-  if (!comp && process.env.LOG_LEVEL !== "debug") return;
+  if (comp && !logging.isOrchestrationDebugEnabled(comp)) return;
+  if (!comp && logging.logLevel !== "debug") return;
   logger.debug(buildLogPayload(event, metadata));
 };
 
@@ -83,8 +84,8 @@ const logError = (event, error, metadata = {}) => {
     ...buildLogPayload(event, safe),
     error_type: error?.name || "UnknownError",
     error_message: error?.message || "No error message provided",
-    error_stack: process.env.NODE_ENV !== "production" ? error?.stack : undefined,
+    error_stack: config.server.isProduction ? undefined : error?.stack,
   });
 };
 
-module.exports = { logInfo, logWarn, logError, logDebug, logger, isDebugEnabled };
+module.exports = { logInfo, logWarn, logError, logDebug, logger };

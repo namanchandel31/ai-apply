@@ -40,7 +40,7 @@ const getSetupStatusController = async (req, res) => {
 
     const hasResume = resumeRows.length > 0;
     const hasEmailSetup = credRows.length > 0;
-    const hasAiSetup = aiChainRows.length > 0 || !!process.env.OPENAI_API_KEY;
+    const hasAiSetup = aiChainRows.length > 0 || !!require("../config").ai.openaiApiKey;
 
     let hasValidResume = false;
     const defaults = await getUserDefaults(userId);

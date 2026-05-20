@@ -27,3 +27,6 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-unit-tes
 process.env.ENCRYPTION_KEY = '1234567890123456789012345678901234567890123456789012345678901234';
 process.env.SUPABASE_URL = 'http://localhost:54321';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/test';
+process.env.INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'test-internal-key';

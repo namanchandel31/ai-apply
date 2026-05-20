@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const config = require("./config");
 const { logger, logInfo, logError } = require("./utils/logger");
 const {
   instrumentedQuery,
@@ -11,8 +12,8 @@ const {
 
 function buildPoolConfig() {
   return {
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    connectionString: config.database.databaseUrl,
+    ssl: config.database.ssl,
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
@@ -28,9 +29,8 @@ function attachPoolErrorHandler(pool) {
         event: "PG_POOL_ERROR",
         error_type: err?.name,
         error_message: err?.message,
-        pgCode: err?.code,
       },
-      "Unexpected PostgreSQL pool error"
+      "Unexpected error on idle PostgreSQL client"
     );
   });
 }
@@ -38,35 +38,25 @@ function attachPoolErrorHandler(pool) {
 const pool = new Pool(buildPoolConfig());
 attachPoolErrorHandler(pool);
 wrapPoolQuery(pool);
-startPoolMetricsLogging(pool);
 
-/**
- * Test the DB connection — call this once on server start.
- */
-const testConnection = async () => {
+async function testConnection() {
   try {
-    const client = await pool.connect();
-    await client.query("SELECT 1");
-    client.release();
-    logInfo("database_connected", { message: "Database connected successfully" });
+    await connectWithTiming(pool);
+    logInfo("DB_CONNECTED", { event: "DB_CONNECTED" });
+    return true;
   } catch (err) {
-    logError("database_connection_failed", err);
+    logError("DB_CONNECTION_FAILED", err);
+    return false;
   }
-};
-
-async function closePoolIfAny() {
-  await pool.end();
 }
 
 module.exports = {
   pool,
+  testConnection,
   instrumentedQuery,
-  connectWithTiming,
   getPoolMetrics,
   startPoolMetricsLogging,
   stopPoolMetricsLogging,
-  closePoolIfAny,
-  testConnection,
   buildPoolConfig,
   attachPoolErrorHandler,
 };

@@ -4,14 +4,11 @@
  * Usage: node scripts/verifyWorkerBoot.js
  */
 require("dotenv").config();
+const config = require("../src/config");
 
-if (!process.env.REDIS_URL) {
+if (!config.redis.redisUrl) {
   console.error("REDIS_URL required");
   process.exit(1);
-}
-
-if (!process.env.WORKER_MODE) {
-  process.env.WORKER_MODE = "inline";
 }
 
 async function main() {

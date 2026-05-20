@@ -1,8 +1,9 @@
+const logging = require("../config/logging.config");
 const { logWarn } = require("./logger");
 
-const DEFAULT_WINDOW_MS = Number(process.env.LOG_DEDUPE_WINDOW_MS) || 60_000;
-const DEFAULT_BUCKET_TTL_MS = Number(process.env.LOG_DEDUPE_BUCKET_TTL_MS) || 120_000;
-const DEFAULT_MAX_BUCKETS = Number(process.env.LOG_DEDUPE_MAX_BUCKETS) || 500;
+const DEFAULT_WINDOW_MS = logging.LOG_DEDUPE_WINDOW_MS;
+const DEFAULT_BUCKET_TTL_MS = logging.LOG_DEDUPE_BUCKET_TTL_MS;
+const DEFAULT_MAX_BUCKETS = logging.LOG_DEDUPE_MAX_BUCKETS;
 const PRUNE_INTERVAL_MS = 30_000;
 
 /** @type {Map<string, { event: string, level: string, count: number, firstAt: number, lastAt: number, lastMeta: object }>} */
@@ -62,12 +63,6 @@ function getDedupeStats() {
   };
 }
 
-/**
- * @param {'warn'|'info'} level
- * @param {string} event
- * @param {string} key
- * @param {object} [metadata]
- */
 function record(level, event, key, metadata = {}) {
   const now = Date.now();
   const k = bucketKey(level, event, key);
@@ -119,7 +114,8 @@ function flush(now = Date.now()) {
 }
 
 function startPruneLoop() {
-  if (pruneTimer || process.env.NODE_ENV === "test") return;
+  const config = require("../config");
+  if (pruneTimer || config.server.isTest) return;
   pruneTimer = setInterval(() => {
     pruneExpired();
     flush();
@@ -134,6 +130,12 @@ function stopPruneLoop() {
   }
 }
 
+function resetForTests() {
+  buckets.clear();
+  lruOrder.length = 0;
+  evictedBucketCount = 0;
+}
+
 startPruneLoop();
 
 const orchestrationDedupe = {
@@ -144,14 +146,4 @@ const orchestrationDedupe = {
   stop: stopPruneLoop,
 };
 
-function resetForTests() {
-  buckets.clear();
-  lruOrder.length = 0;
-  evictedBucketCount = 0;
-}
-
-module.exports = {
-  createDedupeLogger: () => orchestrationDedupe,
-  orchestrationDedupe,
-  resetForTests,
-};
+module.exports = { createDedupeLogger: () => orchestrationDedupe, orchestrationDedupe, resetForTests };
