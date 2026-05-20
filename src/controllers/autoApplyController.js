@@ -1,65 +1,108 @@
-const { autoApply } = require("../services/autoApplyService");
-const { error, ok, ERROR_CODES } = require("../utils/response");
+const { startAutoApply } = require("../services/applicationOrchestrationService");
+const { ok, ERROR_CODES } = require("../utils/response");
+const { sendError } = require("../utils/httpErrorResponse");
 const { logError } = require("../utils/logger");
+const { buildLogContext } = require("../utils/buildLogContext");
 
 const autoApplyController = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
   const userId = req.user.id;
 
   try {
-    const { jobDescription } = req.body;
+    const { jobDescription, resumeId: bodyResumeId } = req.body;
 
-    if (!jobDescription || typeof jobDescription !== "string" || jobDescription.trim().length === 0) {
-      return error(res, 400, "jobDescription must be a non-empty string", ERROR_CODES.BAD_REQUEST);
+    if (!jobDescription || typeof jobDescription !== "string" || !jobDescription.trim()) {
+      return sendError(res, {
+        status: 400,
+        code: ERROR_CODES.BAD_REQUEST,
+        message: "jobDescription must be a non-empty string",
+        retryable: false,
+      });
     }
 
     if (jobDescription.length > 10000) {
-      return error(res, 400, "jobDescription exceeds 10000 characters", ERROR_CODES.BAD_REQUEST);
+      return sendError(res, {
+        status: 400,
+        code: ERROR_CODES.BAD_REQUEST,
+        message: "jobDescription exceeds 10000 characters",
+        retryable: false,
+      });
     }
 
-    const result = await autoApply(userId, jobDescription, reqId);
+    const result = await startAutoApply(userId, jobDescription, reqId, {
+      resumeId: bodyResumeId,
+    });
 
-    if (result.status === "needs_review") {
-      return ok(res, result);
-    }
-
-    // HTTP 202 Accepted for async queued tasks
-    return res.status(202).json(result);
-
+    return res.status(202).json({
+      success: true,
+      applicationId: result.applicationId,
+      status: result.status,
+      jobId: result.jobId,
+    });
   } catch (err) {
-    let status = 500;
-    let errorCode = ERROR_CODES.INTERNAL_ERROR;
-    let message = "An internal error occurred.";
+    logError(
+      "AUTO_APPLY_CONTROLLER_ERROR",
+      err,
+      buildLogContext({ reqId, userId, route: req.originalUrl, method: req.method })
+    );
 
-    if (err.code === "DEFAULTS_NOT_CONFIGURED" || err.code === "NO_CREDENTIALS") {
-      status = 400;
-      errorCode = err.code;
-      message = err.message;
-    } else if (err.code === "RESUME_NOT_FOUND") {
-      status = 404;
-      errorCode = err.code;
-      message = err.message;
-    } else if (err.code === "DUPLICATE_APPLICATION") {
-      status = 409;
-      errorCode = err.code;
-      message = err.message;
-    } else if (err.code === "QUEUE_FAILED") {
-      status = 500;
-      errorCode = err.code;
-      message = err.message;
-    } else if (err.name === "RetryableError" || err.name === "NonRetryableError") {
-      // JD Parse or Email Gen failure
-      status = 503;
-      errorCode = "SERVICE_UNAVAILABLE";
-      message = "AI Service temporarily unavailable. Please try again later.";
+    if (
+      ["RESUME_REQUIRED", "RESUME_NOT_PARSED", "DEFAULTS_NOT_CONFIGURED", "NO_CREDENTIALS"].includes(
+        err.code
+      )
+    ) {
+      return sendError(res, {
+        status: 400,
+        code: err.code === "DEFAULTS_NOT_CONFIGURED" ? "RESUME_REQUIRED" : err.code,
+        message:
+          err.code === "RESUME_REQUIRED" || err.code === "DEFAULTS_NOT_CONFIGURED"
+            ? "A valid resume is required before auto apply"
+            : err.message,
+        retryable: false,
+      });
+    }
+    if (err.code === "RESUME_NOT_FOUND") {
+      return sendError(res, {
+        status: 404,
+        code: err.code,
+        message: err.message,
+        retryable: false,
+      });
+    }
+    if (err.code === "DUPLICATE_APPLICATION") {
+      return sendError(res, {
+        status: 409,
+        code: err.code,
+        message: err.message,
+        retryable: false,
+      });
+    }
+    if (err.code === "ENQUEUE_AFTER_COMMIT_FAILED") {
+      return sendError(res, {
+        status: 503,
+        code: err.code,
+        message:
+          "Application was created but could not be queued immediately. Recovery will retry shortly.",
+        retryable: true,
+        meta: err.applicationId ? { applicationId: err.applicationId } : undefined,
+      });
+    }
+    if (err.name === "RetryableError" || err.name === "NonRetryableError") {
+      return sendError(res, {
+        status: 503,
+        code: "SERVICE_UNAVAILABLE",
+        message: "AI Service temporarily unavailable. Please try again later.",
+        retryable: true,
+      });
     }
 
-    logError("AUTO_APPLY_CONTROLLER_ERROR", err, { reqId, userId });
-
-    return error(res, status, message, errorCode);
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "An internal error occurred.",
+      retryable: false,
+    });
   }
 };
 
-module.exports = {
-  autoApplyController
-};
+module.exports = { autoApplyController };

@@ -1,142 +1,193 @@
 const { Worker, UnrecoverableError } = require("bullmq");
+const { pool } = require("../db");
 const nodemailer = require("nodemailer");
 const { connection } = require("../queues/connection");
 const { QUEUE_NAME } = require("../queues/sendApplicationQueue");
-const { getApplicationById, markProcessingFromQueued, markSent, markFailed } = require("../models/applicationModel");
+const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
+const {
+  getApplicationById,
+  markSentFromGenerated,
+} = require("../models/applicationModel");
+const {
+  getLatestJobByType,
+  hasCompletedSendJob,
+  hasActiveJob,
+} = require("../models/applicationJobModel");
+const { transitionJobState } = require("../services/transitionJobState");
+const { recordEvent } = require("../models/applicationEventModel");
 const { fetchSmtpCredentials } = require("../services/mailService");
 const { supabase } = require("../config/supabase");
+const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
+const { buildLogContext } = require("../utils/buildLogContext");
+const { safePersistApplicationFailure } = require("../services/safePersistApplicationFailure");
 
 const processor = async (job) => {
-  const { applicationId, userId, recipientEmail } = job.data;
-  const reqId = job.id; // use BullMQ job ID as trace ID
+  const { applicationId, userId, recipientEmail, dbJobId } = job.data;
+  const reqId = job.id;
 
-  logInfo("WORKER_JOB_START", { reqId, applicationId, userId, attempt: job.attemptsMade });
+  const application = await getApplicationById(applicationId, userId);
+  if (!application) {
+    throw new UnrecoverableError(`Application not found: ${applicationId}`);
+  }
 
-  // 1. CAS: queued -> processing
-  const claimed = await markProcessingFromQueued(applicationId);
-  if (!claimed) {
-    logInfo("WORKER_CLAIM_SKIPPED", { reqId, applicationId, reason: "Already claimed" });
+  if (application.application_status === APPLICATION_STATUS.SENT) {
+    logInfo("send_worker_already_sent", { applicationId });
     return;
   }
-  logInfo("WORKER_CLAIM_SUCCESS", { reqId, applicationId });
+
+  if (application.application_status === APPLICATION_STATUS.CANCELLED) {
+    throw new UnrecoverableError("Application cancelled");
+  }
+
+  if (application.application_status === APPLICATION_STATUS.NEEDS_REVIEW) {
+    throw new UnrecoverableError("Application needs review");
+  }
+
+  if (await hasCompletedSendJob(applicationId)) {
+    logInfo("send_worker_duplicate_prevented", { applicationId });
+    return;
+  }
+
+  const sendJobRow = await getLatestJobByType(applicationId, "send_email");
+  const jobRowId = sendJobRow?.id || dbJobId;
+  if (!jobRowId) {
+    throw new UnrecoverableError("No send_email job row");
+  }
+
+  const claim = await transitionJobState(pool, {
+    jobId: jobRowId,
+    expectedStatus: "queued",
+    nextStatus: "processing",
+  });
+  if (!claim.ok) {
+    logInfo("send_worker_claim_skipped", { applicationId });
+    return;
+  }
+
+  logInfo(
+    "send_started",
+    buildLogContext({
+      applicationId,
+      jobId: jobRowId,
+      userId,
+      reqId,
+      workerName: "send-application",
+      queueName: QUEUE_NAME,
+    })
+  );
+  await recordEvent({
+    applicationId,
+    eventType: "send_started",
+    actorType: "worker",
+    actorId: "send-application",
+    metadata: { jobRowId },
+  });
 
   try {
-    // 2. Fetch application row for subject, body, resume_snapshot_path
-    const application = await getApplicationById(applicationId, userId);
-    if (!application) {
-      throw new UnrecoverableError(`Application not found: ${applicationId}`);
+    if (application.application_status !== APPLICATION_STATUS.GENERATED) {
+      throw new UnrecoverableError(
+        `Invalid application status for send: ${application.application_status}`
+      );
     }
 
-    // 3. Fetch & Decrypt SMTP Credentials (never log plaintext)
-    let credentials;
-    try {
-      credentials = await fetchSmtpCredentials(userId);
-    } catch (err) {
-      // Missing or invalid credentials is a permanent failure
-      const errorObj = new Error(`Credential error: ${err.message}`);
-      errorObj.stage = "credential_decrypt";
-      throw errorObj;
-    }
+    const credentials = await fetchSmtpCredentials(userId);
 
-    // 4. Download Resume from Supabase
     let fileBuffer;
-    try {
-      const { data, error } = await supabase.storage
-        .from("resumes")
-        .download(application.resume_snapshot_path);
+    const { data, error } = await supabase.storage
+      .from("resumes")
+      .download(application.resume_snapshot_path);
 
-      if (error) {
-        const msg = error.message || "";
-        const isPermanent = error.status === 404 || msg.includes("not found") || msg.includes("invalid path");
-        if (isPermanent) {
-          throw new UnrecoverableError(`Resume not found in storage: ${application.resume_snapshot_path}`);
-        }
-        // Transient error
-        throw new Error(`Transient storage error: ${msg}`);
+    if (error) {
+      const isPermanent =
+        error.status === 404 || error.message?.includes("not found");
+      if (isPermanent) {
+        throw new UnrecoverableError(`Resume not found: ${application.resume_snapshot_path}`);
       }
-      
-      if (!data) throw new UnrecoverableError("Storage returned null file data");
-      
-      // Convert Blob to Buffer
-      const arrayBuffer = await data.arrayBuffer();
-      fileBuffer = Buffer.from(arrayBuffer);
-    } catch (err) {
-      if (err instanceof UnrecoverableError) {
-        err.stage = "resume_download";
-        throw err;
-      }
-      const errorObj = new Error(err.message);
-      errorObj.stage = "resume_download";
-      throw errorObj;
+      throw new Error(`Storage error: ${error.message}`);
     }
+    const arrayBuffer = await data.arrayBuffer();
+    fileBuffer = Buffer.from(arrayBuffer);
 
-    // 5. Setup SMTP Transporter with timeouts
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
-      auth: {
-        user: credentials.email,
-        pass: credentials.password
-      },
-      connectionTimeout: 10000, // 10s
-      greetingTimeout: 10000,   // 10s
-      socketTimeout: 15000      // 15s
+      auth: { user: credentials.email, pass: credentials.password },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
 
-    // TODO [SMTP-POOL]: For high-volume sends, replace createTransport() per job with a shared pool.
-    // TODO [SMTP-TLS]: Handle port 465 / secure: true for non-Gmail providers.
-    // TODO [SMTP-BURST]: Per-user send throttle to protect Gmail reputation.
+    const smtpResult = await transporter.sendMail({
+      from: credentials.email,
+      to: recipientEmail,
+      subject: application.email_subject,
+      text: application.email_body,
+      attachments: [
+        { filename: "resume.pdf", content: fileBuffer, contentType: "application/pdf" },
+      ],
+    });
 
-    // 6. Send Email
-    let smtpResult;
-    try {
-      smtpResult = await transporter.sendMail({
-        from: credentials.email,
-        to: recipientEmail,
-        subject: application.email_subject,
-        text: application.email_body,
-        attachments: [
-          {
-            filename: "resume.pdf",
-            content: fileBuffer,
-            contentType: "application/pdf"
-          }
-        ]
-      });
-    } catch (err) {
-      const PERMANENT_CODES = ["EAUTH", "EENVELOPE", "ERECIPIENT"];
-      if (PERMANENT_CODES.includes(err.code)) {
-        const permErr = new UnrecoverableError(`Permanent SMTP failure [${err.code}]: ${err.message}`);
-        permErr.stage = "smtp_send";
-        throw permErr;
+    const sentRow = await markSentFromGenerated(applicationId, userId, smtpResult.messageId, pool);
+    if (!sentRow) {
+      const current = await getApplicationById(applicationId, userId);
+      if (current?.application_status !== APPLICATION_STATUS.SENT) {
+        throw new Error("CAS sent transition failed");
       }
-      const errorObj = new Error(err.message);
-      errorObj.stage = "smtp_send";
-      throw errorObj;
     }
 
-    // 7. Success
-    await markSent(applicationId, userId, smtpResult.messageId);
-    logInfo("EMAIL_SENT", { reqId, applicationId, messageId: smtpResult.messageId });
+    await transitionJobState(pool, {
+      jobId: jobRowId,
+      expectedStatus: "processing",
+      nextStatus: "completed",
+    });
 
+    logInfo("application_sent", { reqId, applicationId, messageId: smtpResult.messageId });
+    await recordEvent({
+      applicationId,
+      eventType: "email_sent",
+      actorType: "worker",
+      actorId: "send-application",
+      metadata: { messageId: smtpResult.messageId },
+    });
   } catch (err) {
-    const failureStage = err.stage || "unknown";
-    
-    // Mark failed in DB
-    try {
-      await markFailed(applicationId, err.message, failureStage, userId);
-      logError("EMAIL_FAILED", err, { reqId, applicationId, failureStage });
-    } catch (dbErr) {
-      logError("MARK_FAILED_ERROR", dbErr, { reqId, applicationId });
+    logError(
+      "SEND_APPLICATION_FAILED",
+      err,
+      buildLogContext({
+        applicationId,
+        jobId: jobRowId,
+        userId,
+        reqId,
+        workerName: "send-application",
+        queueName: QUEUE_NAME,
+        attempt: job.attemptsMade,
+      })
+    );
+
+    await safePersistApplicationFailure(pool, {
+      applicationId,
+      userId,
+      jobId: jobRowId,
+      failureStage: err.stage || "smtp_send",
+      lastError: err.message,
+      expectedAppStatuses: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
+    });
+    await recordEvent({
+      applicationId,
+      eventType: "send_failed",
+      actorType: "worker",
+      actorId: "send-application",
+      metadata: { message: err.message },
+    });
+
+    if (job.attemptsMade + 1 >= (job.opts?.attempts || 5)) {
+      logInfo("job_max_attempts_exceeded", { applicationId, jobType: "send_email" });
     }
 
-    // Re-throw for BullMQ
-    if (err instanceof UnrecoverableError) {
-      throw err; // Skips retries
-    }
-    throw err; // Retries according to backoff
+    if (err instanceof UnrecoverableError) throw err;
+    throw err;
   }
 };
 
@@ -145,15 +196,9 @@ const worker = new Worker(QUEUE_NAME, processor, {
   concurrency: parseInt(process.env.WORKER_CONCURRENCY || "3", 10),
 });
 
-worker.on("failed", (job, err) => {
-  logError("BULLMQ_JOB_FAILED", err, { jobId: job?.id });
+attachWorkerLifecycle(worker, {
+  workerName: "send-application",
+  queueName: QUEUE_NAME,
 });
 
-worker.on("error", err => {
-  logError("BULLMQ_WORKER_ERROR", err);
-});
-
-module.exports = { worker };
-
-// TODO [CIRCUIT-BREAKER]: Track consecutive SMTP failures per provider. Pause queue if > 10.
-// TODO [PROVIDER-CONCURRENCY]: Split to per-provider sub-queues (send-gmail, send-outlook) with specific limits.
+module.exports = { worker, QUEUE_NAME, processor };

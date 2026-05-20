@@ -25,16 +25,20 @@ const llmProtection = require("./llmProtection");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
 const { LLM_TIMEOUT_MS } = require("../config/parsingConfig");
+const {
+  HEALTH_CHECK_TIMEOUT_MS,
+  HEALTH_CHECK_CACHE_TTL_MS,
+  RUNTIME_EMAIL_TIMEOUT_MS,
+} = require("../config/aiTimeoutConfig");
 
-const EMAIL_LLM_TIMEOUT_MS = parseInt(process.env.EMAIL_LLM_TIMEOUT_MS || "10000", 10);
-const HEALTH_CHECK_CACHE_TTL_MS = parseInt(process.env.HEALTH_CHECK_CACHE_TTL_MS || "60000", 10);
 const healthCache = new Map();
 
+/** Runtime generation timeouts only — health probes use adapter HEALTH_CHECK_TIMEOUT_MS. */
 const TASK_TIMEOUTS = {
   resume_parse: LLM_TIMEOUT_MS,
   jd_parse: LLM_TIMEOUT_MS,
-  email_generate: EMAIL_LLM_TIMEOUT_MS,
-  health_check: parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || "5000", 10),
+  email_generate: RUNTIME_EMAIL_TIMEOUT_MS,
+  health_check: HEALTH_CHECK_TIMEOUT_MS,
 };
 
 // =============================================================================
@@ -478,10 +482,30 @@ async function healthCheck({ userId, provider, credentialId, model, apiKey, base
   if (credentials.providerType !== "local" && !resolvedProbe) {
     return { ok: false, error: "Model is required", code: "MODEL_REQUIRED", estimatedCost: 0 };
   }
+  logInfo("AI_MODEL_HEALTH_CHECK", {
+    provider: credentials.provider,
+    model: resolvedProbe,
+    operationType: "health_check",
+    timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+  });
+
+  const startedAt = Date.now();
   const result = await adapter.healthCheck({
     credentials: { ...credentials, model: resolvedProbe },
     model: resolvedProbe,
   });
+  const elapsedMs = result.elapsedMs ?? Date.now() - startedAt;
+
+  if (!result.ok && result.code === "HEALTH_CHECK_TIMEOUT") {
+    logInfo("AI_OPERATION_TIMEOUT", {
+      provider: credentials.provider,
+      model: resolvedProbe,
+      operationType: "health_check",
+      timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+      elapsedMs,
+      reason: "health_check_exhausted",
+    });
+  }
 
   if (userId && credentialId && result.ok) {
     await updateCredentialHealth(credentialId, userId, "healthy", {

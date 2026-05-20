@@ -50,7 +50,11 @@ export function Setup() {
           onUpdate={handleUpdate} 
         />
         <AiProviderStatusCard
-          activeAiProvider={status?.activeAiProvider}
+          activeAiProvider={
+            status?.activeAiProvider?.id
+              ? (status.activeAiProvider as import("@/lib/api").AiCredentialSummary)
+              : null
+          }
           hasAiSetup={status?.hasAiSetup}
           onUpdate={handleUpdate}
         />

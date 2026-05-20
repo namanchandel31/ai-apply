@@ -1,4 +1,48 @@
-export type ApiError = Error & { status?: number; code?: string };
+export type ApiError = Error & {
+  status?: number;
+  code?: string;
+  retryable?: boolean;
+  retryAfterMs?: number;
+};
+
+export type RequestOptions = RequestInit & {
+  signal?: AbortSignal;
+};
+
+function parseRetryAfterMs(res: Response, body: Record<string, unknown>): number | undefined {
+  const header = res.headers.get("Retry-After");
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.ceil(seconds * 1000);
+    }
+  }
+  const fromBody =
+    (body as { retryAfterSeconds?: number }).retryAfterSeconds ??
+    (body as { retryAfter?: number }).retryAfter;
+  if (typeof fromBody === "number" && Number.isFinite(fromBody) && fromBody >= 0) {
+    return Math.ceil(fromBody * 1000);
+  }
+  return undefined;
+}
+
+/**
+ * TODO(vNext-error-cleanup):
+ * Remove legacy flat error parsing after all lifecycle endpoints
+ * fully migrate to nested sendError() shape.
+ *
+ * Legacy supported temporarily:
+ * - body.error as string
+ * - body.code at top level
+ *
+ * Rollout checklist:
+ * - [x] autoApplyController uses sendError
+ * - [x] applicationController retry/continue/cancel/status use sendError
+ * - [x] sendController / applyController / jdController migrated
+ * - [x] global middleware uses nested shape
+ * - [ ] flip flag + remove legacy parsing
+ */
+const ENABLE_LEGACY_ERROR_COMPAT = true;
 
 const getToken = () => localStorage.getItem("ai_apply_token");
 const setToken = (token: string | null) => {
@@ -6,24 +50,113 @@ const setToken = (token: string | null) => {
   else localStorage.removeItem("ai_apply_token");
 };
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(path, { ...options, headers });
-  const body = await res.json().catch(() => ({}));
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
-    const err = new Error(
-      (body as { error?: string }).error || `Request failed (${res.status})`
-    ) as ApiError;
+    const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
+    let message: string;
+    let code: string | undefined;
+    let retryable: boolean | undefined;
+
+    if (typeof e === "object" && e !== null) {
+      message = e.message ?? "Request failed";
+      code = e.code;
+      retryable = e.retryable;
+    } else if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
+      message = e;
+      code = (body as { code?: string }).code;
+    } else {
+      message = (body as { message?: string }).message ?? `Request failed (${res.status})`;
+      if (ENABLE_LEGACY_ERROR_COMPAT) {
+        code = (body as { code?: string }).code;
+      }
+    }
+
+    const err = new Error(message) as ApiError;
     err.status = res.status;
-    err.code = (body as { code?: string }).code;
+    err.code = code;
+    err.retryable = retryable;
+    if (res.status === 429) {
+      err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
+    }
     throw err;
   }
 
   return body as T;
+}
+
+export type ApplicationStatusResponse =
+  | { notModified: true; etag: string }
+  | { notModified: false; data: ApplicationStatusPayload; etag?: string };
+
+async function requestApplicationStatus(
+  applicationId: string,
+  options?: { signal?: AbortSignal; ifNoneMatch?: string }
+): Promise<ApplicationStatusResponse> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (options?.ifNoneMatch) {
+    headers.set("If-None-Match", options.ifNoneMatch);
+  }
+
+  const res = await fetch(`/api/applications/${applicationId}/status`, {
+    method: "GET",
+    headers,
+    signal: options?.signal,
+  });
+
+  if (res.status === 304) {
+    return {
+      notModified: true,
+      etag: res.headers.get("ETag") ?? options?.ifNoneMatch ?? "",
+    };
+  }
+
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
+    let message: string;
+    let code: string | undefined;
+    let retryable: boolean | undefined;
+
+    if (typeof e === "object" && e !== null) {
+      message = e.message ?? "Request failed";
+      code = e.code;
+      retryable = e.retryable;
+    } else if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
+      message = e;
+      code = (body as { code?: string }).code;
+    } else {
+      message = (body as { message?: string }).message ?? `Request failed (${res.status})`;
+      if (ENABLE_LEGACY_ERROR_COMPAT) {
+        code = (body as { code?: string }).code;
+      }
+    }
+
+    const err = new Error(message) as ApiError;
+    err.status = res.status;
+    err.code = code;
+    err.retryable = retryable;
+    if (res.status === 429) {
+      err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
+    }
+    throw err;
+  }
+
+  const data = (body as { data: ApplicationStatusPayload }).data;
+  return {
+    notModified: false,
+    data,
+    etag: res.headers.get("ETag") ?? undefined,
+  };
 }
 
 export const api = {
@@ -88,6 +221,19 @@ export const api = {
     });
   },
 
+  autoApply(jobDescription: string) {
+    return request<{
+      success: boolean;
+      applicationId: string;
+      status: string;
+      jobId?: string;
+    }>("/api/auto-apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobDescription }),
+    });
+  },
+
   apply(resumeId: string, jobDescriptionId: string) {
     return request<{
       success: boolean;
@@ -120,11 +266,22 @@ export const api = {
       success: boolean;
       data: {
         hasResume: boolean;
+        hasValidResume?: boolean;
         hasEmailSetup: boolean;
         hasAiSetup?: boolean;
         activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
         email?: string | null;
-        activeAiProvider?: AiCredentialSummary | null;
+        activeAiProvider?: {
+          id?: string;
+          provider: string;
+          selectedModel?: string | null;
+          label?: string | null;
+          providerType?: string;
+          allowPlatformFallback?: boolean;
+          healthStatus?: string;
+          inFallbackChain?: boolean;
+          priority?: number;
+        } | null;
         aiCredentialChain?: AiCredentialSummary[];
       };
     }>("/api/user/setup-status", { method: "GET" });
@@ -214,16 +371,83 @@ export const api = {
   getApplications() {
     return request<{
       success: boolean;
-      data: Array<{
-        id: string;
-        status: string;
-        createdAt: string;
-        sentAt?: string | null;
-        role?: string | null;
-        company?: string | null;
-      }>;
-    }>("/api/apply/", { method: "GET" });
+      data: ApplicationRecord[];
+    }>("/api/applications", { method: "GET" });
   },
+
+  getOrchestrationActive() {
+    return request<{
+      success: boolean;
+      data: {
+        states: Array<{
+          applicationId: string;
+          version: number;
+          orchestrationEpoch: number;
+          updatedAt: string;
+          terminal: boolean;
+          pollable: boolean;
+          uiStatus: string;
+          status: string;
+        }>;
+      };
+    }>("/api/orchestration/active", { method: "GET" });
+  },
+
+  getApplicationStatus(
+    applicationId: string,
+    options?: { signal?: AbortSignal; ifNoneMatch?: string }
+  ): Promise<ApplicationStatusResponse> {
+    return requestApplicationStatus(applicationId, options);
+  },
+
+  retryApplication(applicationId: string) {
+    return request<{ success: boolean; data: { applicationId: string; status: string; jobId?: string } }>(
+      `/api/applications/${applicationId}/retry`,
+      { method: "POST" }
+    );
+  },
+
+  continueApplication(applicationId: string, contactEmail: string) {
+    return request<{ success: boolean; data: { applicationId: string; status: string; jobId?: string } }>(
+      `/api/applications/${applicationId}/continue`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactEmail }),
+      }
+    );
+  },
+};
+
+export type ApplicationStatusPayload = {
+  applicationId: string;
+  status: string;
+  uiStatus: string;
+  terminal: boolean;
+  executionTerminal?: boolean;
+  pollable: boolean;
+  canRetry: boolean;
+  canContinue: boolean;
+  reviewReason?: string | null;
+  version?: number;
+  orchestrationEpoch?: number;
+  updatedAt?: string;
+};
+
+export type ApplicationRecord = {
+  id: string;
+  status: string;
+  uiStatus?: string;
+  terminal?: boolean;
+  executionTerminal?: boolean;
+  pollable?: boolean;
+  canRetry?: boolean;
+  canContinue?: boolean;
+  reviewReason?: string | null;
+  createdAt: string;
+  sentAt?: string | null;
+  role?: string | null;
+  company?: string | null;
 };
 
 export type AiCredentialSummary = {

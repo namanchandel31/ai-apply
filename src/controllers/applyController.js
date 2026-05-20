@@ -1,6 +1,8 @@
 const { processApplyJob } = require("../services/applyService");
 const { logInfo, logError } = require("../utils/logger");
-const { error, ok, ERROR_CODES } = require("../utils/response");
+const { ok, ERROR_CODES } = require("../utils/response");
+const { sendError } = require("../utils/httpErrorResponse");
+const { buildLogContext } = require("../utils/buildLogContext");
 
 const processApplication = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
@@ -9,7 +11,12 @@ const processApplication = async (req, res) => {
   logInfo("request_start", { reqId, stage: "unknown", source: "apply" });
 
   if (!resumeId || !jobDescriptionId) {
-    return error(res, 400, "Missing resumeId or jobDescriptionId", ERROR_CODES.BAD_REQUEST);
+    return sendError(res, {
+      status: 400,
+      code: ERROR_CODES.BAD_REQUEST,
+      message: "Missing resumeId or jobDescriptionId",
+      retryable: false,
+    });
   }
 
   try {
@@ -19,25 +26,49 @@ const processApplication = async (req, res) => {
 
     const result = await Promise.race([
       processApplyJob(resumeId, jobDescriptionId, reqId, req.user.id),
-      timeoutPromise
+      timeoutPromise,
     ]);
 
     logInfo("request_end", { reqId, stage: "unknown", source: "apply", status: "success" });
-    
-    // Add idempotent flag if present in result
+
     const options = result.idempotent ? { idempotent: true } : {};
     return ok(res, result, options);
-  } catch (error) {
-    const statusCode = error.message.includes("timed out") ? 504 : 500;
-    const isClientError = error.message === "Resume not found" || error.message === "Job Description not found";
-    const finalStatusCode = isClientError ? 404 : statusCode;
-    
-    logError("request_end", error, { reqId, stage: "unknown", source: "apply", status: "failed" });
-    
-    const errorCode = finalStatusCode === 404 ? ERROR_CODES.NOT_FOUND : 
-                      finalStatusCode === 504 ? 'TIMEOUT' : ERROR_CODES.INTERNAL_ERROR;
-    
-    return error(res, finalStatusCode, error.message, errorCode);
+  } catch (err) {
+    logError(
+      "APPLICATION_PROCESSING_FAILED",
+      err,
+      buildLogContext({
+        reqId,
+        userId: req.user?.id,
+        route: req.originalUrl,
+        method: req.method,
+      })
+    );
+
+    if (err.message === "Resume not found" || err.message === "Job Description not found") {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: err.message === "Resume not found" ? "Resume not found" : "Job description not found",
+        retryable: false,
+      });
+    }
+
+    if (err.message?.includes("timed out")) {
+      return sendError(res, {
+        status: 504,
+        code: "TIMEOUT",
+        message: "Request timed out",
+        retryable: true,
+      });
+    }
+
+    return sendError(res, {
+      status: 500,
+      code: "APPLICATION_PROCESSING_FAILED",
+      message: "Failed to process application",
+      retryable: true,
+    });
   }
 };
 

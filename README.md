@@ -39,7 +39,9 @@ cp .env.example .env
 | `DEFAULT_AI_PROVIDER` | Default provider id (default `openai`) |
 | `DEFAULT_AI_MODEL` | Default model when not set on credential |
 | `AI_PLATFORM_FALLBACK_PROVIDERS` | Comma-separated platform fallback chain |
-| `HEALTH_CHECK_TIMEOUT_MS` | Cheap health probe timeout (default 5000) |
+| `HEALTH_CHECK_TIMEOUT_MS` | Credential test / health probe timeout (default 20000) |
+| `LOCAL_HEALTH_CHECK_TIMEOUT_MS` | Local provider reachability probe (default 5000) |
+| `PARSE_LLM_TIMEOUT_MS` / `LLM_TIMEOUT_MS` | Runtime generation timeout (default 45000) |
 
 See [docs/AI_GATEWAY.md](docs/AI_GATEWAY.md) for BYOK architecture.
 | `SUPABASE_URL` | Supabase project URL |

@@ -14,6 +14,22 @@
  * @param {string} message - Error message
  * @param {string} code - Error code for client handling
  */
+/**
+ * Structured error response (preferred for new endpoints).
+ */
+function fail(res, status, { message, code, retryable = false }) {
+  let errorMessage = message;
+  if (status === 500 && process.env.NODE_ENV === "production") {
+    errorMessage = "Internal server error";
+  }
+  return res.status(status).json({
+    success: false,
+    message: errorMessage,
+    code,
+    retryable,
+  });
+}
+
 function error(res, status, message, code) {
   // Hide internal error details in production
   let errorMessage = message;
@@ -63,6 +79,7 @@ const ERROR_CODES = {
 
 module.exports = {
   error,
+  fail,
   ok,
-  ERROR_CODES
+  ERROR_CODES,
 };

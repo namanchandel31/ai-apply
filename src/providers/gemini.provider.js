@@ -1,5 +1,10 @@
 const { REMOTE_PARSE_CAPABILITIES } = require("./capabilities");
+const { HEALTH_CHECK_TIMEOUT_MS } = require("../config/aiTimeoutConfig");
 const { normalizeModelInput } = require("../utils/normalizeModelInput");
+const {
+  createOperationTimeout,
+  classifyHealthCheckError,
+} = require("../utils/operationTimeout");
 const { logInfo, logError } = require("../utils/logger");
 const {
   parseJsonFromText,
@@ -101,43 +106,66 @@ module.exports = {
       return { ok: false, error: normalized.message, code: normalized.code, estimatedCost: 0 };
     }
     const probeModel = normalized.model;
-    logInfo("AI_MODEL_HEALTH_CHECK", { provider: "gemini", model: probeModel, method: "minimal_generate" });
+    const timeoutMs = HEALTH_CHECK_TIMEOUT_MS;
+    logInfo("AI_MODEL_HEALTH_CHECK", {
+      provider: "gemini",
+      model: probeModel,
+      method: "minimal_generate",
+      operationType: "health_check",
+      timeoutMs,
+    });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || "5000", 10)
-    );
+    const op = createOperationTimeout(timeoutMs, {
+      operationType: "health_check",
+      provider: "gemini",
+      model: probeModel,
+    });
     try {
       await geminiGenerate({
         apiKey,
         model: probeModel,
         userPrompt: "hi",
         jsonMode: false,
-        signal: controller.signal,
+        signal: op.signal,
       });
-      return { ok: true, method: "minimal_generate", model: probeModel, estimatedCost: 0 };
+      return {
+        ok: true,
+        method: "minimal_generate",
+        model: probeModel,
+        elapsedMs: op.elapsedMs(),
+        estimatedCost: 0,
+      };
     } catch (err) {
+      const failure = classifyHealthCheckError(err, {
+        timeoutMs,
+        elapsedMs: op.elapsedMs(),
+        provider: "gemini",
+        wasTimedOut: op.wasTimedOut(),
+      });
       logError("AI_MODEL_PROVIDER_ERROR", err, {
         provider: "gemini",
         model: probeModel,
+        operationType: "health_check",
+        timeoutMs,
+        elapsedMs: op.elapsedMs(),
+        errorType: failure.errorType,
+        code: failure.code,
         statusCode: err.status,
       });
-      const isModelError =
-        err.status === 404 ||
-        err.message?.toLowerCase().includes("model");
-      if (isModelError) {
+      if (failure.code === "AI_MODEL_INVALID") {
         logInfo("AI_MODEL_INVALID", { provider: "gemini", model: probeModel });
       }
       return {
         ok: false,
-        error: err.message,
-        code: isModelError ? "AI_MODEL_INVALID" : "PROVIDER_ERROR",
+        error: failure.message,
+        code: failure.code,
+        errorType: failure.errorType,
         model: probeModel,
+        elapsedMs: op.elapsedMs(),
         estimatedCost: 0,
       };
     } finally {
-      clearTimeout(timeout);
+      op.clear();
     }
   },
 

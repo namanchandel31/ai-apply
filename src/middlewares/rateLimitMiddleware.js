@@ -1,5 +1,7 @@
 const { rateLimiter, RATE_LIMITS } = require("../utils/rateLimiter");
 const { error, ERROR_CODES } = require("../utils/response");
+const { logInfo } = require("../utils/logger");
+const { buildLogContext } = require("../utils/buildLogContext");
 
 /**
  * Factory: create a rate limit middleware for a named tier.
@@ -27,6 +29,15 @@ const createRateLimit = (userLimitKey) => {
       const resetTime = rateLimiter.getResetTime(ipKey);
       const retryAfter = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : ipCfg.windowSeconds;
       res.setHeader("Retry-After", retryAfter);
+      logInfo(
+        "RATE_LIMIT_EXCEEDED",
+        buildLogContext({
+          tier: "IP_GLOBAL",
+          path: req.originalUrl,
+          userId: req.user?.id,
+          retryAfterSeconds: retryAfter,
+        })
+      );
       return error(
         res, 429,
         `Rate limit exceeded: ${ipCfg.limit} requests per ${ipCfg.windowSeconds}s per IP`,
@@ -41,6 +52,15 @@ const createRateLimit = (userLimitKey) => {
         const resetTime = rateLimiter.getResetTime(userKey);
         const retryAfter = resetTime ? Math.ceil((resetTime - Date.now()) / 1000) : userCfg.windowSeconds;
         res.setHeader("Retry-After", retryAfter);
+        logInfo(
+          "RATE_LIMIT_EXCEEDED",
+          buildLogContext({
+            tier: userLimitKey,
+            path: req.originalUrl,
+            userId,
+            retryAfterSeconds: retryAfter,
+          })
+        );
         return error(
           res, 429,
           `Rate limit exceeded: ${userCfg.limit} requests per ${userCfg.windowSeconds}s`,

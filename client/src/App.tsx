@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -11,16 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-const queryClient = new QueryClient();
+import { RealtimeProvider } from "@/contexts/RealtimeProvider";
 
 export default function App() {
   const [activePage, setActivePage] = useState<PageId>("dashboard");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
-  
+
   const authed = !!api.getToken();
 
   const handleLogout = () => {
@@ -133,7 +130,7 @@ export default function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <RealtimeProvider>
       <Layout
         activePage={activePage}
         onNavigate={setActivePage}
@@ -144,6 +141,6 @@ export default function App() {
         {activePage === "applications" && <Applications />}
         {activePage === "setup" && <Setup />}
       </Layout>
-    </QueryClientProvider>
+    </RealtimeProvider>
   );
 }

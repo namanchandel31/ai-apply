@@ -5,9 +5,20 @@ const cors = require("cors");
 const pinoHttp = require("pino-http");
 const { testConnection } = require("./src/db");
 const { logger, logInfo, logError } = require("./src/utils/logger");
-const tracingMiddleware = require("./src/middlewares/tracing");
-const { recoverStaleProcessing } = require("./src/models/applicationModel");
 
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logError("UNHANDLED_REJECTION", err);
+});
+
+process.on("uncaughtException", (err) => {
+  logger.fatal(
+    { event: "UNCAUGHT_EXCEPTION", err, error_message: err?.message },
+    "Uncaught exception"
+  );
+  process.exit(1);
+});
+const tracingMiddleware = require("./src/middlewares/tracing");
 // Fail-fast checks for required environment variables
 ["JWT_SECRET", "REDIS_URL", "INTERNAL_API_KEY"].forEach(key => {
   if (!process.env[key]) {
@@ -56,6 +67,9 @@ const applyRoutes      = require("./src/routes/applyRoutes");
 const credentialRoutes = require("./src/routes/credentialRoutes");
 const sendRoutes       = require("./src/routes/sendRoutes");
 const autoApplyRoutes  = require("./src/routes/autoApplyRoutes");
+const applicationRoutes = require("./src/routes/applicationRoutes");
+const realtimeRoutes = require("./src/routes/realtimeRoutes");
+const orchestrationRoutes = require("./src/routes/orchestrationRoutes");
 const userRoutes       = require("./src/routes/userRoutes");
 const aiRoutes         = require("./src/routes/aiRoutes");
 
@@ -97,6 +111,9 @@ app.use("/api", credentialRoutes);
 
 // Auto-Apply + User Defaults
 app.use("/api", autoApplyRateLimit, autoApplyRoutes);
+app.use("/api", readRateLimit, applicationRoutes);
+app.use("/api", realtimeRoutes);
+app.use("/api", orchestrationRoutes);
 app.use("/api", readRateLimit, userRoutes);
 app.use("/api", readRateLimit, aiRoutes);
 
@@ -189,22 +206,56 @@ app.get(SPA_FALLBACK_PATTERN, (_req, res) => {
 // Global error handler — catch-all for unhandled errors thrown by middleware
 // ---------------------------------------------------------------------------
 
-app.use((err, req, res, _next) => {
-  logError("unhandled_error", err, { reqId: req.requestId || "NO_REQ_ID" });
-  res.status(500).json({ success: false, message: "Internal server error" });
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+  const { buildLogContext } = require("./src/utils/buildLogContext");
+  const { sendError } = require("./src/utils/httpErrorResponse");
+  logError(
+    "UNHANDLED_REQUEST_ERROR",
+    err,
+    buildLogContext({
+      reqId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      userId: req.user?.id,
+    })
+  );
+  return sendError(res, {
+    status: 500,
+    code: "INTERNAL_SERVER_ERROR",
+    message: "Unexpected server error",
+    retryable: false,
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Worker & Recovery
 // ---------------------------------------------------------------------------
 
-// Inline worker — dev ONLY, hard-guarded
-if (process.env.WORKER_MODE === "inline" && process.env.NODE_ENV !== "production") {
+// Default inline workers in local dev when WORKER_MODE is unset (avoids silent "queued forever")
+if (!process.env.WORKER_MODE && process.env.NODE_ENV !== "production") {
+  process.env.WORKER_MODE = "inline";
+}
+
+const workersInlineEnabled =
+  process.env.WORKER_MODE === "inline" && process.env.NODE_ENV !== "production";
+
+// Inline workers — dev ONLY, hard-guarded (both process + send must run or jobs stay queued)
+if (workersInlineEnabled) {
+  require("./src/workers/processApplication.worker");
   require("./src/workers/sendApplication.worker");
-  logInfo("inline_worker_started", { queue: "send-application" });
+  logInfo("inline_workers_started", {
+    workerMode: process.env.WORKER_MODE,
+    queues: ["process-application", "send-application"],
+  });
 }
 
 const { recoveryLoop } = require("./src/jobs/recovery.job");
+const { startSseGateway } = require("./src/realtime/sseGateway");
+
+startSseGateway();
 
 // ---------------------------------------------------------------------------
 // Server startup
@@ -212,7 +263,12 @@ const { recoveryLoop } = require("./src/jobs/recovery.job");
 
 if (require.main === module) {
   app.listen(PORT, async () => {
-    logInfo("server_start", { port: PORT });
+    logInfo("server_start", {
+      port: PORT,
+      workerMode: process.env.WORKER_MODE || "separate",
+      workersInlineEnabled,
+      workersRequired: ["process-application", "send-application"],
+    });
     
     logInfo("LLM_PROTECTION_INITIALIZED", { 
       retryBudget: process.env.LLM_GLOBAL_RETRY_BUDGET || 100,
@@ -228,6 +284,16 @@ if (require.main === module) {
     });
 
     await testConnection();
+
+    try {
+      const { validateQueueSystem } = require("./src/queues/validateQueueSystem");
+      await validateQueueSystem({ role: "api" });
+    } catch (queueErr) {
+      logError("QUEUE_SYSTEM_VALIDATION_FAILED", queueErr);
+      if (process.env.STRICT_QUEUE_VALIDATION === "1") {
+        process.exit(1);
+      }
+    }
 
     // Start auto-apply recovery loop (fire-and-forget, P0 fix)
     recoveryLoop().catch(err => {

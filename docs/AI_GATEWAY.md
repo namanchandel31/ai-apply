@@ -105,6 +105,19 @@ All BYOK model strings pass through `src/utils/normalizeModelInput.js` before sa
 
 Legacy mixed-case rows are re-normalized at gateway/health boundaries (idempotent).
 
+## Operation timeouts
+
+Timeouts are separated by operation type in `src/config/aiTimeoutConfig.js`:
+
+| Operation | Env | Default |
+|-----------|-----|---------|
+| Credential health check / test connection | `HEALTH_CHECK_TIMEOUT_MS` | 20s |
+| Local provider reachability | `LOCAL_HEALTH_CHECK_TIMEOUT_MS` | 5s |
+| Runtime parse/generate (`resume_parse`, `jd_parse`) | `PARSE_LLM_TIMEOUT_MS` | 45s |
+| Runtime email generation | `EMAIL_LLM_TIMEOUT_MS` | 10s |
+
+Health probes use `createOperationTimeout` + `AI_OPERATION_TIMEOUT` logs (`provider`, `model`, `timeoutMs`, `elapsedMs`, `operationType`). Failures are classified as `HEALTH_CHECK_TIMEOUT` (client abort), `PROVIDER_TIMEOUT`, `NETWORK_FAILURE`, `AUTH_FAILURE`, or `AI_MODEL_INVALID`.
+
 ## Provider adapter versioning (P1+)
 
 Upstream APIs change independently. Future patterns:
@@ -190,7 +203,8 @@ Model-specific events (always use canonical lowercase `model`):
 
 | Event | When |
 |-------|------|
-| `AI_MODEL_HEALTH_CHECK` | Adapter health probe started |
+| `AI_MODEL_HEALTH_CHECK` | Adapter health probe started (`timeoutMs`, `operationType`) |
+| `AI_OPERATION_TIMEOUT` | Client-side abort timer fired (`elapsedMs`, `timeoutMs`) |
 | `AI_MODEL_EXECUTION` | Gateway attempt before provider call |
 | `AI_MODEL_PROVIDER_ERROR` | Classified provider failure |
 | `AI_MODEL_INVALID` | Provider rejected model id (404 / model-not-found) |

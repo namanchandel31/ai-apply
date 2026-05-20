@@ -126,9 +126,53 @@ const getJDById = async (jobDescriptionId, userId = null, client = null) => {
   };
 };
 
+/**
+ * Draft auto-apply: raw JD only (no parsed row yet).
+ */
+const createPlaceholderJobDescription = async (client, rawText, userId) => {
+  const jd = await createJobDescription(client, null, rawText, userId, {});
+  return { jobDescriptionId: jd.id };
+};
+
+const updateJobDescriptionFromParsed = async (client, jobDescriptionId, parsedJson, userId) => {
+  const { rows } = await client.query(
+    `UPDATE job_descriptions
+     SET title = COALESCE($2, title),
+         company_name = $3,
+         contact_person = $4,
+         contact_email = $5,
+         location = $6,
+         job_type = $7
+     WHERE id = $1 AND ($8::uuid IS NULL OR user_id = $8)
+     RETURNING id`,
+    [
+      jobDescriptionId,
+      parsedJson.job_title || null,
+      parsedJson.company_name || null,
+      parsedJson.contact_person || null,
+      parsedJson.contact_email || null,
+      parsedJson.location || null,
+      parsedJson.job_type || null,
+      userId,
+    ]
+  );
+  if (!rows.length) return null;
+
+  const existing = await client.query(
+    `SELECT 1 FROM parsed_job_descriptions WHERE job_description_id = $1 LIMIT 1`,
+    [jobDescriptionId]
+  );
+  if (!existing.rows.length) {
+    await saveParsedJD(client, jobDescriptionId, parsedJson);
+  }
+  return rows[0];
+};
+
 module.exports = {
   createJobDescription,
   saveParsedJD,
   createJDWithParsedData,
+  createPlaceholderJobDescription,
+  updateJobDescriptionFromParsed,
   getJDById,
 };

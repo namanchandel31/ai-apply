@@ -170,10 +170,36 @@ const getResumeById = async (resumeId, userId = null, client = null) => {
   };
 };
 
+/**
+ * Latest resume for user that has parsed data (fallback when no default is set).
+ */
+const getLatestParsedResumeForUser = async (userId, client = null) => {
+  const queryClient = client || pool;
+  const { rows } = await queryClient.query(
+    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+     FROM resumes r
+     INNER JOIN parsed_resumes pr ON pr.resume_id = r.id
+     WHERE r.user_id = $1
+     ORDER BY r.uploaded_at DESC, pr.created_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+
+  if (rows.length === 0) return null;
+
+  return {
+    resumeId: rows[0].resume_id,
+    parsedResumeId: rows[0].parsed_resume_id,
+    parsedJson: rows[0].parsed_json,
+    filePath: rows[0].file_path,
+  };
+};
+
 module.exports = {
   createResume,
   saveParsedResume,
   findResumeByHash,
   createResumeWithParsedData,
   getResumeById,
+  getLatestParsedResumeForUser,
 };

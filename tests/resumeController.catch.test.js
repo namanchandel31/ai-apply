@@ -30,6 +30,7 @@ describe("uploadResumeController catch handling", () => {
   const baseReq = {
     requestId: "req-1",
     user: { id: "user-1" },
+    body: { context: "onboarding" },
     file: {
       buffer: Buffer.from("%PDF-1.4 test"),
       mimetype: "application/pdf",
@@ -76,10 +77,9 @@ describe("uploadResumeController catch handling", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
-        data: expect.objectContaining({
-          resumeId: "existing-id",
-          message: "Resume retrieved from cache",
-        }),
+        deduplicated: true,
+        resumeId: "existing-id",
+        message: expect.stringContaining("Duplicate resume"),
       })
     );
   });

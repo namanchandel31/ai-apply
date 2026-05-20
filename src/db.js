@@ -1,9 +1,44 @@
 const { Pool } = require("pg");
+const { logger, logInfo, logError } = require("./utils/logger");
+const {
+  instrumentedQuery,
+  connectWithTiming,
+  wrapPoolQuery,
+  getPoolMetrics,
+  startPoolMetricsLogging,
+  stopPoolMetricsLogging,
+} = require("./db/queryInstrumentation");
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // required for Supabase
-});
+function buildPoolConfig() {
+  return {
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    keepAlive: true,
+  };
+}
+
+function attachPoolErrorHandler(pool) {
+  pool.on("error", (err) => {
+    logger.error(
+      {
+        err,
+        event: "PG_POOL_ERROR",
+        error_type: err?.name,
+        error_message: err?.message,
+        pgCode: err?.code,
+      },
+      "Unexpected PostgreSQL pool error"
+    );
+  });
+}
+
+const pool = new Pool(buildPoolConfig());
+attachPoolErrorHandler(pool);
+wrapPoolQuery(pool);
+startPoolMetricsLogging(pool);
 
 /**
  * Test the DB connection — call this once on server start.
@@ -13,10 +48,25 @@ const testConnection = async () => {
     const client = await pool.connect();
     await client.query("SELECT 1");
     client.release();
-    console.log("✅ Database connected successfully");
+    logInfo("database_connected", { message: "Database connected successfully" });
   } catch (err) {
-    console.error("❌ Database connection failed:", err.message);
+    logError("database_connection_failed", err);
   }
 };
 
-module.exports = { pool, testConnection };
+async function closePoolIfAny() {
+  await pool.end();
+}
+
+module.exports = {
+  pool,
+  instrumentedQuery,
+  connectWithTiming,
+  getPoolMetrics,
+  startPoolMetricsLogging,
+  stopPoolMetricsLogging,
+  closePoolIfAny,
+  testConnection,
+  buildPoolConfig,
+  attachPoolErrorHandler,
+};

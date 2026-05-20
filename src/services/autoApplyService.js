@@ -130,7 +130,7 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
       client,
       emailStatus,
       recipientEmail: contactEmail || null,
-      resumeSnapshotPath: resume.file_path,
+      resumeSnapshotPath: resume.filePath,
       normalizedJobTitle: jobTitle,
       normalizedCompanyName: company,
       parsedJdSnapshot: {

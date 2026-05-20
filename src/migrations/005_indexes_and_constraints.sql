@@ -13,8 +13,18 @@ CREATE INDEX IF NOT EXISTS idx_app_jd_id ON applications(job_description_id);
 CREATE INDEX IF NOT EXISTS idx_parsed_resume_id ON parsed_resumes(resume_id);
 CREATE INDEX IF NOT EXISTS idx_parsed_jd_id ON parsed_job_descriptions(job_description_id);
 
--- Performance indexes
-CREATE INDEX IF NOT EXISTS idx_app_status ON applications(status);
+-- Performance indexes (status column removed in 011b — only create when present)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'applications'
+      AND column_name = 'status'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_app_status ON applications(status);
+  END IF;
+END $$;
 -- Note: file_hash has UNIQUE constraint, no separate index needed
 
 -- JSONB performance indexes

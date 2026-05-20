@@ -36,11 +36,16 @@ function computePromptHash(systemPrompt, userPrompt) {
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 32);
 }
 
-function classifyProviderError(err) {
+function classifyProviderError(err, { operationType } = {}) {
   if (err instanceof NonRetryableError || err instanceof RetryableError) return err;
-  if (err.name === "AbortError") return new RetryableError(`Request aborted: ${err.message}`);
-  if (["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"].includes(err.code)) {
-    return new RetryableError(err.message);
+  if (err.name === "AbortError" || err.code === "ABORT_ERR") {
+    const prefix =
+      operationType === "health_check" ? "Health check timed out" : "Request aborted";
+    return new RetryableError(`${prefix}: ${err.message || "operation aborted"}`);
+  }
+  if (["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED", "ECONNABORTED"].includes(err.code)) {
+    const label = err.code === "ETIMEDOUT" ? "Provider timeout" : "Network error";
+    return new RetryableError(`${label}: ${err.message}`);
   }
   if (err.status === 401 || err.status === 403) {
     return new NonRetryableError(`Authentication failed: ${err.message}`);

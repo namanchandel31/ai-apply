@@ -78,7 +78,7 @@ describe("parseJobDescription — valid input", () => {
     mockCreate.mockResolvedValue(makeOpenAIResponse(payload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("We are hiring a Flutter Developer at Acme Corp.");
+    const result = await parseJobDescription("We are hiring a Flutter Developer at Acme Corp.", "user-test");
 
     expect(result.job_title).toBe("Flutter Developer");
     expect(result.company_name).toBe("Acme Corp");
@@ -110,7 +110,7 @@ describe("parseJobDescription — missing fields", () => {
     mockCreate.mockResolvedValue(makeOpenAIResponse(payload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("Backend Engineer role.");
+    const result = await parseJobDescription("Backend Engineer role.", "user-test");
 
     expect(result.company_name).toBeNull();
     expect(result.contact_person).toBeNull();
@@ -144,7 +144,7 @@ describe("parseJobDescription — invalid JSON triggers retry", () => {
       .mockResolvedValueOnce(makeOpenAIResponse(validPayload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("Senior Designer needed.");
+    const result = await parseJobDescription("Senior Designer needed.", "user-test");
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(result.job_title).toBe("Designer");
@@ -155,7 +155,7 @@ describe("parseJobDescription — invalid JSON triggers retry", () => {
     mockCreate.mockResolvedValue(makeOpenAIResponse("INVALID JSON EVERY TIME }{"));
 
     const { parseJobDescription } = getService();
-    await expect(parseJobDescription("Some JD text.")).rejects.toThrow();
+    await expect(parseJobDescription("Some JD text.", "user-test")).rejects.toThrow();
     expect(mockCreate).toHaveBeenCalledTimes(3); // MAX_RETRIES = 3
   });
 });
@@ -181,7 +181,7 @@ describe("parseJobDescription — schema validation failure", () => {
     const { parseJobDescription } = getService();
     const NonRetryableError = getNonRetryableError();
 
-    await expect(parseJobDescription("Some JD.")).rejects.toThrow(NonRetryableError);
+    await expect(parseJobDescription("Some JD.", "user-test")).rejects.toThrow(NonRetryableError);
 
     // Must NOT retry on schema failure
     expect(mockCreate).toHaveBeenCalledTimes(1);
@@ -207,7 +207,7 @@ describe("parseJobDescription — skills normalization", () => {
     mockCreate.mockResolvedValue(makeOpenAIResponse(payload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("Mobile developer with Flutter and Dart.");
+    const result = await parseJobDescription("Mobile developer with Flutter and Dart.", "user-test");
 
     expect(result.skills).toEqual(["flutter", "dart"]);
   });
@@ -232,7 +232,7 @@ describe("parseJobDescription — invalid contact fields", () => {
     mockCreate.mockResolvedValue(makeOpenAIResponse(payload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("Product Manager position.");
+    const result = await parseJobDescription("Product Manager position.", "user-test");
 
     expect(result.contact_email).toBeNull();
     expect(result.contact_number).toBeNull();
@@ -245,7 +245,7 @@ describe("parseJobDescription — invalid contact fields", () => {
 describe("parseJobDescription — empty input", () => {
   it("throws for empty string", async () => {
     const { parseJobDescription } = getService();
-    await expect(parseJobDescription("")).rejects.toThrow(
+    await expect(parseJobDescription("", "user-test")).rejects.toThrow(
       "parseJobDescription: rawText must be a non-empty string"
     );
     expect(mockCreate).not.toHaveBeenCalled();
@@ -253,7 +253,7 @@ describe("parseJobDescription — empty input", () => {
 
   it("throws for whitespace-only string", async () => {
     const { parseJobDescription } = getService();
-    await expect(parseJobDescription("   ")).rejects.toThrow(
+    await expect(parseJobDescription("   ", "user-test")).rejects.toThrow(
       "parseJobDescription: rawText must be a non-empty string"
     );
     expect(mockCreate).not.toHaveBeenCalled();
@@ -261,7 +261,7 @@ describe("parseJobDescription — empty input", () => {
 
   it("throws for null input", async () => {
     const { parseJobDescription } = getService();
-    await expect(parseJobDescription(null)).rejects.toThrow(
+    await expect(parseJobDescription(null, "user-test")).rejects.toThrow(
       "parseJobDescription: rawText must be a non-empty string"
     );
     expect(mockCreate).not.toHaveBeenCalled();
@@ -290,7 +290,7 @@ describe("parseJobDescription — OpenAI failure retry logic", () => {
       .mockResolvedValueOnce(makeOpenAIResponse(validPayload));
 
     const { parseJobDescription } = getService();
-    const result = await parseJobDescription("Looking for a developer.");
+    const result = await parseJobDescription("Looking for a developer.", "user-test");
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(result.job_title).toBe("Developer");
@@ -319,7 +319,7 @@ describe("parseJobDescription — input truncation", () => {
 
     // Create string > 5000 chars
     const largeInput = "A".repeat(5050);
-    await parseJobDescription(largeInput);
+    await parseJobDescription(largeInput, "user-test");
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
 

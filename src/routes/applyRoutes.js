@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { processApplication } = require("../controllers/applyController");
-const { getApplicationsController } = require("../controllers/applicationController");
+const { listApplicationsLegacyController } = require("../controllers/applicationController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
 
@@ -69,6 +69,6 @@ router.post("/", authMiddleware, applyRateLimit, processApplication);
  *       200:
  *         description: List of applications returned successfully
  */
-router.get("/", authMiddleware, getApplicationsController);
+router.get("/", authMiddleware, listApplicationsLegacyController);
 
 module.exports = router;

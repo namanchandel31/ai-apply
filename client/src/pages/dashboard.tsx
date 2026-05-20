@@ -25,9 +25,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const setupLoaded = !isLoading && (isSuccess || isError);
   const hasResume = !!status?.hasResume;
+  const hasValidResume = status?.hasValidResume ?? hasResume;
   const hasEmailSetup = !!status?.hasEmailSetup;
   const hasAiSetup = !!status?.hasAiSetup;
-  const canApply = setupLoaded && hasResume && hasEmailSetup && hasAiSetup && !loadingTask;
+  const canApply = setupLoaded && hasValidResume && hasEmailSetup && hasAiSetup && !loadingTask;
 
   useEffect(() => {
     if (isError) {
@@ -45,19 +46,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
     setLoadingTask({
       type: "apply",
-      label: "Analyzing JD, matching profile, and drafting email...",
+      label: "Queuing your application…",
       startedAt: Date.now(),
     });
 
     try {
-      const jdRes = await api.uploadJD(text, "");
-      const jdId = jdRes.data.jobDescriptionId;
-
-      const applyRes = await api.apply(status!.activeResume!.id, jdId);
-      const appId = applyRes.data.applicationId;
-
-      await api.send(appId);
-      toast.success("Application successfully sent!");
+      const applyRes = await api.autoApply(text);
+      toast.success("Application queued — we'll draft and send it in the background.", {
+        description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
+      });
 
       const textarea = document.getElementById("jd-text") as HTMLTextAreaElement;
       if (textarea) textarea.value = "";
@@ -70,8 +67,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const applyDisabledReason = !setupLoaded
     ? null
-    : !hasResume
-      ? "Upload a resume in Setup before applying"
+    : !hasValidResume
+      ? "Upload and parse a resume in Setup before using auto apply"
       : !hasEmailSetup
         ? "Connect your email in Setup before applying"
         : !hasAiSetup
@@ -174,7 +171,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <CardHeader className="text-center pb-4 pt-8">
           <CardTitle className="font-serif text-3xl">Apply to a Job</CardTitle>
           <CardDescription className="text-base mt-2">
-            Paste the job description and let AI tailor + send your application.
+            Paste the job description — AI will tailor and send your application in the background.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-8">

@@ -1,71 +1,114 @@
 const { pool } = require("../db");
 const { logInfo, logError } = require("../utils/logger");
+const { buildLogContext } = require("../utils/buildLogContext");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
-const { markAbandoned } = require("../models/applicationModel");
+const { enqueueProcessApplicationJob } = require("../queues/processApplicationQueue");
+const { bullmqQueueForJobType } = require("../queues/queueConstants");
+const {
+  findRecoverableStuckQueuedJobs,
+  findRecoverableStuckProcessingJobs,
+  createJob,
+} = require("../models/applicationJobModel");
+const { transitionJobState } = require("../services/transitionJobState");
+const { transitionApplicationState } = require("../services/transitionApplicationState");
+const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 
 /**
- * Re-enqueues jobs that have been stuck in 'queued' for >5 minutes without processing_started_at.
+ * Recovery operates on latest active application_jobs per type — skips needs_review / sent / cancelled.
  */
-async function recoverStuckQueued(client) {
-  const { rows } = await client.query(
-    `SELECT a.id, a.user_id, jd.contact_email AS recipient_email 
-     FROM applications a
-     LEFT JOIN job_descriptions jd ON a.job_description_id = jd.id
-     WHERE a.email_status = 'queued' 
-       AND a.processing_started_at IS NULL 
-       AND a.created_at < NOW() - interval '5 minutes'`
-  );
+async function recoverStuckJobs(client) {
+  const queued = await findRecoverableStuckQueuedJobs(5, client);
+  for (const row of queued) {
+    const ctx = buildLogContext({
+      applicationId: row.application_id,
+      jobId: row.id,
+      userId: row.user_id,
+      queueName: bullmqQueueForJobType(row.job_type),
+      jobType: row.job_type,
+    });
+    try {
+      let enqueueResult;
+      if (row.job_type === "send_email") {
+        const email = row.contact_email || row.recipient_email;
+        if (!email) {
+          logInfo("RECOVERY_SKIP_NO_EMAIL", ctx);
+          continue;
+        }
+        enqueueResult = await enqueueSendJob(row.application_id, row.user_id, email, {
+          dbJobId: row.id,
+        });
+      } else if (row.job_type === "ai_process") {
+        enqueueResult = await enqueueProcessApplicationJob(row.application_id, row.user_id, {
+          dbJobId: row.id,
+        });
+      }
+      logInfo("RECOVERY_REENQUEUED", {
+        ...ctx,
+        jobType: row.job_type,
+        alreadyQueued: Boolean(enqueueResult?.alreadyQueued),
+      });
+    } catch (err) {
+      logError("RECOVERY_REENQUEUE_FAILED", err, ctx);
+    }
+  }
 
-  for (const row of rows) {
-    if (!row.recipient_email) {
-      logInfo("APPLICATION_RECOVERY_SKIPPED_NO_CONTACT_EMAIL", { applicationId: row.id, reason: "Missing contact_email in job_descriptions" });
-      await markAbandoned(row.id, "missing_contact_email_recovery");
+  const processing = await findRecoverableStuckProcessingJobs(15, client);
+  const MAX = parseInt(process.env.MAX_PROCESSING_ATTEMPTS || "5", 10);
+
+  for (const row of processing) {
+    const ctx = buildLogContext({
+      applicationId: row.application_id,
+      jobId: row.id,
+      userId: row.user_id,
+      queueName: bullmqQueueForJobType(row.job_type),
+      jobType: row.job_type,
+    });
+
+    if (row.retry_count >= MAX) {
+      await transitionJobState(client, {
+        jobId: row.id,
+        expectedStatus: "processing",
+        nextStatus: "failed",
+        lastError: "recovery_max_attempts",
+      });
+      await transitionApplicationState(client, {
+        applicationId: row.application_id,
+        expectedStatus: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
+        nextStatus: APPLICATION_STATUS.FAILED,
+        patch: { lastError: "recovery_max_attempts", failureStage: "recovery" },
+      });
+      logInfo("RECOVERY_JOB_FAILED", ctx);
       continue;
     }
 
-    try {
-      await enqueueSendJob(row.id, row.user_id, row.recipient_email);
-      logInfo("RECOVERY_QUEUED_REENQUEUED", { applicationId: row.id });
-    } catch (err) {
-      logError("RECOVERY_REENQUEUE_FAILED", err, { applicationId: row.id });
-    }
-  }
-}
+    await transitionJobState(client, {
+      jobId: row.id,
+      expectedStatus: "processing",
+      nextStatus: "retrying",
+    });
 
-/**
- * Recovers jobs stuck in 'processing' for >15 minutes.
- * Resets them to 'queued' or marks them 'abandoned' if max attempts reached.
- */
-async function recoverStalledProcessing(client) {
-  const { rows } = await client.query(
-    `SELECT id, processing_attempts 
-     FROM applications
-     WHERE email_status = 'processing' 
-       AND processing_started_at < NOW() - interval '15 minutes'`
-  );
+    const newJob = await createJob(
+      {
+        applicationId: row.application_id,
+        jobType: row.job_type,
+        status: "queued",
+      },
+      client
+    );
 
-  const MAX = parseInt(process.env.MAX_PROCESSING_ATTEMPTS || "5", 10);
-
-  for (const row of rows) {
-    if (row.processing_attempts >= MAX) {
-      await markAbandoned(row.id, "recovery_abandoned");
-      logInfo("APPLICATION_ABANDONED", { applicationId: row.id, processing_attempts: row.processing_attempts });
+    if (row.job_type === "send_email") {
+      const email = row.contact_email || row.recipient_email;
+      if (email) {
+        await enqueueSendJob(row.application_id, row.user_id, email, { dbJobId: newJob.id });
+      }
     } else {
-      await client.query(
-        `UPDATE applications 
-         SET email_status='queued', processing_started_at=NULL
-         WHERE id=$1 AND email_status='processing'`,
-        [row.id]
-      );
-      logInfo("RECOVERY_PROCESSING_RESET", { applicationId: row.id });
+      await enqueueProcessApplicationJob(row.application_id, row.user_id, { dbJobId: newJob.id });
     }
+
+    logInfo("RECOVERY_PROCESSING_RESET", { ...ctx, newJobId: newJob.id });
   }
 }
 
-/**
- * Runs the recovery routines wrapped in a PostgreSQL advisory lock
- * to ensure singleton safety across horizontally scaled instances.
- */
 async function runRecovery() {
   const client = await pool.connect();
   let lockAcquired = false;
@@ -73,16 +116,22 @@ async function runRecovery() {
   try {
     const { rows } = await client.query("SELECT pg_try_advisory_lock(987654321) AS acquired");
     lockAcquired = rows[0].acquired;
-
     if (!lockAcquired) {
       logInfo("RECOVERY_LOCK_SKIPPED", { reason: "another instance holds lock" });
       return;
     }
 
     logInfo("RECOVERY_LOCK_ACQUIRED");
-    await recoverStuckQueued(client);
-    await recoverStalledProcessing(client);
-
+    try {
+      const { getAllQueueCounts } = require("../queues/validateQueueSystem");
+      const counts = await getAllQueueCounts();
+      for (const [queueName, metrics] of Object.entries(counts)) {
+        logInfo("RECOVERY_QUEUE_METRICS", { queueName, ...metrics });
+      }
+    } catch (metricsErr) {
+      logError("RECOVERY_QUEUE_METRICS_FAILED", metricsErr);
+    }
+    await recoverStuckJobs(client);
   } finally {
     if (lockAcquired) {
       await client.query("SELECT pg_advisory_unlock(987654321)");
@@ -92,9 +141,6 @@ async function runRecovery() {
   }
 }
 
-/**
- * Recursive timeout loop to prevent overlapping recovery executions.
- */
 async function recoveryLoop() {
   logInfo("RECOVERY_LOOP_STARTED");
   try {
@@ -102,21 +148,8 @@ async function recoveryLoop() {
     logInfo("RECOVERY_LOOP_COMPLETED");
   } catch (err) {
     logError("RECOVERY_LOOP_ERROR", err);
-  } finally {
-    setTimeout(recoveryLoop, 5 * 60 * 1000); // 5 minutes
   }
+  setTimeout(recoveryLoop, 5 * 60 * 1000);
 }
 
-// TODO [SHUTDOWN]: Track setTimeout reference for graceful process exit:
-// let recoveryTimer = null;
-// ... finally { recoveryTimer = setTimeout(recoveryLoop, 5 * 60 * 1000); }
-// function stopRecoveryLoop() { if (recoveryTimer) clearTimeout(recoveryTimer); }
-
-// TODO [METRICS]: Future metrics roadmap:
-// - recovery_reenqueued_total
-// - recovery_abandoned_total
-
-module.exports = {
-  recoveryLoop,
-  runRecovery, // Exported for unit testing
-};
+module.exports = { runRecovery, recoveryLoop };

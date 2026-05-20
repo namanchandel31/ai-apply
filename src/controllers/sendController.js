@@ -1,18 +1,19 @@
 const { sendApplication } = require("../services/mailService");
 const { getUserId } = require("../utils/auth");
 const { logInfo, logError } = require("../utils/logger");
-const { error, ok, ERROR_CODES } = require("../utils/response");
+const { ok, ERROR_CODES } = require("../utils/response");
+const { sendError } = require("../utils/httpErrorResponse");
+const { buildLogContext } = require("../utils/buildLogContext");
 
 const sendApplicationController = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
   const { applicationId } = req.params;
   const userId = getUserId(req);
-  const meta = { reqId, applicationId, userId };
+  const meta = buildLogContext({ reqId, applicationId, userId });
 
   try {
     logInfo("send_application_start", meta);
 
-    // Validate recipient email (override or fall back handled inside sendApplication)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const rawRecipient = req.body?.recipientEmail;
     let recipientEmail = null;
@@ -22,15 +23,18 @@ const sendApplicationController = async (req, res) => {
       if (emailRegex.test(normalized)) {
         recipientEmail = normalized;
       } else {
-        return error(res, 400, "Invalid recipientEmail format", ERROR_CODES.BAD_REQUEST);
+        return sendError(res, {
+          status: 400,
+          code: ERROR_CODES.BAD_REQUEST,
+          message: "Invalid recipientEmail format",
+          retryable: false,
+        });
       }
     }
 
-    // Fetch the application to resolve the JD contact email if no override provided.
-    // Full ownership check is enforced inside getApplicationById (user_id in WHERE).
     const { pool } = require("../db");
     const { rows: apps } = await pool.query(
-      `SELECT a.email_subject, a.email_body, a.email_status,
+      `SELECT a.email_subject, a.email_body, a.application_status,
               r.file_path,
               jd.contact_email AS jd_contact_email
        FROM applications a
@@ -41,32 +45,53 @@ const sendApplicationController = async (req, res) => {
     );
 
     if (apps.length === 0) {
-      return error(res, 404, "Application not found", ERROR_CODES.NOT_FOUND);
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "Application not found",
+        retryable: false,
+      });
     }
 
     const application = apps[0];
 
-    // Resolve recipient
     if (!recipientEmail && application.jd_contact_email) {
       const jdEmail = application.jd_contact_email.trim().toLowerCase();
       if (emailRegex.test(jdEmail)) recipientEmail = jdEmail;
     }
 
     if (!recipientEmail) {
-      return error(res, 400, "Valid recipient email is required (none found in request or JD)", ERROR_CODES.BAD_REQUEST);
+      return sendError(res, {
+        status: 400,
+        code: ERROR_CODES.BAD_REQUEST,
+        message: "Valid recipient email is required (none found in request or JD)",
+        retryable: false,
+      });
     }
 
-    // Guard: already in a terminal state — idempotent short-circuit
-    if (application.email_status === "sent") {
+    if (application.application_status === "sent") {
       logInfo("send_already_sent", { ...meta, state: "sent" });
       return ok(res, { status: "sent", message: "Application already sent" });
     }
 
-    if (application.email_status === "abandoned") {
-      return error(res, 409, "Application has been permanently abandoned after exceeding max retries", "ABANDONED");
+    if (application.application_status === "cancelled") {
+      return sendError(res, {
+        status: 409,
+        code: "CANCELLED",
+        message: "Application has been cancelled",
+        retryable: false,
+      });
     }
 
-    // ── Delegate everything to the service (queue-boundary) ─────────────────
+    if (application.application_status === "failed") {
+      return sendError(res, {
+        status: 409,
+        code: "FAILED",
+        message: "Application failed — use retry endpoint",
+        retryable: false,
+      });
+    }
+
     const result = await sendApplication(applicationId, userId, recipientEmail, meta);
 
     if (result.alreadyProcessing) {
@@ -74,26 +99,50 @@ const sendApplicationController = async (req, res) => {
       return ok(res, { status: "processing", message: "Send already in progress" });
     }
 
-    logInfo("send_application_success", { ...meta, state: "sent" });
+    if (result.alreadySent || result.sent) {
+      return ok(res, { status: "sent", message: "Application already sent" });
+    }
 
+    if (result.queued) {
+      return res.status(202).json({
+        success: true,
+        data: { status: "queued", message: "Send queued — worker will deliver email" },
+      });
+    }
+
+    logInfo("send_application_success", { ...meta, state: "sent" });
     return ok(res, {
       messageId: result.messageId,
-      status:    "sent",
-      sentAt:    result.sentAt,
-      message:   "Application sent successfully",
+      status: "sent",
+      sentAt: result.sentAt,
+      message: "Application sent successfully",
     });
-
   } catch (err) {
     logError("send_application_error", err, meta);
 
     if (err.stage === "validation") {
-      return error(res, 400, err.message, ERROR_CODES.BAD_REQUEST);
+      return sendError(res, {
+        status: 400,
+        code: ERROR_CODES.BAD_REQUEST,
+        message: "Invalid send request",
+        retryable: false,
+      });
     }
     if (err.stage === "storage") {
-      return error(res, 502, `Storage error: ${err.message}`, "STORAGE_ERROR");
+      return sendError(res, {
+        status: 502,
+        code: "STORAGE_ERROR",
+        message: "Storage error while sending application",
+        retryable: true,
+      });
     }
 
-    return error(res, 500, `Failed to send application: ${err.message}`, ERROR_CODES.INTERNAL_ERROR);
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "Failed to send application",
+      retryable: true,
+    });
   }
 };
 

@@ -1,6 +1,10 @@
 const { pool } = require('../db');
 const { ok, error, ERROR_CODES } = require('../utils/response');
+const { sendError } = require('../utils/httpErrorResponse');
 const { logError } = require('../utils/logger');
+const { isTransientPgError } = require('../utils/pgErrors');
+const { getUserDefaults } = require('../models/userModel');
+const { getResumeById } = require('../models/resumeModel');
 
 const getSetupStatusController = async (req, res) => {
   const userId = req.user.id;
@@ -38,8 +42,26 @@ const getSetupStatusController = async (req, res) => {
     const hasEmailSetup = credRows.length > 0;
     const hasAiSetup = aiChainRows.length > 0 || !!process.env.OPENAI_API_KEY;
 
+    let hasValidResume = false;
+    const defaults = await getUserDefaults(userId);
+    if (defaults?.defaultResumeId) {
+      const defaultParsed = await getResumeById(defaults.defaultResumeId, userId);
+      hasValidResume = !!defaultParsed?.parsedJson;
+    }
+    if (!hasValidResume && hasResume) {
+      const { rows: parsedRows } = await pool.query(
+        `SELECT 1 FROM resumes r
+         INNER JOIN parsed_resumes pr ON pr.resume_id = r.id
+         WHERE r.user_id = $1
+         LIMIT 1`,
+        [userId]
+      );
+      hasValidResume = parsedRows.length > 0;
+    }
+
     return ok(res, {
       hasResume,
+      hasValidResume,
       hasEmailSetup,
       hasAiSetup,
       activeResume: hasResume ? resumeRows[0] : null,
@@ -49,6 +71,14 @@ const getSetupStatusController = async (req, res) => {
     });
   } catch (err) {
     logError("GET_SETUP_STATUS_ERROR", err, { userId, reqId: req.requestId });
+    if (isTransientPgError(err)) {
+      return sendError(res, {
+        status: 503,
+        code: "SERVICE_UNAVAILABLE",
+        message: "Database temporarily unavailable. Please retry.",
+        retryable: true,
+      });
+    }
     return error(res, 500, "Failed to fetch setup status", ERROR_CODES.INTERNAL_ERROR);
   }
 };

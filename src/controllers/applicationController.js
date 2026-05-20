@@ -1,32 +1,295 @@
-const { pool } = require('../db');
-const { ok, error, ERROR_CODES } = require('../utils/response');
-const { logError } = require('../utils/logger');
+const {
+  listApplicationsForUser,
+  getApplicationById,
+  getApplicationStatusBundle,
+  getApplicationStatusSnapshot,
+} = require("../models/applicationModel");
+const { getApplicationStatusForPoll } = require("../services/applicationStatusForPoll");
+const { pool, getPoolMetrics } = require("../db");
+const { orchestrationDedupe } = require("../utils/logDedupe");
+const { metrics } = require("../observability/orchestrationMetrics");
+const { getLatestJobsForApplication, getJobById } = require("../models/applicationJobModel");
+const {
+  buildStatusFingerprint,
+  buildSnapshotFingerprint,
+  computeStatusEtag,
+  etagMatches,
+  parseIfNoneMatch,
+} = require("../services/applicationStatusEtag");
+const { serializeApplication } = require("../services/applicationSerializer");
+const {
+  continueApplication,
+  retryApplication,
+  cancelApplication,
+} = require("../services/applicationCommandService");
+const { ok, ERROR_CODES } = require("../utils/response");
+const { sendError } = require("../utils/httpErrorResponse");
+const { logError } = require("../utils/logger");
+const { buildLogContext } = require("../utils/buildLogContext");
 
-const getApplicationsController = async (req, res) => {
-  const userId = req.user.id;
+const CLIENT_ERROR_MESSAGES = {
+  NOT_FOUND: "Application not found",
+  INVALID_EMAIL: "Invalid contact email format",
+  INVALID_STATE: "Operation not allowed in current state",
+  DUPLICATE_CONTINUE: "Duplicate continue request",
+  SEND_ALREADY_IN_FLIGHT: "Send already in progress",
+  ALREADY_SENT: "Application already sent",
+  STATE_TRANSITION_CONFLICT: "State transition conflict",
+  RETRY_ALREADY_IN_FLIGHT: "A retry is already in progress",
+};
+
+function handleCommandError(res, err, req) {
+  const map = {
+    NOT_FOUND: 404,
+    INVALID_EMAIL: 400,
+    INVALID_STATE: 409,
+    DUPLICATE_CONTINUE: 409,
+    SEND_ALREADY_IN_FLIGHT: 409,
+    ALREADY_SENT: 409,
+    STATE_TRANSITION_CONFLICT: 409,
+    RETRY_ALREADY_IN_FLIGHT: 409,
+  };
+  const status = map[err.code] || 500;
+  const code = err.code || ERROR_CODES.INTERNAL_ERROR;
+  const message =
+    status < 500
+      ? CLIENT_ERROR_MESSAGES[err.code] || "Request could not be completed"
+      : "An internal error occurred.";
+
+  if (status >= 500) {
+    logError("APPLICATION_COMMAND_ERROR", err, buildLogContext({
+      reqId: req.requestId,
+      userId: req.user?.id,
+      applicationId: req.params?.id,
+      route: req.originalUrl,
+      method: req.method,
+    }));
+  }
+
+  return sendError(res, {
+    status,
+    code,
+    message,
+    retryable: status >= 500,
+  });
+}
+
+const listApplicationsController = async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT 
-         a.id, 
-         a.status, 
-         a.created_at as "createdAt",
-         a.sent_at as "sentAt",
-         jd.title as "role",
-         jd.company_name as "company"
-       FROM applications a
-       JOIN job_descriptions jd ON a.job_description_id = jd.id
-       WHERE a.user_id = $1
-       ORDER BY a.created_at DESC`,
-      [userId]
+    const rows = await listApplicationsForUser(req.user.id);
+    const data = await Promise.all(
+      rows.map(async (row) => {
+        const jobs = await getLatestJobsForApplication(row.id);
+        return serializeApplication(row, jobs);
+      })
     );
-
-    return ok(res, rows);
+    return ok(res, data);
   } catch (err) {
-    logError("GET_APPLICATIONS_ERROR", err, { userId });
-    return error(res, 500, "Failed to fetch applications", ERROR_CODES.INTERNAL_ERROR);
+    logError("GET_APPLICATIONS_ERROR", err, buildLogContext({ userId: req.user.id }));
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "Failed to list applications",
+      retryable: false,
+    });
   }
 };
 
+const getApplicationController = async (req, res) => {
+  try {
+    const row = await getApplicationById(req.params.id, req.user.id);
+    if (!row) {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "Application not found",
+        retryable: false,
+      });
+    }
+    const jobs = await getLatestJobsForApplication(row.id);
+    return ok(res, serializeApplication(row, jobs));
+  } catch (err) {
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "Failed to fetch application",
+      retryable: false,
+    });
+  }
+};
+
+function logStatusPollEvent(durationMs, bundleQueryMs, payload) {
+  metrics.histogram("orchestration.poll.duration_ms", durationMs, {
+    fastPath: payload.fastPath || "bundle",
+  });
+  if (payload.fastPath === "terminal") return;
+  const base = { ...payload, durationMs, bundleQueryMs, component: "poll" };
+  if (durationMs > 500) {
+    orchestrationDedupe.record("warn", "STATUS_POLL_CRITICAL", payload.applicationId, base);
+  } else if (durationMs > 250) {
+    orchestrationDedupe.record("warn", "STATUS_POLL_SLOW", payload.applicationId, base);
+  } else if (bundleQueryMs > 100) {
+    orchestrationDedupe.record("warn", "STATUS_POLL_SLOW_DB", payload.applicationId, base);
+  }
+  orchestrationDedupe.flush();
+}
+
+const getApplicationStatusController = async (req, res) => {
+  const started = performance.now();
+  const poolMetrics = getPoolMetrics(pool);
+
+  try {
+    const t0 = performance.now();
+    const pollResult = await getApplicationStatusForPoll(req.params.id, req.user.id, {
+      getApplicationStatusSnapshot,
+      getApplicationStatusBundle,
+    });
+    const bundleQueryMs = Math.round(performance.now() - t0);
+
+    if (!pollResult) {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "Application not found",
+        retryable: false,
+      });
+    }
+
+    const { row, serialized, fastPath, bundleRow } = pollResult;
+    const fingerprint =
+      fastPath === "terminal"
+        ? buildSnapshotFingerprint(row)
+        : buildStatusFingerprint(bundleRow ?? row);
+    const etag = computeStatusEtag(fingerprint);
+    const ifNoneMatch = parseIfNoneMatch(req.headers["if-none-match"]);
+
+    if (etagMatches(ifNoneMatch, etag)) {
+      const durationMs = Math.round(performance.now() - started);
+      metrics.increment("orchestration.poll.not_modified");
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, no-cache");
+      return res.status(304).end();
+    }
+
+    const durationMs = Math.round(performance.now() - started);
+
+    logStatusPollEvent(durationMs, bundleQueryMs, {
+      applicationId: row.id,
+      userId: req.user.id,
+      reqId: req.requestId,
+      uiStatus: serialized.uiStatus,
+      pollable: serialized.pollable,
+      terminal: serialized.terminal,
+      fastPath,
+      ...poolMetrics,
+    });
+
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, no-cache");
+    return ok(res, {
+      applicationId: row.id,
+      status: serialized.status,
+      uiStatus: serialized.uiStatus,
+      terminal: serialized.terminal,
+      executionTerminal: serialized.executionTerminal,
+      pollable: serialized.pollable,
+      canRetry: serialized.canRetry,
+      canContinue: serialized.canContinue,
+      reviewReason: serialized.reviewReason,
+      version: Number(row.orchestration_version ?? 0),
+      orchestrationEpoch: Number(row.orchestration_epoch ?? 0),
+      updatedAt: serialized.updatedAt,
+    });
+  } catch (err) {
+    logError("STATUS_POLL_ERROR", err, buildLogContext({
+      reqId: req.requestId,
+      userId: req.user?.id,
+      applicationId: req.params?.id,
+    }));
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "Failed to fetch status",
+      retryable: false,
+    });
+  }
+};
+
+const continueApplicationController = async (req, res) => {
+  try {
+    const { contactEmail } = req.body;
+    const idempotencyKey = req.headers["idempotency-key"] || req.headers["x-idempotency-key"];
+    const result = await continueApplication(
+      req.user.id,
+      req.params.id,
+      contactEmail,
+      req.requestId,
+      idempotencyKey
+    );
+    return ok(res, result);
+  } catch (err) {
+    return handleCommandError(res, err, req);
+  }
+};
+
+const retryApplicationController = async (req, res) => {
+  try {
+    const result = await retryApplication(req.user.id, req.params.id, req.requestId);
+    return ok(res, result);
+  } catch (err) {
+    return handleCommandError(res, err, req);
+  }
+};
+
+const cancelApplicationController = async (req, res) => {
+  try {
+    const result = await cancelApplication(req.user.id, req.params.id, req.requestId);
+    return ok(res, result);
+  } catch (err) {
+    return handleCommandError(res, err, req);
+  }
+};
+
+const getApplicationJobController = async (req, res) => {
+  try {
+    const job = await getJobById(req.params.id);
+    if (!job) {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "Job not found",
+        retryable: false,
+      });
+    }
+    const app = await getApplicationById(job.application_id, req.user.id);
+    if (!app) {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "Job not found",
+        retryable: false,
+      });
+    }
+    return ok(res, job);
+  } catch (err) {
+    return sendError(res, {
+      status: 500,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: "Failed to fetch job",
+      retryable: false,
+    });
+  }
+};
+
+const listApplicationsLegacyController = listApplicationsController;
+
 module.exports = {
-  getApplicationsController
+  listApplicationsController,
+  getApplicationController,
+  getApplicationStatusController,
+  continueApplicationController,
+  retryApplicationController,
+  cancelApplicationController,
+  getApplicationJobController,
+  listApplicationsLegacyController,
 };

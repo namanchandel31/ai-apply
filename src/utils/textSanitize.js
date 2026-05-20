@@ -14,10 +14,10 @@ const sanitizeTextForStorage = (text, maxLen = MAX_STORAGE_TEXT_CHARS) => {
   // Drop lone surrogate halves / other non-characters
   s = s.replace(/[\uD800-\uDFFF]/g, "");
   // 1. Protect Emails and URLs from normalization
-  const protected = [];
+  const protectedFragments = [];
   s = s.replace(/(https?:\/\/[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match) => {
-    protected.push(match);
-    return `__PROTECTED_${protected.length - 1}__`;
+    protectedFragments.push(match);
+    return `__PROTECTED_${protectedFragments.length - 1}__`;
   });
 
   // 2. Fix hyphenated line wraps (e.g., appli-\ncations -> applications)
@@ -75,7 +75,7 @@ const sanitizeTextForStorage = (text, maxLen = MAX_STORAGE_TEXT_CHARS) => {
 
   // Restore protected Emails and URLs
   s = s.replace(/__PROTECTED_(\d+)__/g, (match, p1) => {
-    return protected[parseInt(p1, 10)];
+    return protectedFragments[parseInt(p1, 10)];
   });
 
   // 7. Preserve structure (paragraphs, bullets)

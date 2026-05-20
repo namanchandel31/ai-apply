@@ -1,7 +1,8 @@
 const { Queue } = require("bullmq");
 const { connection } = require("./connection");
+const { SEND_APPLICATION_QUEUE } = require("./queueConstants");
 
-const QUEUE_NAME = "send-application";
+const QUEUE_NAME = SEND_APPLICATION_QUEUE;
 
 const sendApplicationQueue = new Queue(QUEUE_NAME, {
   connection,
@@ -24,16 +25,28 @@ const sendApplicationQueue = new Queue(QUEUE_NAME, {
  * Enqueues an application to be sent by the worker.
  * Uses deterministic job IDs for idempotency.
  */
-async function enqueueSendJob(applicationId, userId, recipientEmail) {
-  const jobId = `application:${applicationId}`; // Deterministic ID
-  
+/**
+ * Idempotent send enqueue — deterministic BullMQ job id.
+ * TODO: DLQ — send-application-dlq when DLQ_ENABLED=true
+ */
+async function enqueueSendJob(applicationId, userId, recipientEmail, { dbJobId } = {}) {
+  const jobId = `send:application:${applicationId}`;
+
+  const existing = await sendApplicationQueue.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (["waiting", "delayed", "active"].includes(state)) {
+      return { jobId: existing.id, alreadyQueued: true };
+    }
+  }
+
   const job = await sendApplicationQueue.add(
     QUEUE_NAME,
-    { applicationId, userId, recipientEmail },
+    { applicationId, userId, recipientEmail, dbJobId },
     { jobId }
   );
 
-  return { jobId: job.id };
+  return { jobId: job.id, bullmqJobId: job.id };
 }
 
 module.exports = {

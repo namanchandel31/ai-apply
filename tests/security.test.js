@@ -5,8 +5,11 @@
  * Run these manually with proper test data setup.
  */
 
-const request = require('supertest');
-const app = require('../src/app');
+jest.mock("../src/realtime/sseGateway", () => ({ startSseGateway: jest.fn() }));
+jest.mock("../src/jobs/recovery.job", () => ({ recoveryLoop: jest.fn().mockResolvedValue(undefined) }));
+
+const request = require("supertest");
+const app = require("../index");
 
 // Test data
 const testUser = {
