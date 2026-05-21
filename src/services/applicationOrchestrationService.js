@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("../db");
+const { withPgTransaction } = require("../db/pgClient");
 const { createPlaceholderJobDescription } = require("../models/jdModel");
 const { createApplication } = require("../models/applicationModel");
 const { createJob } = require("../models/applicationJobModel");
@@ -9,7 +10,8 @@ const { resolveResumeForAutoApply } = require("./resolveResumeForAutoApply");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
-const { scheduleApplicationRealtimePublish } = require("./applicationRealtimePublisher");
+const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
+const { enqueuePostCommitPublish } = require("../realtime/postCommitPublishQueue");
 
 /**
  * Draft-first auto-apply — no AI in HTTP path.
@@ -31,12 +33,9 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
   }
 
   const applicationId = crypto.randomUUID();
-  const client = await pool.connect();
   let dbJob;
 
-  try {
-    await client.query("BEGIN");
-
+  await withPgTransaction(pool, async (client) => {
     const { jobDescriptionId } = await createPlaceholderJobDescription(
       client,
       jobDescriptionText,
@@ -83,14 +82,10 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
       },
       client
     );
+  });
 
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+  enqueuePostCommitPublish(applicationId, userId, { source: "auto_apply" });
+  await flushRealtimeAfterDbCommit([applicationId]);
 
   try {
     const { jobId } = await enqueueProcessApplicationJob(applicationId, userId, {
@@ -101,8 +96,6 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
       "job_queued",
       buildLogContext({ reqId, userId, applicationId, jobId: dbJob.id, queueName: "process-application" })
     );
-
-    scheduleApplicationRealtimePublish(applicationId, userId);
 
     return {
       success: true,

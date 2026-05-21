@@ -20,12 +20,12 @@ describe("config env validation", () => {
     process.env.DEBUG = prev;
   });
 
-  it("queue config does not use WORKER_MODE env", () => {
+  it("queue config uses WORKER_MODE env defaulting to separate", () => {
     const src = fs.readFileSync(
       path.join(__dirname, "../../src/config/queue.config.js"),
       "utf8"
     );
-    expect(src).not.toContain("WORKER_MODE");
+    expect(src).toContain('str("WORKER_MODE", "separate")');
     expect(src).toContain("shouldRunInlineWorkers");
   });
 });

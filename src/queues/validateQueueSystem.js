@@ -3,10 +3,13 @@ const { connection } = require("./connection");
 const { processApplicationQueue } = require("./processApplicationQueue");
 const { sendApplicationQueue } = require("./sendApplicationQueue");
 const {
-  PROCESS_APPLICATION_QUEUE,
-  SEND_APPLICATION_QUEUE,
+  QUEUE_NAMES,
   ALL_BULLMQ_QUEUES,
-} = require("./queueConstants");
+  assertQueueConfiguration,
+} = require("../constants/queues");
+
+const PROCESS_APPLICATION_QUEUE = QUEUE_NAMES.PROCESS_APPLICATION;
+const SEND_APPLICATION_QUEUE = QUEUE_NAMES.SEND_APPLICATION;
 const { logInfo, logError } = require("../utils/logger");
 
 async function pingRedis() {
@@ -40,6 +43,16 @@ async function getAllQueueCounts() {
 }
 
 async function validateQueueSystem({ role = "api" } = {}) {
+  assertQueueConfiguration();
+
+  if (!config.redis.redisUrl) {
+    const err = new Error(
+      "REDIS_URL is required for BullMQ (set a redis:// or rediss:// URL)"
+    );
+    logError("QUEUE_SYSTEM_REDIS_URL_MISSING", err, { role });
+    throw err;
+  }
+
   const workerMode = config.queue.workerDeploymentMode();
   const strict = config.queue.queueValidationStrict();
 

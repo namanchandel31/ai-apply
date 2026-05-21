@@ -51,11 +51,9 @@ const saveEmailCredentialsController = async (req, res) => {
     const encryptedPassword = encrypt(normalizedPassword);
 
     // UPSERT credentials
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      const { rows } = await client.query(
+    const { withPgTransaction } = require('../db/pgClient');
+    const rows = await withPgTransaction(pool, async (client) => {
+      const result = await client.query(
         `INSERT INTO user_email_credentials (user_id, email, encrypted_app_password, updated_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (user_id) 
@@ -66,23 +64,16 @@ const saveEmailCredentialsController = async (req, res) => {
          RETURNING user_id, email, updated_at`,
         [userId, normalizedEmail, encryptedPassword]
       );
+      return result.rows;
+    });
 
-      await client.query('COMMIT');
+    logInfo("credential_save_success", { reqId, userId, email: normalizedEmail });
 
-      logInfo("credential_save_success", { reqId, userId, email: normalizedEmail });
-
-      return ok(res, {
-        userId: rows[0].user_id,
-        email: rows[0].email,
-        updatedAt: rows[0].updated_at
-      });
-
-    } catch (dbError) {
-      await client.query('ROLLBACK');
-      throw dbError;
-    } finally {
-      client.release();
-    }
+    return ok(res, {
+      userId: rows[0].user_id,
+      email: rows[0].email,
+      updatedAt: rows[0].updated_at
+    });
 
   } catch (err) {
     logError("credential_save_error", err, { reqId });

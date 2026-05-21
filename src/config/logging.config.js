@@ -17,12 +17,18 @@ function isOrchestrationDebugEnabled(_component) {
   return hasDebugScope("orchestration");
 }
 
+/** When true, truncated AI output snapshots may appear in logs (never input JD/resume/email). */
+function isDebugAiEnabled() {
+  return bool("DEBUG_AI", false);
+}
+
 module.exports = {
   logLevel: str("LOG_LEVEL", "info"),
   logPretty: bool("LOG_PRETTY", isDevelopment),
   debugScopes,
   hasDebugScope,
   isOrchestrationDebugEnabled,
+  isDebugAiEnabled,
   LOG_DEDUPE_WINDOW_MS,
   LOG_DEDUPE_BUCKET_TTL_MS,
   LOG_DEDUPE_MAX_BUCKETS,

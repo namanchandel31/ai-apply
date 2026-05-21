@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { upsertOptimisticApplication } from "@/queries/applicationsCache";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,13 +12,9 @@ import { LoadingTimer } from "@/components/loading-timer";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { AlertCircle, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { PageId } from "@/components/layout";
-
-interface DashboardProps {
-  onNavigate: (page: PageId) => void;
-}
-
-export function Dashboard({ onNavigate }: DashboardProps) {
+export function Dashboard() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: status, isLoading, isSuccess, isError } = useSetupStatus();
   const [loadingTask, setLoadingTask] = useState<{
     type: "resume" | "jd" | "apply";
@@ -52,6 +51,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
     try {
       const applyRes = await api.autoApply(text);
+      upsertOptimisticApplication(queryClient, {
+        id: applyRes.applicationId,
+        status: "draft",
+        uiStatus: "processing",
+        terminal: false,
+        pollable: true,
+        canRetry: false,
+        canContinue: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        jdEnrichment: "pending",
+      });
       toast.success("Application queued — we'll draft and send it in the background.", {
         description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
       });
@@ -121,7 +132,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <AlertCircle className="h-4 w-4 text-amber-500" />
                       Upload a resume before applying.
                     </p>
-                    <Button size="sm" variant="outline" onClick={() => onNavigate("setup")}>
+                    <Button size="sm" variant="outline" onClick={() => navigate("/setup")}>
                       Upload Resume
                     </Button>
                   </div>
@@ -156,7 +167,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <AlertCircle className="h-4 w-4 text-amber-500" />
                       Connect your email account to send applications.
                     </p>
-                    <Button size="sm" variant="outline" onClick={() => onNavigate("setup")}>
+                    <Button size="sm" variant="outline" onClick={() => navigate("/setup")}>
                       Connect Email
                     </Button>
                   </div>

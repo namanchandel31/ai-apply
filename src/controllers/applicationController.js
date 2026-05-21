@@ -173,6 +173,10 @@ const getApplicationStatusController = async (req, res) => {
 
     const durationMs = Math.round(performance.now() - started);
 
+    if (serialized.pollable) {
+      metrics.increment("orchestration.poll.tick", { fastPath: String(fastPath ?? "bundle") });
+    }
+
     logStatusPollEvent(durationMs, bundleQueryMs, {
       applicationId: row.id,
       userId: req.user.id,
@@ -199,6 +203,9 @@ const getApplicationStatusController = async (req, res) => {
       version: Number(row.orchestration_version ?? 0),
       orchestrationEpoch: Number(row.orchestration_epoch ?? 0),
       updatedAt: serialized.updatedAt,
+      role: serialized.role ?? null,
+      company: serialized.company ?? null,
+      jdEnrichment: serialized.jdEnrichment,
     });
   } catch (err) {
     logError("STATUS_POLL_ERROR", err, buildLogContext({

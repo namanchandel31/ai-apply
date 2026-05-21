@@ -6,6 +6,17 @@
 require("dotenv").config();
 
 const { logInfo, logError } = require("../utils/logger");
+const {
+  registerProcessLifecycleHandlers,
+  startRuntimeDiagnostics,
+} = require("../observability/processLifecycle");
+
+registerProcessLifecycleHandlers();
+startRuntimeDiagnostics(30000);
+const { registerRuntimeOwnership } = require("../runtime/runtimeOwnership");
+registerRuntimeOwnership({ role: "worker", sseGatewayOwner: false });
+const { startPostCommitSweep } = require("../realtime/postCommitPublishQueue");
+startPostCommitSweep();
 const { validateQueueSystem } = require("../queues/validateQueueSystem");
 
 async function bootWorkers() {
@@ -19,6 +30,10 @@ async function bootWorkers() {
   }
   require("./processApplication.worker");
   require("./sendApplication.worker");
+  const { pool, startPoolMetricsLogging } = require("../db");
+  startPoolMetricsLogging(pool);
+  const { markBootPhaseComplete } = require("../observability/processLifecycle");
+  markBootPhaseComplete();
   logInfo("ALL_WORKERS_STARTED", {
     queues: ["process-application", "send-application"],
   });

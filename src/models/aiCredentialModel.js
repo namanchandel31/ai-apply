@@ -72,12 +72,10 @@ async function upsertCredential({
   allowPlatformFallback,
   role,
 }) {
-  const client = await pool.connect();
+  const { withPgTransaction } = require("../db/pgClient");
   const isPrimary = role !== "backup";
 
-  try {
-    await client.query("BEGIN");
-
+  return withPgTransaction(pool, async (client) => {
     const { rows: existing } = await client.query(
       `SELECT id FROM user_ai_credentials
        WHERE user_id = $1 AND provider = $2 AND label = $3`,
@@ -171,20 +169,13 @@ async function upsertCredential({
       [credentialId]
     );
 
-    await client.query("COMMIT");
     return result[0];
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 async function reorderChain(userId, orderedIds) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const { withPgTransaction } = require("../db/pgClient");
+  await withPgTransaction(pool, async (client) => {
     const { rows } = await client.query(
       `SELECT id FROM user_ai_credentials WHERE user_id = $1`,
       [userId]
@@ -203,14 +194,8 @@ async function reorderChain(userId, orderedIds) {
       }
     }
     await applyPriorities(client, userId, orderedIds);
-    await client.query("COMMIT");
-    return listByUser(userId);
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+  });
+  return listByUser(userId);
 }
 
 async function promoteToPrimary(credentialId, userId) {
@@ -252,38 +237,39 @@ async function updateHealth(credentialId, userId, healthStatus, { allowTerminalC
 }
 
 async function deleteCredential(id, userId) {
-  const client = await pool.connect();
-  try {
+  const { withPgClient, markClientInTransaction } = require("../db/pgClient");
+  return withPgClient(pool, async (client) => {
     await client.query("BEGIN");
-    const row = await getById(id, userId);
-    if (!row) {
-      await client.query("ROLLBACK");
-      return false;
-    }
+    markClientInTransaction(client);
+    try {
+      const row = await getById(id, userId);
+      if (!row) {
+        await client.query("ROLLBACK");
+        return false;
+      }
 
-    await client.query(`DELETE FROM user_ai_credentials WHERE id = $1 AND user_id = $2`, [id, userId]);
+      await client.query(`DELETE FROM user_ai_credentials WHERE id = $1 AND user_id = $2`, [id, userId]);
 
-    const { rows: remaining } = await client.query(
-      `SELECT id FROM user_ai_credentials WHERE user_id = $1 ORDER BY priority ASC`,
-      [userId]
-    );
-
-    if (remaining.length) {
-      await applyPriorities(
-        client,
-        userId,
-        remaining.map((r) => r.id)
+      const { rows: remaining } = await client.query(
+        `SELECT id FROM user_ai_credentials WHERE user_id = $1 ORDER BY priority ASC`,
+        [userId]
       );
-    }
 
-    await client.query("COMMIT");
-    return true;
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
+      if (remaining.length) {
+        await applyPriorities(
+          client,
+          userId,
+          remaining.map((r) => r.id)
+        );
+      }
+
+      await client.query("COMMIT");
+      return true;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    }
+  });
 }
 
 async function setActive(credentialId, userId) {

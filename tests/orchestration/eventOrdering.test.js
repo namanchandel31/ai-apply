@@ -1,4 +1,8 @@
 const { shouldApplyEvent } = require("../helpers/orchestrationMirror.cjs");
+const {
+  shouldApplyOrchestrationEvent,
+  shouldApplyDisplayEventTieBreak,
+} = require("../helpers/reconciliationMirror.cjs");
 
 describe("event ordering", () => {
   const baseRegistry = {
@@ -39,7 +43,7 @@ describe("event ordering", () => {
     expect(result.reason).toBe("stale_epoch");
   });
 
-  it("rejects stale updatedAt tie-break", () => {
+  it("rejects stale updatedAt tie-break via combined shim only", () => {
     const result = shouldApplyEvent(baseRegistry, {
       applicationId: "app-1",
       version: 5,
@@ -51,6 +55,25 @@ describe("event ordering", () => {
     });
     expect(result.apply).toBe(false);
     expect(result.reason).toBe("stale_updated_at");
+  });
+
+  it("orchestration ingress allows same-version older updatedAt (display gated in cache)", () => {
+    expect(
+      shouldApplyOrchestrationEvent(baseRegistry, {
+        applicationId: "app-1",
+        version: 5,
+        orchestrationEpoch: 2,
+        updatedAt: "2026-05-20T11:00:00.000Z",
+        uiStatus: "processing",
+      }).apply
+    ).toBe(true);
+    expect(
+      shouldApplyDisplayEventTieBreak(baseRegistry, {
+        version: 5,
+        orchestrationEpoch: 2,
+        updatedAt: "2026-05-20T11:00:00.000Z",
+      }).reason
+    ).toBe("stale_updated_at");
   });
 
   it("accepts newer version", () => {

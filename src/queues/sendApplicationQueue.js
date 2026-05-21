@@ -1,9 +1,9 @@
 const { Queue } = require("bullmq");
 const config = require("../config");
 const { connection } = require("./connection");
-const { SEND_APPLICATION_QUEUE } = require("./queueConstants");
+const { QUEUE_NAMES } = require("../constants/queues");
 
-const QUEUE_NAME = SEND_APPLICATION_QUEUE;
+const QUEUE_NAME = QUEUE_NAMES.SEND_APPLICATION;
 
 const sendApplicationQueue = new Queue(QUEUE_NAME, {
   connection,
@@ -14,10 +14,10 @@ const sendApplicationQueue = new Queue(QUEUE_NAME, {
       delay: 5000,
     },
     removeOnComplete: {
-      age: 86400, // Keep completed jobs for 24 hours
+      age: 86400,
     },
     removeOnFail: {
-      age: 604800, // Keep failed jobs for 7 days (acts as interim DLQ)
+      age: 604800,
     },
   },
 });
@@ -25,10 +25,6 @@ const sendApplicationQueue = new Queue(QUEUE_NAME, {
 /**
  * Enqueues an application to be sent by the worker.
  * Uses deterministic job IDs for idempotency.
- */
-/**
- * Idempotent send enqueue — deterministic BullMQ job id.
- * TODO: DLQ — send-application-dlq when DLQ_ENABLED=true
  */
 async function enqueueSendJob(applicationId, userId, recipientEmail, { dbJobId } = {}) {
   const jobId = `send:application:${applicationId}`;

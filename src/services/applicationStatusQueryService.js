@@ -22,8 +22,11 @@ SELECT
   sj.created_at AS send_job_created_at,
   sj.updated_at AS send_job_updated_at,
   sj.last_error AS send_job_last_error,
-  sj.retry_count AS send_job_retry_count
+  sj.retry_count AS send_job_retry_count,
+  jd.title AS role,
+  jd.company_name AS company
 FROM applications a
+LEFT JOIN job_descriptions jd ON jd.id = a.job_description_id
 LEFT JOIN LATERAL (
   SELECT id, status, created_at, updated_at, last_error, retry_count
   FROM application_jobs
@@ -68,6 +71,10 @@ function mapBundleRow(row) {
     updated_at: row.updated_at,
     sent_at: row.sent_at,
     completed_at: row.completed_at,
+    role: row.role,
+    company: row.company,
+    jd_title: row.role,
+    company_name: row.company,
   };
   return {
     row: appRow,
@@ -86,7 +93,8 @@ async function getApplicationStatusBundle(applicationId, userId, client = null) 
     "status_bundle",
     STATUS_BUNDLE_SQL,
     [applicationId, userId],
-    pool
+    pool,
+    { source: "status_bundle" }
   );
   return mapBundleRow(rows[0] ?? null);
 }
@@ -101,7 +109,8 @@ async function getApplicationStatusSnapshot(applicationId, userId, client = null
      FROM applications
      WHERE id = $1 AND user_id = $2`,
     [applicationId, userId],
-    pool
+    pool,
+    { source: "status_snapshot" }
   );
   return rows[0] ?? null;
 }

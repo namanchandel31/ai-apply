@@ -4,6 +4,7 @@ const { getResumeById } = require("../models/resumeModel");
 const { getJDById } = require("../models/jdModel");
 const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail, RetryableError } = require("./emailService");
+const { buildEmailGenerationContext } = require("./emailContextBuilder");
 const { logInfo, logError } = require("../utils/logger");
 
 /**
@@ -34,10 +35,12 @@ const withRetry = async (operation, maxRetries = 1) => {
  */
 const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null) => {
   const { pool } = require("../db");
-  const client = await pool.connect();
+  const { withPgClient, markClientInTransaction } = require("../db/pgClient");
 
+  return withPgClient(pool, async (client) => {
   try {
     await client.query("BEGIN");
+    markClientInTransaction(client);
     await client.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
 
     // 1. Duplicate Pre-check (with transaction client)
@@ -80,10 +83,8 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
     const matchResult = computeMatch(resume.parsedJson, jd.parsedJson);
     logInfo("match_computed", { reqId, resumeId, jobDescriptionId, score: matchResult.score });
 
-    const candidateName = resume.parsedJson?.name || null;
-    const jobTitle = jd.parsedJson?.job_title || null;
-
     const applicationId = crypto.randomUUID();
+    const rawJdText = jd.rawText || jd.raw_text || "";
     let cachedEmail = null;
 
     // 4. Resilient Generation Loop
@@ -93,13 +94,19 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
         if (!cachedEmail) {
           logInfo("email_generation_start", { reqId, resumeId, jobDescriptionId, attempt });
           
-          cachedEmail = await generateApplicationEmail(
-            candidateName,
-            jobTitle,
-            matchResult.matchedSkills,
-            matchResult.score,
-            { reqId, userId, resumeId, jobDescriptionId }
-          );
+          const emailContext = buildEmailGenerationContext({
+            rawJdText,
+            parsedJd: jd.parsedJson,
+            resumeParsedJson: resume.parsedJson,
+            matchResult,
+          });
+
+          cachedEmail = await generateApplicationEmail(emailContext, {
+            reqId,
+            userId,
+            resumeId,
+            jobDescriptionId,
+          });
 
           logInfo("email_generation_success", { reqId, resumeId, jobDescriptionId, attempt });
         }
@@ -112,6 +119,8 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
           matchScore: matchResult.score,
           emailSubject: cachedEmail.subject,
           emailBody: cachedEmail.body,
+          emailMetadata: cachedEmail.emailMetadata,
+          emailFeedbackSignals: cachedEmail.emailFeedbackSignals,
           userId,
           client
         });
@@ -147,9 +156,8 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
-  } finally {
-    client.release();
   }
+  });
 };
 
 module.exports = {

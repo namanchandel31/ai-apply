@@ -10,7 +10,7 @@ describe("orchestration broadcast", () => {
     expect(src).toContain('"revive"');
     expect(src).toContain('"terminal"');
     expect(src).toContain('"invalidate"');
-    expect(src).toContain('"event"');
+    expect(src).toContain('"state_patch"');
     expect(src).toContain("ORCHESTRATION_CHANNEL");
   });
 

@@ -4,7 +4,7 @@ const path = require("path");
 describe("realtime terminal guard", () => {
   it("logs REALTIME_TERMINAL_SKIP for already-terminal publish", () => {
     const src = fs.readFileSync(
-      path.join(__dirname, "../src/services/applicationRealtimePublisher.js"),
+      path.join(__dirname, "../src/realtime/publishApplicationUpdate.js"),
       "utf8"
     );
     expect(src).toContain("REALTIME_TERMINAL_SKIP");

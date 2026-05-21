@@ -1,15 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
 
 export function useSetupStatus() {
   return useQuery({
-    queryKey: ["setup-status"],
-    queryFn: async () => {
-      const res = await api.getSetupStatus();
-      return res.data;
-    },
+    ...setupStatusQueryOptions,
     retry: 2,
     retryDelay: 5000,
-    refetchOnWindowFocus: false,
   });
 }

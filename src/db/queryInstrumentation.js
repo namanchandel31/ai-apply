@@ -1,5 +1,11 @@
 const crypto = require("crypto");
 const { logInfo } = require("../utils/logger");
+const { metrics } = require("../observability/orchestrationMetrics");
+const { executeWithPgRetry } = require("./pgQueryRetry");
+const {
+  attachPgClientErrorHandler,
+  isInTransactionContext,
+} = require("./pgClient");
 
 const SLOW_QUERY_MS = 100;
 const STATUS_QUERY_NAMES = new Set([
@@ -128,12 +134,26 @@ function execQuery(target, text, values, callback) {
 /**
  * Run a labeled query with timing, row count, and pool pressure metrics.
  */
-async function instrumentedQuery(client, queryName, text, values, poolForMetrics = null) {
+async function instrumentedQuery(
+  client,
+  queryName,
+  text,
+  values,
+  poolForMetrics = null,
+  options = {}
+) {
+  const source = options.source || "unknown";
   const metricsPool =
     poolForMetrics && typeof poolForMetrics.totalCount === "number" ? poolForMetrics : null;
   const poolMetricsBefore = metricsPool ? getPoolMetrics(metricsPool) : getPoolMetrics(null);
 
-  if (poolMetricsBefore.poolWaiting > 0 || poolMetricsBefore.poolIdle === 0) {
+  if (poolMetricsBefore.poolWaiting >= 5 || poolMetricsBefore.poolIdle === 0) {
+    metrics.increment("db.pool.pressure");
+    logQueryEvent("DB_POOL_PRESSURE", {
+      queryName,
+      ...poolMetricsBefore,
+    });
+  } else if (poolMetricsBefore.poolWaiting >= 3) {
     logQueryEvent("DB_POOL_PRESSURE", {
       queryName,
       ...poolMetricsBefore,
@@ -154,7 +174,19 @@ async function instrumentedQuery(client, queryName, text, values, poolForMetrics
       ? { query: client._rawQuery.bind(client) }
       : client;
 
-  result = await execQuery(queryTarget, text, values);
+  const inTransaction = isPoolClient || isInTransactionContext(client);
+
+  const runQuery = () => execQuery(queryTarget, text, values);
+
+  if (inTransaction) {
+    result = await runQuery();
+  } else {
+    result = await executeWithPgRetry(runQuery, {
+      inTransaction: false,
+      queryName,
+      source,
+    });
+  }
 
   const durationMs = Math.round(performance.now() - queryStart);
   const totalMs = Math.round(performance.now() - totalStart);
@@ -162,6 +194,7 @@ async function instrumentedQuery(client, queryName, text, values, poolForMetrics
 
   const meta = {
     queryName,
+    source,
     durationMs,
     totalMs,
     rowCount: result.rowCount ?? result.rows?.length ?? 0,
@@ -188,7 +221,7 @@ async function instrumentedQuery(client, queryName, text, values, poolForMetrics
     });
   } else if (isSlow) {
     logQueryEvent("DB_QUERY_SLOW", meta);
-  } else if (isStatusPath || logging.hasDebugScope("query")) {
+  } else if ((isStatusPath && isSlow) || logging.hasDebugScope("query")) {
     logQueryEvent("DB_QUERY", meta);
   }
 
@@ -202,9 +235,11 @@ async function connectWithTiming(pool) {
   const poolMetrics = getPoolMetrics(pool);
   const connectStart = performance.now();
   const client = await pool.connect();
+  attachPgClientErrorHandler(client);
   const poolWaitMs = Math.round(performance.now() - connectStart);
 
   if (poolWaitMs > SLOW_QUERY_MS || poolMetrics.poolWaiting > 0) {
+    metrics.histogram("db.pool.acquire_wait_ms", poolWaitMs);
     logQueryEvent("DB_POOL_CONNECT_SLOW", {
       poolWaitMs,
       ...poolMetrics,
@@ -229,63 +264,79 @@ function wrapPoolQuery(pool) {
   pool.query = function wrappedQuery(...args) {
     const queryStart = performance.now();
     const poolMetrics = getPoolMetrics(pool);
-
     const first = args[0];
-    let out;
+    const hasCallback =
+      typeof args[1] === "function" ||
+      typeof args[2] === "function" ||
+      (first && typeof first === "object" && typeof args[1] === "function");
 
-    if (typeof first === "string") {
-      const config = buildQueryConfig(first, args[1]);
-      logQueryShape("pool.query", config, "pool");
-      if (typeof args[1] === "function") {
-        out = originalQuery(config, args[1]);
-      } else if (typeof args[2] === "function") {
-        out = originalQuery(config, args[2]);
-      } else {
-        out = originalQuery(config);
+    if (hasCallback) {
+      if (typeof first === "string") {
+        const config = buildQueryConfig(first, args[1]);
+        logQueryShape("pool.query", config, "pool");
+        const cb = typeof args[1] === "function" ? args[1] : args[2];
+        return originalQuery(config, cb);
       }
-    } else if (first && typeof first === "object") {
-      const config = isQueryInstance(first) ? first : buildQueryConfig(first);
-      logQueryShape("pool.query", config, "pool");
-      if (typeof args[1] === "function") {
-        out = originalQuery(config, args[1]);
-      } else {
-        out = originalQuery(config);
+      if (first && typeof first === "object") {
+        const config = isQueryInstance(first) ? first : buildQueryConfig(first);
+        logQueryShape("pool.query", config, "pool");
+        return originalQuery(config, args[1]);
       }
-    } else {
-      out = originalQuery(...args);
+      return originalQuery(...args);
     }
 
-    const logSlow = (result) => {
-      const totalMs = Math.round(performance.now() - queryStart);
-      const poolMetricsAfter = getPoolMetrics(pool);
-      const likelyPoolAcquire =
-        poolMetrics.poolTotal === 0 && poolMetricsAfter.poolTotal > 0;
-      if (totalMs > SLOW_QUERY_MS && !likelyPoolAcquire) {
-        logQueryEvent("DB_QUERY_SLOW", {
-          queryName: "pool.query",
-          durationMs: totalMs,
-          totalMs,
-          likelyPoolAcquire: false,
-          rowCount: result?.rowCount ?? result?.rows?.length ?? 0,
-          poolMetricsBefore: poolMetrics,
-          poolMetricsAfter,
-        });
-      } else if (likelyPoolAcquire && totalMs > SLOW_QUERY_MS) {
-        logQueryEvent("DB_POOL_CONNECT_SLOW", {
-          queryName: "pool.query",
-          totalMs,
-          rowCount: result?.rowCount ?? result?.rows?.length ?? 0,
-          poolMetricsBefore: poolMetrics,
-          poolMetricsAfter,
-        });
+    const runPoolQuery = () => {
+      let out;
+      if (typeof first === "string") {
+        const config = buildQueryConfig(first, args[1]);
+        logQueryShape("pool.query", config, "pool");
+        out = originalQuery(config);
+      } else if (first && typeof first === "object") {
+        const config = isQueryInstance(first) ? first : buildQueryConfig(first);
+        logQueryShape("pool.query", config, "pool");
+        out = originalQuery(config);
+      } else {
+        out = originalQuery(...args);
       }
-      return result;
+
+      const logSlow = (result) => {
+        const totalMs = Math.round(performance.now() - queryStart);
+        const poolMetricsAfter = getPoolMetrics(pool);
+        const likelyPoolAcquire =
+          poolMetrics.poolTotal === 0 && poolMetricsAfter.poolTotal > 0;
+        if (totalMs > SLOW_QUERY_MS && !likelyPoolAcquire) {
+          logQueryEvent("DB_QUERY_SLOW", {
+            queryName: "pool.query",
+            durationMs: totalMs,
+            totalMs,
+            likelyPoolAcquire: false,
+            rowCount: result?.rowCount ?? result?.rows?.length ?? 0,
+            poolMetricsBefore: poolMetrics,
+            poolMetricsAfter,
+          });
+        } else if (likelyPoolAcquire && totalMs > SLOW_QUERY_MS) {
+          logQueryEvent("DB_POOL_CONNECT_SLOW", {
+            queryName: "pool.query",
+            totalMs,
+            rowCount: result?.rowCount ?? result?.rows?.length ?? 0,
+            poolMetricsBefore: poolMetrics,
+            poolMetricsAfter,
+          });
+        }
+        return result;
+      };
+
+      if (out && typeof out.then === "function") {
+        return out.then(logSlow);
+      }
+      return out;
     };
 
-    if (out && typeof out.then === "function") {
-      return out.then(logSlow);
-    }
-    return out;
+    return executeWithPgRetry(runPoolQuery, {
+      inTransaction: false,
+      queryName: "pool.query",
+      source: "pool",
+    });
   };
 
   return pool;

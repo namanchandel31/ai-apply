@@ -8,7 +8,17 @@ const { createJDWithParsedData } = require("../src/models/jdModel");
 jest.mock("../src/services/emailService", () => ({
   generateApplicationEmail: jest.fn().mockResolvedValue({
     subject: "Application for Software Engineer",
-    body: "Here is my application body focusing on react and node."
+    body: "Here is my application body focusing on react and node.",
+    emailMetadata: { schemaVersion: 1, latestRun: { promptVersion: "email_generate_v2" } },
+    emailFeedbackSignals: {
+      manuallyEdited: null,
+      recruiterReply: null,
+      ignored: null,
+      bounced: null,
+      regenerated: null,
+      userRewritten: null,
+      responseLatencyMs: null,
+    },
   }),
   RetryableError: class RetryableError extends Error {
     constructor(msg) {

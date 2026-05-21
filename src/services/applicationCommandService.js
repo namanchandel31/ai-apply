@@ -1,4 +1,5 @@
 const { pool } = require("../db");
+const { withPgTransaction } = require("../db/pgClient");
 const {
   getApplicationById,
   transitionApplicationState,
@@ -93,10 +94,7 @@ async function continueApplication(userId, applicationId, contactEmail, reqId, i
     throw err;
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
+  const txnResult = await withPgTransaction(pool, async (client) => {
     clearPublishCache(applicationId);
 
     await client.query(
@@ -147,31 +145,28 @@ async function continueApplication(userId, applicationId, contactEmail, reqId, i
       client
     );
 
-    await client.query("COMMIT");
+    return { sendJob, tr };
+  });
 
-    const { jobId } = await enqueueSendJob(
-      applicationId,
-      userId,
-      contactEmail.trim().toLowerCase(),
-      { dbJobId: sendJob.id }
-    );
+  const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
+  await flushRealtimeAfterDbCommit([applicationId]);
 
-    logInfo("continue_enqueued", buildLogContext({ applicationId, jobId: sendJob.id, userId, reqId }));
-    scheduleRevivePublish(applicationId, userId);
+  const { jobId } = await enqueueSendJob(
+    applicationId,
+    userId,
+    contactEmail.trim().toLowerCase(),
+    { dbJobId: txnResult.sendJob.id }
+  );
 
-    return {
-      applicationId,
-      status: APPLICATION_STATUS.GENERATED,
-      jobId,
-      orchestrationEpoch: Number(tr.orchestrationMeta?.orchestration_epoch ?? 0),
-      version: Number(tr.orchestrationMeta?.orchestration_version ?? 0),
-    };
-  } catch (e) {
-    await client.query("ROLLBACK");
-    throw e;
-  } finally {
-    client.release();
-  }
+  logInfo("continue_enqueued", buildLogContext({ applicationId, jobId: txnResult.sendJob.id, userId, reqId }));
+
+  return {
+    applicationId,
+    status: APPLICATION_STATUS.GENERATED,
+    jobId,
+    orchestrationEpoch: Number(txnResult.tr.orchestrationMeta?.orchestration_epoch ?? 0),
+    version: Number(txnResult.tr.orchestrationMeta?.orchestration_version ?? 0),
+  };
 }
 
 async function retryApplication(userId, applicationId, reqId) {

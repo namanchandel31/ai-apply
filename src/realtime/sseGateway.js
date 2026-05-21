@@ -1,8 +1,10 @@
 const { realtimeBus } = require("../events/realtimeBus");
 const { EVENT_APPLICATION_UPDATED } = require("../contracts/applicationEvents");
 const { logInfo } = require("../utils/logger");
+const { logRealtimeLifecycle, envelopeFromPayload } = require("./realtimeLifecycleLog");
 const { metrics } = require("../observability/orchestrationMetrics");
 const { broadcastToUser } = require("./sseConnectionRegistry");
+const { writeSseEvent } = require("./sseFormat");
 
 const config = require("../config");
 const HEARTBEAT_MS = config.realtime.SSE_HEARTBEAT_MS;
@@ -10,15 +12,22 @@ const HEARTBEAT_MS = config.realtime.SSE_HEARTBEAT_MS;
 let gatewayStarted = false;
 let busHandler = null;
 
-const { formatSseEvent } = require("./sseFormat");
-
 function broadcastApplicationUpdated(payload) {
+  const eventId = payload.eventId;
   const sent = broadcastToUser(payload.userId, (res) => {
-    res.write(formatSseEvent("application.updated", payload));
+    const result = writeSseEvent(
+      res,
+      payload.userId,
+      "application.updated",
+      payload,
+      eventId
+    );
+    return result.ok;
   });
 
   if (sent > 0) {
     metrics.increment("orchestration.sse.event_sent", { via: "local" }, sent);
+    logRealtimeLifecycle("SSE_EVENT_SENT", envelopeFromPayload(payload, { sent }));
   }
 }
 

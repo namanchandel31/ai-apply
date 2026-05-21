@@ -1,9 +1,11 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { BootstrapErrorBoundary } from "@/components/BootstrapErrorBoundary";
 import { installBootstrapDiagnostics } from "@/bootstrapDebug";
+import { AuthProvider } from "@/auth/AuthContext";
 import App from "./App";
 import "./index.css";
 
@@ -29,8 +31,12 @@ try {
     <StrictMode>
       <BootstrapErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <App />
-          <Toaster position="bottom-right" richColors />
+          <BrowserRouter>
+            <AuthProvider>
+              <App />
+              <Toaster position="bottom-right" richColors />
+            </AuthProvider>
+          </BrowserRouter>
         </QueryClientProvider>
       </BootstrapErrorBoundary>
     </StrictMode>

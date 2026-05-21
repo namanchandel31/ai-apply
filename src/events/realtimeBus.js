@@ -8,6 +8,10 @@ class RealtimeBus extends EventEmitter {
   constructor() {
     super();
     this.setMaxListeners(50);
+    this.on("error", (err) => {
+      const { logNetworkError } = require("../observability/networkError");
+      logNetworkError("realtime_bus", err, { hypothesisId: "E", phase: "emitter_error" });
+    });
   }
 }
 

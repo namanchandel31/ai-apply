@@ -2,11 +2,27 @@ import type { ApplicationUpdatedPayload } from "./orchestrationRegistry";
 
 export const ORCHESTRATION_CHANNEL = "ai-apply-orchestration";
 
+export type StatePatchMessage = {
+  applicationId: string;
+  status?: string;
+  uiStatus?: string;
+  version?: number;
+  orchestrationEpoch?: number;
+  updatedAt?: string;
+  terminal?: boolean;
+  executionTerminal?: boolean;
+  pollable?: boolean;
+  canRetry?: boolean;
+  canContinue?: boolean;
+  role?: string | null;
+  company?: string | null;
+};
+
 export type OrchestrationBroadcastPost =
   | { type: "revive"; applicationId: string; orchestrationEpoch: number }
   | { type: "terminal"; applicationId: string }
   | { type: "invalidate"; applicationId?: string }
-  | { type: "event"; payload: ApplicationUpdatedPayload }
+  | { type: "state_patch"; patches: StatePatchMessage[] }
   | { type: "leader_claim"; ts: number }
   | { type: "leader_release" }
   | { type: "leader_heartbeat"; ts: number }
@@ -40,8 +56,25 @@ export function createOrchestrationBroadcast(
     if (!data || data.tabId === getTabId()) return;
     onMessage(data);
   };
+  const post = (msg: OrchestrationBroadcastPost) => {
+    try {
+      channel.postMessage({ ...msg, tabId: getTabId() });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "InvalidStateError") {
+        return;
+      }
+      throw err;
+    }
+  };
+
   return {
-    post: (msg) => channel.postMessage({ ...msg, tabId: getTabId() }),
-    close: () => channel.close(),
+    post,
+    close: () => {
+      try {
+        channel.close();
+      } catch {
+        /* already closed */
+      }
+    },
   };
 }

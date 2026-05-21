@@ -50,6 +50,12 @@ const setToken = (token: string | null) => {
   else localStorage.removeItem("ai_apply_token");
 };
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const token = getToken();
@@ -59,6 +65,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
+    if (res.status === 401 && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
     let message: string;
     let code: string | undefined;
@@ -122,6 +131,9 @@ async function requestApplicationStatus(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
+    if (res.status === 401 && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
     let message: string;
     let code: string | undefined;
@@ -162,6 +174,7 @@ async function requestApplicationStatus(
 export const api = {
   getToken,
   setToken,
+  setUnauthorizedHandler,
 
   signup(email: string, password: string) {
     return request<{ success: boolean; data: { user: { id: string; email: string } } }>(
@@ -419,6 +432,8 @@ export const api = {
   },
 };
 
+export type JdEnrichmentState = "pending" | "complete";
+
 export type ApplicationStatusPayload = {
   applicationId: string;
   status: string;
@@ -432,6 +447,9 @@ export type ApplicationStatusPayload = {
   version?: number;
   orchestrationEpoch?: number;
   updatedAt?: string;
+  role?: string | null;
+  company?: string | null;
+  jdEnrichment?: JdEnrichmentState;
 };
 
 export type ApplicationRecord = {
@@ -445,9 +463,11 @@ export type ApplicationRecord = {
   canContinue?: boolean;
   reviewReason?: string | null;
   createdAt: string;
+  updatedAt?: string;
   sentAt?: string | null;
   role?: string | null;
   company?: string | null;
+  jdEnrichment?: JdEnrichmentState;
 };
 
 export type AiCredentialSummary = {

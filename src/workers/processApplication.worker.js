@@ -1,6 +1,6 @@
 const { Worker } = require("bullmq");
 const { connection } = require("../queues/connection");
-const { QUEUE_NAME } = require("../queues/processApplicationQueue");
+const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
 const { pool } = require("../db");
 const { getApplicationById, updateApplicationFields, transitionApplicationState } = require("../models/applicationModel");
@@ -12,6 +12,7 @@ const { getResumeById } = require("../models/resumeModel");
 const { parseJobDescription } = require("../services/jdParseService");
 const { computeMatch } = require("../services/matchingService");
 const { generateApplicationEmail } = require("../services/emailService");
+const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
@@ -65,7 +66,7 @@ async function processor(job) {
       userId,
       reqId,
       workerName: "process-application",
-      queueName: QUEUE_NAME,
+      queueName: QUEUE_NAMES.PROCESS_APPLICATION,
     })
   );
   await recordEvent({
@@ -76,8 +77,9 @@ async function processor(job) {
     metadata: { jobId },
   });
 
-  const client = await pool.connect();
+  const { withPgClient, markClientInTransaction } = require("../db/pgClient");
 
+  await withPgClient(pool, async (client) => {
   try {
     const { rows: jdRows } = await client.query(
       `SELECT raw_text FROM job_descriptions WHERE id = $1`,
@@ -96,15 +98,22 @@ async function processor(job) {
     const company = (parsedJd.company_name || "").toLowerCase().trim();
     const contactEmail = parsedJd.contact_email;
 
-    const cachedEmail = await generateApplicationEmail(
-      resume.parsedJson?.name,
-      jobTitle,
-      matchResult.matchedSkills,
-      matchResult.score,
-      { reqId, userId, resumeId: app.resume_id, jobDescriptionId: app.job_description_id }
-    );
+    const emailContext = buildEmailGenerationContext({
+      rawJdText: rawText,
+      parsedJd,
+      resumeParsedJson: resume.parsedJson,
+      matchResult,
+    });
+
+    const cachedEmail = await generateApplicationEmail(emailContext, {
+      reqId,
+      userId,
+      resumeId: app.resume_id,
+      jobDescriptionId: app.job_description_id,
+    });
 
     await client.query("BEGIN");
+    markClientInTransaction(client);
 
     await updateJobDescriptionFromParsed(client, app.job_description_id, parsedJd, userId);
 
@@ -127,6 +136,8 @@ async function processor(job) {
           skills: (resume.parsedJson?.skills || []).slice(0, 20),
         },
         match_score_snapshot: matchResult.score,
+        email_metadata: cachedEmail.emailMetadata,
+        email_feedback_signals: cachedEmail.emailFeedbackSignals,
       },
       userId,
       client
@@ -160,6 +171,8 @@ async function processor(job) {
       );
 
       await client.query("COMMIT");
+      const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
+      await flushRealtimeAfterDbCommit([applicationId]);
       return;
     }
 
@@ -178,6 +191,8 @@ async function processor(job) {
     );
 
     await client.query("COMMIT");
+    const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
+    await flushRealtimeAfterDbCommit([applicationId]);
 
     await enqueueSendJob(applicationId, userId, contactEmail, { dbJobId: sendDbJob.id });
 
@@ -200,7 +215,7 @@ async function processor(job) {
         userId,
         reqId,
         workerName: "process-application",
-        queueName: QUEUE_NAME,
+        queueName: QUEUE_NAMES.PROCESS_APPLICATION,
         attempt: job.attemptsMade,
       })
     );
@@ -226,19 +241,22 @@ async function processor(job) {
     }
 
     throw err;
-  } finally {
-    client.release();
   }
+  });
 }
 
-const worker = new Worker(QUEUE_NAME, processor, {
+const worker = new Worker(QUEUE_NAMES.PROCESS_APPLICATION, processor, {
   connection,
   concurrency: require("../config").queue.WORKER_CONCURRENCY.process,
 });
 
 attachWorkerLifecycle(worker, {
   workerName: "process-application",
-  queueName: QUEUE_NAME,
+  queueName: QUEUE_NAMES.PROCESS_APPLICATION,
 });
 
-module.exports = { worker, QUEUE_NAME, processor };
+module.exports = {
+  worker,
+  QUEUE_NAME: QUEUE_NAMES.PROCESS_APPLICATION,
+  processor,
+};

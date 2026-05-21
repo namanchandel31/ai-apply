@@ -12,12 +12,16 @@ jest.mock("../src/utils/logger", () => ({
 const config = require("../src/config");
 const { logger } = require("../src/utils/logger");
 const { buildPoolConfig, attachPoolErrorHandler } = require("../src/db");
-const { isTransientPgError } = require("../src/utils/pgErrors");
+const {
+  isTransientPgError,
+  isRecoverableInfraError,
+  isFatalApplicationError,
+} = require("../src/utils/pgErrors");
 
 describe("buildPoolConfig", () => {
   it("returns pool sizing defaults wired from database config", () => {
     const poolConfig = buildPoolConfig();
-    expect(poolConfig.max).toBe(10);
+    expect(poolConfig.max).toBe(config.database.poolMax);
     expect(poolConfig.idleTimeoutMillis).toBe(30000);
     expect(poolConfig.connectionTimeoutMillis).toBe(10000);
     expect(poolConfig.keepAlive).toBe(true);
@@ -64,5 +68,18 @@ describe("isTransientPgError", () => {
   it("returns false for generic errors", () => {
     expect(isTransientPgError(new Error("syntax error"))).toBe(false);
     expect(isTransientPgError({ code: "23505" })).toBe(false);
+  });
+
+  it("isRecoverableInfraError includes connection ended unexpectedly", () => {
+    expect(
+      isRecoverableInfraError(new Error("Connection ended unexpectedly"))
+    ).toBe(true);
+  });
+
+  it("isFatalApplicationError detects TypeError", () => {
+    expect(isFatalApplicationError(new TypeError("fail"))).toBe(true);
+    const infra = new Error("read ECONNRESET");
+    infra.code = "ECONNRESET";
+    expect(isFatalApplicationError(infra)).toBe(false);
   });
 });

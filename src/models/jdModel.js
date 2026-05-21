@@ -70,25 +70,18 @@ const saveParsedJD = async (client, jobDescriptionId, parsedJson) => {
  * @returns {Promise<{jobDescriptionId: string, parsedJobDescriptionId: string}>}
  */
 const createJDWithParsedData = async (title, rawText, parsedJson, userId = null) => {
-  const client = await pool.connect();
-
+  const { withPgTransaction } = require("../db/pgClient");
   try {
-    await client.query("BEGIN");
-
-    const jd = await createJobDescription(client, title, rawText, userId, parsedJson);
-    const parsed = await saveParsedJD(client, jd.id, parsedJson);
-
-    await client.query("COMMIT");
-
-    return {
-      jobDescriptionId: jd.id,
-      parsedJobDescriptionId: parsed.id,
-    };
+    return await withPgTransaction(pool, async (client) => {
+      const jd = await createJobDescription(client, title, rawText, userId, parsedJson);
+      const parsed = await saveParsedJD(client, jd.id, parsedJson);
+      return {
+        jobDescriptionId: jd.id,
+        parsedJobDescriptionId: parsed.id,
+      };
+    });
   } catch (err) {
-    await client.query("ROLLBACK");
     throw new Error(`JD DB transaction failed: ${err.message}`);
-  } finally {
-    client.release();
   }
 };
 

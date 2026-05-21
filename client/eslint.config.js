@@ -8,6 +8,28 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/services/realtime/cache/**',
+      'src/queries/applicationsCache.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tanstack/react-query',
+              importNames: ['useQueryClient'],
+              message:
+                'Use cacheSyncApi / applicationCacheSync for applications cache mutations.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,

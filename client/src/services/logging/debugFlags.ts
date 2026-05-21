@@ -6,7 +6,8 @@ export type OrchestrationComponent =
   | "hydration"
   | "transport"
   | "leader"
-  | "poll";
+  | "poll"
+  | "cache";
 
 /** Frozen allowlist: orchestration | query | llm — parsed from VITE_DEBUG */
 export function isDebugEnabled(_component?: OrchestrationComponent): boolean {

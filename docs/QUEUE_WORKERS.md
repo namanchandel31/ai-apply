@@ -6,4 +6,4 @@ Canonical documentation:
 - [workers/README.md](workers/README.md)
 - [architecture/async-processing.md](architecture/async-processing.md)
 
-Note: `WORKER_MODE` is removed — inline workers run in development via `queue.config.shouldRunInlineWorkers()`.
+`WORKER_MODE` env: `separate` (default) | `inline` (dev/test only). Production always uses separate worker processes.

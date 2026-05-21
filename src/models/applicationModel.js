@@ -82,6 +82,8 @@ const createApplication = async ({
   parsedJdSnapshot = null,
   parsedResumeSnapshot = null,
   matchScoreSnapshot = null,
+  emailMetadata = null,
+  emailFeedbackSignals = null,
 }) => {
   const queryClient = client || pool;
 
@@ -90,9 +92,10 @@ const createApplication = async ({
         id, resume_id, job_description_id, match_score, email_subject, email_body, user_id,
         application_status, review_reason, recipient_email, resume_snapshot_path,
         normalized_job_title, normalized_company_name,
-        parsed_jd_snapshot, parsed_resume_snapshot, match_score_snapshot
+        parsed_jd_snapshot, parsed_resume_snapshot, match_score_snapshot,
+        email_metadata, email_feedback_signals
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      ON CONFLICT (user_id, resume_id, job_description_id)
      DO UPDATE SET
         updated_at = NOW(),
@@ -120,6 +123,8 @@ const createApplication = async ({
       parsedJdSnapshot ? JSON.stringify(parsedJdSnapshot) : null,
       parsedResumeSnapshot ? JSON.stringify(parsedResumeSnapshot) : null,
       matchScoreSnapshot,
+      emailMetadata ? JSON.stringify(emailMetadata) : null,
+      emailFeedbackSignals ? JSON.stringify(emailFeedbackSignals) : null,
     ]
   );
 
@@ -139,6 +144,8 @@ const updateApplicationFields = async (applicationId, fields, userId = null, cli
     "match_score_snapshot",
     "normalized_job_title",
     "normalized_company_name",
+    "email_metadata",
+    "email_feedback_signals",
   ];
   const sets = [];
   const values = [applicationId];

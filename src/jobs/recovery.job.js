@@ -110,35 +110,35 @@ async function recoverStuckJobs(client) {
 }
 
 async function runRecovery() {
-  const client = await pool.connect();
-  let lockAcquired = false;
-
-  try {
-    const { rows } = await client.query("SELECT pg_try_advisory_lock(987654321) AS acquired");
-    lockAcquired = rows[0].acquired;
-    if (!lockAcquired) {
-      logInfo("RECOVERY_LOCK_SKIPPED", { reason: "another instance holds lock" });
-      return;
-    }
-
-    logInfo("RECOVERY_LOCK_ACQUIRED");
+  const { withPgClient } = require("../db/pgClient");
+  await withPgClient(pool, async (client) => {
+    let lockAcquired = false;
     try {
-      const { getAllQueueCounts } = require("../queues/validateQueueSystem");
-      const counts = await getAllQueueCounts();
-      for (const [queueName, metrics] of Object.entries(counts)) {
-        logInfo("RECOVERY_QUEUE_METRICS", { queueName, ...metrics });
+      const { rows } = await client.query("SELECT pg_try_advisory_lock(987654321) AS acquired");
+      lockAcquired = rows[0].acquired;
+      if (!lockAcquired) {
+        logInfo("RECOVERY_LOCK_SKIPPED", { reason: "another instance holds lock" });
+        return;
       }
-    } catch (metricsErr) {
-      logError("RECOVERY_QUEUE_METRICS_FAILED", metricsErr);
+
+      logInfo("RECOVERY_LOCK_ACQUIRED");
+      try {
+        const { getAllQueueCounts } = require("../queues/validateQueueSystem");
+        const counts = await getAllQueueCounts();
+        for (const [queueName, metrics] of Object.entries(counts)) {
+          logInfo("RECOVERY_QUEUE_METRICS", { queueName, ...metrics });
+        }
+      } catch (metricsErr) {
+        logError("RECOVERY_QUEUE_METRICS_FAILED", metricsErr);
+      }
+      await recoverStuckJobs(client);
+    } finally {
+      if (lockAcquired) {
+        await client.query("SELECT pg_advisory_unlock(987654321)");
+        logInfo("RECOVERY_LOCK_RELEASED");
+      }
     }
-    await recoverStuckJobs(client);
-  } finally {
-    if (lockAcquired) {
-      await client.query("SELECT pg_advisory_unlock(987654321)");
-      logInfo("RECOVERY_LOCK_RELEASED");
-    }
-    client.release();
-  }
+  });
 }
 
 async function recoveryLoop() {

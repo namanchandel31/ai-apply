@@ -26,5 +26,8 @@ export function normalizeApplicationEvent(
     canRetry: Boolean(raw.canRetry),
     canContinue: Boolean(raw.canContinue),
     reviewReason: (raw.reviewReason as string | null) ?? null,
+    role: (raw.role as string | null) ?? null,
+    company: (raw.company as string | null) ?? null,
+    jdEnrichment: raw.jdEnrichment as ApplicationUpdatedPayload["jdEnrichment"],
   };
 }

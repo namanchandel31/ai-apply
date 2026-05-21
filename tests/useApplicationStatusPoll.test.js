@@ -10,7 +10,7 @@ describe("useApplicationStatusPoll", () => {
   it("poll loop effect does not depend on applications (prevents poll storm)", () => {
     const src = fs.readFileSync(hookPath, "utf8");
     expect(src).toMatch(
-      /}, \[pollableIdsKey, pollIntervalMs, visibilityEpoch, connectionState\]\);/
+      /}, \[pollableIdsKey, pollIntervalMs, visibilityEpoch, connectionState, sseReady, isLeader\]\);/
     );
     const pollerStart = src.lastIndexOf("useEffect(() => {");
     const pollerEnd = src.indexOf("}, [pollableIdsKey, pollIntervalMs, visibilityEpoch, connectionState]");
@@ -54,6 +54,8 @@ describe("useApplicationStatusPoll", () => {
     expect(src).toContain("pollIntervalForConnection");
     expect(src).toMatch(/state === "connected"\)[\s\S]*return null/);
     expect(src).toContain("pollIntervalMs === null");
+    expect(src).toContain("sseReady");
+    expect(src).not.toMatch(/return APPLICATION_POLL_MS/);
   });
 });
 

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   api,
   type ApiError,
   type ApplicationRecord,
   type ApplicationStatusPayload,
 } from "@/lib/api";
+import { applyPollStatusToCache } from "@/services/realtime/cache/cacheSyncApi";
 import {
-  APPLICATION_POLL_MS,
   APPLICATION_POLL_SSE_FALLBACK_MS,
   APPLICATION_MAX_POLL_ATTEMPTS,
   MAX_CONSECUTIVE_POLL_ERRORS,
@@ -34,26 +35,34 @@ function jitterMs(baseMs: number): number {
   return baseMs + Math.floor(Math.random() * 500) - 250;
 }
 
-function pollIntervalForConnection(state: ConnectionState): number | null {
+function pollIntervalForConnection(
+  state: ConnectionState,
+  options: { sseReady: boolean; isLeader: boolean }
+): number | null {
+  if (options.sseReady || !options.isLeader) return null;
   if (state === "connected") return null;
-  if (state === "degraded") return APPLICATION_POLL_SSE_FALLBACK_MS;
-  return APPLICATION_POLL_MS;
+  if (state === "degraded" || state === "disconnected") {
+    return APPLICATION_POLL_SSE_FALLBACK_MS;
+  }
+  return null;
 }
 
 export function useApplicationStatusPoll(
   applications: ApplicationRecord[],
-  onUpdate: (apps: ApplicationRecord[]) => void,
+  queryClient: QueryClient,
   options?: {
     onPollTimeout?: PollTimeoutHandler;
     onPollError?: PollErrorHandler;
     connectionState?: ConnectionState;
+    sseReady?: boolean;
+    isLeader?: boolean;
   }
 ) {
   const appsRef = useRef(applications);
   appsRef.current = applications;
 
-  const onUpdateRef = useRef(onUpdate);
-  onUpdateRef.current = onUpdate;
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -77,7 +86,9 @@ export function useApplicationStatusPoll(
   }, [applications]);
 
   const connectionState = options?.connectionState ?? "disconnected";
-  const pollIntervalMs = pollIntervalForConnection(connectionState);
+  const sseReady = options?.sseReady ?? false;
+  const isLeader = options?.isLeader ?? true;
+  const pollIntervalMs = pollIntervalForConnection(connectionState, { sseReady, isLeader });
 
   useEffect(() => {
     const clearPoller = () => {
@@ -171,16 +182,17 @@ export function useApplicationStatusPoll(
                 if (res.etag) etagByAppIdRef.current[app.id] = res.etag;
                 registry.clearPollError(app.id);
                 return null;
-              }
-              if (res.etag) etagByAppIdRef.current[app.id] = res.etag;
-              registry.clearPollError(app.id);
+              } else {
+                if (res.etag) etagByAppIdRef.current[app.id] = res.etag;
+                registry.clearPollError(app.id);
 
-              const data = res.data as ApplicationStatusPayload & {
-                version?: number;
-                orchestrationEpoch?: number;
-                updatedAt?: string;
-              };
-              return { id: app.id, status: data };
+                const data = res.data as ApplicationStatusPayload & {
+                  version?: number;
+                  orchestrationEpoch?: number;
+                  updatedAt?: string;
+                };
+                return { id: app.id, status: data };
+              }
             } catch (e) {
               if (controller.signal.aborted) return null;
               const err = e as ApiError;
@@ -219,32 +231,18 @@ export function useApplicationStatusPoll(
         );
         if (byId.size === 0) return;
 
-        onUpdateRef.current(
-          current.map((app) => {
-            const patch = byId.get(app.id);
-            if (!patch) return app;
-            const becameTerminal = registry.upsertFromPoll({
-              ...patch,
-              applicationId: app.id,
-            });
-            if (becameTerminal) {
-              delete etagByAppIdRef.current[app.id];
-              const key = registry.getPollableIdsKey(APPLICATION_MAX_POLL_ATTEMPTS);
-              setPollableIdsKey((prev) => (prev === key ? prev : key));
-            }
-            return {
-              ...app,
-              status: patch.status,
-              uiStatus: patch.uiStatus,
-              terminal: patch.terminal,
-              executionTerminal: patch.executionTerminal,
-              pollable: patch.pollable,
-              canRetry: patch.canRetry,
-              canContinue: patch.canContinue,
-              reviewReason: patch.reviewReason,
-            };
-          })
-        );
+        for (const [id, status] of byId) {
+          const becameTerminal = registry.upsertFromPoll({
+            ...status,
+            applicationId: id,
+          });
+          applyPollStatusToCache(queryClientRef.current, id, status);
+          if (becameTerminal) {
+            delete etagByAppIdRef.current[id];
+            const key = registry.getPollableIdsKey(APPLICATION_MAX_POLL_ATTEMPTS);
+            setPollableIdsKey((prev) => (prev === key ? prev : key));
+          }
+        }
       } finally {
         tickInFlightRef.current = false;
       }
@@ -279,5 +277,5 @@ export function useApplicationStatusPoll(
       }
       clearPoller();
     };
-  }, [pollableIdsKey, pollIntervalMs, visibilityEpoch, connectionState]);
+  }, [pollableIdsKey, pollIntervalMs, visibilityEpoch, connectionState, sseReady, isLeader]);
 }

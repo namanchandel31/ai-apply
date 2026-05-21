@@ -21,6 +21,6 @@ describe("reconciliation diagnostics", () => {
     );
     expect(src).toContain("ReconciliationHealth");
     expect(src).toContain("registry.invalidate");
-    expect(src).toContain("scheduleHydrate");
+    expect(src).toContain("runPerAppStatusRecovery");
   });
 });

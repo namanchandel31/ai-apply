@@ -5,6 +5,7 @@ const { createApplication, findRecentDuplicate } = require("../models/applicatio
 const { parseJobDescription } = require("./jdParseService");
 const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail } = require("./emailService");
+const { buildEmailGenerationContext } = require("./emailContextBuilder");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { logInfo, logError } = require("../utils/logger");
 const { pool } = require("../db");
@@ -81,13 +82,19 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   // 7. Generate personalized email
   let cachedEmail;
   try {
-    cachedEmail = await generateApplicationEmail(
-      candidateName,
-      jobTitle,
-      matchResult.matchedSkills,
-      matchResult.score,
-      { reqId, userId, resumeId, jobDescriptionId: "auto" }
-    );
+    const emailContext = buildEmailGenerationContext({
+      rawJdText: jobDescriptionText,
+      parsedJd,
+      resumeParsedJson: resume.parsedJson,
+      matchResult,
+    });
+
+    cachedEmail = await generateApplicationEmail(emailContext, {
+      reqId,
+      userId,
+      resumeId,
+      jobDescriptionId: "auto",
+    });
     logInfo("EMAIL_GENERATED", { reqId, userId });
   } catch (error) {
     error.stage = "email_generation";
@@ -96,13 +103,15 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
 
   // Phase 2 — Short DB Tx (Inserts only)
   
-  const client = await pool.connect();
+  const { withPgClient, markClientInTransaction } = require("../db/pgClient");
   let appRecord;
   let jdRecordId;
   const applicationId = require("crypto").randomUUID();
 
+  await withPgClient(pool, async (client) => {
   try {
     await client.query("BEGIN");
+    markClientInTransaction(client);
     await client.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
 
     // Insert JD
@@ -148,7 +157,9 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
         experience_count: (resume.parsedJson?.experience || []).length,
         education_count: (resume.parsedJson?.education || []).length
       },
-      matchScoreSnapshot: matchResult.score
+      matchScoreSnapshot: matchResult.score,
+      emailMetadata: cachedEmail.emailMetadata,
+      emailFeedbackSignals: cachedEmail.emailFeedbackSignals,
     });
 
     // TODO [RESUME-CHECKSUM]: Add resume_snapshot_hash and resume_snapshot_version
@@ -158,9 +169,8 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
-  } finally {
-    client.release();
   }
+  });
 
   // Phase 3 — Queue Enqueue (Outside Tx)
   

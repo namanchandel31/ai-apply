@@ -13,7 +13,7 @@ describe("getApplicationStatusBundle", () => {
     expect(STATUS_BUNDLE_SQL).toContain("LEFT JOIN LATERAL");
     expect(STATUS_BUNDLE_SQL).toMatch(/job_type = 'ai_process'/);
     expect(STATUS_BUNDLE_SQL).toMatch(/job_type = 'send_email'/);
-    expect(STATUS_BUNDLE_SQL).not.toContain("job_descriptions");
+    expect(STATUS_BUNDLE_SQL).toContain("job_descriptions");
   });
 
   it("controller routes status poll through fast-path helper", () => {

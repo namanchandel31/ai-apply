@@ -113,25 +113,18 @@ const findResumeByHash = async (fileHash, userId = null, client = null) => {
  * @returns {Promise<{resumeId: string, parsedResumeId: string}>}
  */
 const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText, parsedJson, userId = null, filePath = null) => {
-  const client = await pool.connect();
-
+  const { withPgTransaction } = require("../db/pgClient");
   try {
-    await client.query("BEGIN");
-
-    const resume = await createResume(client, fileName, fileSize, fileHash, userId, filePath);
-    const parsed = await saveParsedResume(client, resume.id, rawText, parsedJson);
-
-    await client.query("COMMIT");
-
-    return {
-      resumeId: resume.id,
-      parsedResumeId: parsed.id,
-    };
+    return await withPgTransaction(pool, async (client) => {
+      const resume = await createResume(client, fileName, fileSize, fileHash, userId, filePath);
+      const parsed = await saveParsedResume(client, resume.id, rawText, parsedJson);
+      return {
+        resumeId: resume.id,
+        parsedResumeId: parsed.id,
+      };
+    });
   } catch (err) {
-    await client.query("ROLLBACK");
     throw new Error(`Resume DB transaction failed: ${err.message}`);
-  } finally {
-    client.release();
   }
 };
 

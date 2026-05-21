@@ -6,19 +6,13 @@ const cors = require("cors");
 const pinoHttp = require("pino-http");
 const { testConnection } = require("./src/db");
 const { logger, logInfo, logError } = require("./src/utils/logger");
+const {
+  registerProcessLifecycleHandlers,
+  startRuntimeDiagnostics,
+} = require("./src/observability/processLifecycle");
 
-process.on("unhandledRejection", (reason) => {
-  const err = reason instanceof Error ? reason : new Error(String(reason));
-  logError("UNHANDLED_REJECTION", err);
-});
-
-process.on("uncaughtException", (err) => {
-  logger.fatal(
-    { event: "UNCAUGHT_EXCEPTION", err, error_message: err?.message },
-    "Uncaught exception"
-  );
-  process.exit(1);
-});
+registerProcessLifecycleHandlers();
+startRuntimeDiagnostics(30000);
 const tracingMiddleware = require("./src/middlewares/tracing");
 
 const app = express();
@@ -36,8 +30,20 @@ app.use(pinoHttp({
   logger,
   // Assign the tracing requestId to pino-http's genReqId so logs are correlated
   genReqId: (req) => req.requestId,
-  // Suppress health check noise
-  autoLogging: { ignore: (req) => req.url === "/health" },
+  autoLogging: {
+    ignore: (req) => {
+      const pathOnly = (req.url || "").split("?")[0];
+      if (pathOnly === "/health") return true;
+      if (req.method !== "GET") return false;
+      if (pathOnly === "/api/user/setup-status" || pathOnly === "/api/applications") {
+        return true;
+      }
+      if (/^\/api\/applications\/[^/]+\/status$/.test(pathOnly)) {
+        return true;
+      }
+      return false;
+    },
+  },
   customLogLevel: (_req, res) => (res.statusCode >= 500 ? "error" : "info"),
 }));
 
@@ -241,9 +247,13 @@ if (workersInlineEnabled) {
 }
 
 const { recoveryLoop } = require("./src/jobs/recovery.job");
+const { registerRuntimeOwnership } = require("./src/runtime/runtimeOwnership");
 const { startSseGateway } = require("./src/realtime/sseGateway");
+const { startSseZombieReaper } = require("./src/realtime/sseZombieReaper");
 
+registerRuntimeOwnership({ role: "api", sseGatewayOwner: true });
 startSseGateway();
+startSseZombieReaper();
 
 // ---------------------------------------------------------------------------
 // Server startup
@@ -282,6 +292,12 @@ if (require.main === module) {
         process.exit(1);
       }
     }
+
+    const { pool, startPoolMetricsLogging, POOL_INSTANCE_ID } = require("./src/db");
+    startPoolMetricsLogging(pool);
+    const { markBootPhaseComplete } = require("./src/observability/processLifecycle");
+    markBootPhaseComplete();
+    logInfo("RUNTIME_BOOT_COMPLETE", { poolInstanceId: POOL_INSTANCE_ID });
 
     // Start auto-apply recovery loop (fire-and-forget, P0 fix)
     recoveryLoop().catch(err => {

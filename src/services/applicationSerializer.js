@@ -1,6 +1,14 @@
 const { buildResolverContext } = require("../domain/applicationStatus/context/buildResolverContext");
 const { resolveUiStatus } = require("../domain/applicationStatus/resolver/resolveUiStatus");
 
+function deriveJdEnrichment(serialized) {
+  const hasRole = Boolean(serialized.role && String(serialized.role).trim());
+  const hasCompany = Boolean(serialized.company && String(serialized.company).trim());
+  if (hasRole && hasCompany) return "complete";
+  if (!serialized.terminal) return "pending";
+  return undefined;
+}
+
 /**
  * Maps DB row + jobs to API shape. See resolveCapabilities for terminal/pollable semantics.
  * Workflow failed (application_status) vs execution failed (job row) — see failureSemantics.js.
@@ -15,7 +23,7 @@ function serializeApplication(row, jobs = {}) {
   });
   const resolved = resolveUiStatus(ctx);
 
-  return {
+  const base = {
     id: row.id,
     status: row.application_status,
     uiStatus: resolved.uiStatus,
@@ -31,11 +39,16 @@ function serializeApplication(row, jobs = {}) {
     updatedAt: row.updated_at,
     sentAt: row.sent_at,
     completedAt: row.completed_at,
-    role: row.role ?? row.jd_title,
-    company: row.company ?? row.company_name,
+    role: row.role ?? row.jd_title ?? null,
+    company: row.company ?? row.company_name ?? null,
     emailSubject: row.email_subject,
     emailBody: row.email_body,
   };
+  const jdEnrichment = deriveJdEnrichment(base);
+  if (jdEnrichment) {
+    base.jdEnrichment = jdEnrichment;
+  }
+  return base;
 }
 
-module.exports = { serializeApplication };
+module.exports = { serializeApplication, deriveJdEnrichment };

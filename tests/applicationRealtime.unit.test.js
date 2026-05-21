@@ -19,6 +19,9 @@ describe("applicationRealtimePublisher", () => {
         canContinue: false,
         reviewReason: null,
         updatedAt: "2026-05-20T12:00:00.000Z",
+        role: "Software Engineer",
+        company: "Acme Corp",
+        terminal: false,
       },
       { version: 1, epoch: 0 }
     );
@@ -28,6 +31,10 @@ describe("applicationRealtimePublisher", () => {
     expect(payload.userId).toBe("user-1");
     expect(payload.uiStatus).toBe("processing");
     expect(payload.terminal).toBe(false);
+    expect(payload.role).toBe("Software Engineer");
+    expect(payload.company).toBe("Acme Corp");
+    expect(payload.updatedAt).toBe("2026-05-20T12:00:00.000Z");
+    expect(payload.jdEnrichment).toBe("complete");
     expect(payload).not.toHaveProperty("emailBody");
   });
 });

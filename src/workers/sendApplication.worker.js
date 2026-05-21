@@ -2,7 +2,7 @@ const { Worker, UnrecoverableError } = require("bullmq");
 const { pool } = require("../db");
 const nodemailer = require("nodemailer");
 const { connection } = require("../queues/connection");
-const { QUEUE_NAME } = require("../queues/sendApplicationQueue");
+const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
 const {
   getApplicationById,
@@ -73,7 +73,7 @@ const processor = async (job) => {
       userId,
       reqId,
       workerName: "send-application",
-      queueName: QUEUE_NAME,
+      queueName: QUEUE_NAMES.SEND_APPLICATION,
     })
   );
   await recordEvent({
@@ -156,7 +156,7 @@ const processor = async (job) => {
         userId,
         reqId,
         workerName: "send-application",
-        queueName: QUEUE_NAME,
+        queueName: QUEUE_NAMES.SEND_APPLICATION,
         attempt: job.attemptsMade,
       })
     );
@@ -186,14 +186,18 @@ const processor = async (job) => {
   }
 };
 
-const worker = new Worker(QUEUE_NAME, processor, {
+const worker = new Worker(QUEUE_NAMES.SEND_APPLICATION, processor, {
   connection,
   concurrency: require("../config").queue.WORKER_CONCURRENCY.send,
 });
 
 attachWorkerLifecycle(worker, {
   workerName: "send-application",
-  queueName: QUEUE_NAME,
+  queueName: QUEUE_NAMES.SEND_APPLICATION,
 });
 
-module.exports = { worker, QUEUE_NAME, processor };
+module.exports = {
+  worker,
+  QUEUE_NAME: QUEUE_NAMES.SEND_APPLICATION,
+  processor,
+};

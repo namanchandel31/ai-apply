@@ -11,6 +11,8 @@ const {
   normalizeUsage,
   classifyProviderError,
   DEFAULT_MODELS,
+  safeProviderFetch,
+  safeReadResponseJson,
 } = require("./providerUtils");
 const { estimateCost } = require("../config/providerPricing");
 const { NonRetryableError } = require("../utils/errors");
@@ -28,13 +30,22 @@ async function geminiGenerate({ apiKey, model, systemPrompt, userPrompt, jsonMod
     body.generationConfig.responseMimeType = "application/json";
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
+  const res = await safeProviderFetch(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    },
+    { subsystem: "gemini_fetch", provider: "gemini", hypothesisId: "A", phase: "generate" }
+  );
+  const data = await safeReadResponseJson(res, {
+    subsystem: "gemini_fetch",
+    provider: "gemini",
+    hypothesisId: "A",
+    fallbackOnReadError: {},
   });
-  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error?.message || res.statusText);
     err.status = res.status;

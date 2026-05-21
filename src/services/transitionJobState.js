@@ -1,7 +1,9 @@
 const { logInfo } = require("../utils/logger");
-const {
-  scheduleApplicationRealtimePublish,
-} = require("./applicationRealtimePublisher");
+const { enqueuePostCommitPublish } = require("../realtime/postCommitPublishQueue");
+
+function isTransactionalClient(client) {
+  return Boolean(client && typeof client.release === "function");
+}
 
 function normalizeExpected(expectedStatus) {
   return Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
@@ -63,15 +65,22 @@ async function transitionJobState(client, params) {
 
   const row = rows[0];
   if (row.application_id) {
-    client
-      .query(`SELECT user_id FROM applications WHERE id = $1`, [row.application_id])
-      .then(({ rows: appRows }) => {
-        const userId = appRows[0]?.user_id;
-        if (userId) {
-          scheduleApplicationRealtimePublish(row.application_id, userId);
-        }
-      })
-      .catch(() => {});
+    const appRes = await client.query(
+      `SELECT user_id FROM applications WHERE id = $1`,
+      [row.application_id]
+    );
+    const userId = appRes.rows[0]?.user_id;
+    if (userId) {
+      enqueuePostCommitPublish(row.application_id, userId, { source: "job_transition" });
+      if (!isTransactionalClient(client)) {
+        const {
+          markApplicationPublishCommitted,
+          flushPostCommitPublishes,
+        } = require("../realtime/postCommitPublishQueue");
+        markApplicationPublishCommitted(row.application_id);
+        void flushPostCommitPublishes();
+      }
+    }
   }
   return { ok: true, row };
 }

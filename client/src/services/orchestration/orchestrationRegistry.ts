@@ -152,7 +152,6 @@ export class OrchestrationRegistry {
         terminal,
         pollable,
         sseSubscribed: !terminal,
-        lastUpdatedAt: app.updatedAt ?? app.createdAt ?? existing.lastUpdatedAt,
       });
       if (terminal) {
         this.markTerminal(app.id);
@@ -321,6 +320,15 @@ export class OrchestrationRegistry {
     }
     return evicted;
   }
+
+  resetAll(): void {
+    this.states.clear();
+    this.hydrated = false;
+  }
 }
 
 export const globalOrchestrationRegistry = new OrchestrationRegistry();
+
+export function resetOrchestrationRegistry(): void {
+  globalOrchestrationRegistry.resetAll();
+}

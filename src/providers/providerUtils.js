@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const OpenAI = require("openai");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { safeParseJSON } = require("../utils/openaiHelper");
+const { logNetworkError } = require("../observability/networkError");
 
 function parseJsonFromText(text) {
   if (!text || !String(text).trim()) {
@@ -24,6 +25,40 @@ function buildOpenAICompatibleClient({ apiKey, baseUrl }) {
   return new OpenAI(opts);
 }
 
+/**
+ * Fetch wrapper — logs network errors; rethrows for gateway classification.
+ */
+async function safeProviderFetch(url, options, meta = {}) {
+  const subsystem = meta.subsystem || "provider_fetch";
+  const phase = meta.phase || "fetch";
+  try {
+    const res = await fetch(url, options);
+    return res;
+  } catch (err) {
+    logNetworkError(subsystem, err, {
+      ...meta,
+      phase: `${phase}_failed`,
+      hypothesisId: meta.hypothesisId || "A",
+    });
+    throw err;
+  }
+}
+
+async function safeReadResponseJson(res, meta = {}) {
+  try {
+    return await res.json();
+  } catch (err) {
+    logNetworkError(meta.subsystem || "provider_fetch", err, {
+      ...meta,
+      phase: "response_body_read",
+      hypothesisId: meta.hypothesisId || "A",
+      httpStatus: res?.status,
+    });
+    if (meta.fallbackOnReadError) return meta.fallbackOnReadError;
+    throw err;
+  }
+}
+
 function normalizeUsage(raw = {}) {
   const promptTokens = raw.prompt_tokens ?? raw.input_tokens ?? raw.promptTokens ?? 0;
   const completionTokens = raw.completion_tokens ?? raw.output_tokens ?? raw.completionTokens ?? 0;
@@ -38,7 +73,12 @@ function computePromptHash(systemPrompt, userPrompt) {
 
 function classifyProviderError(err, { operationType } = {}) {
   if (err instanceof NonRetryableError || err instanceof RetryableError) return err;
-  if (err.name === "AbortError" || err.code === "ABORT_ERR") {
+  if (
+    err.name === "AbortError" ||
+    err.code === "ABORT_ERR" ||
+    err.code === 20 ||
+    String(err.message || "").toLowerCase().includes("aborted")
+  ) {
     const prefix =
       operationType === "health_check" ? "Health check timed out" : "Request aborted";
     return new RetryableError(`${prefix}: ${err.message || "operation aborted"}`);
@@ -77,6 +117,8 @@ const DEFAULT_MODELS = {
 module.exports = {
   parseJsonFromText,
   buildOpenAICompatibleClient,
+  safeProviderFetch,
+  safeReadResponseJson,
   normalizeUsage,
   computePromptHash,
   classifyProviderError,

@@ -25,6 +25,7 @@ const {
 const llmProtection = require("./llmProtection");
 const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
+const { logNetworkError } = require("../observability/networkError");
 const { LLM_TIMEOUT_MS } = require("../config/parsingConfig");
 const {
   HEALTH_CHECK_TIMEOUT_MS,
@@ -281,6 +282,15 @@ async function executeWithFallback({
         fallbackIndex: i,
       };
     } catch (err) {
+      if (err?.code === "ECONNRESET" || err?.code === "EPIPE" || err?.code === "ETIMEDOUT") {
+        logNetworkError(`ai_gateway_${attemptCreds.provider}`, err, {
+          task,
+          reqId,
+          jobId,
+          hypothesisId: "A",
+          phase: "provider_execute",
+        });
+      }
       const classified = classifyExecutionFailure(err);
       lastError = classified.error;
 

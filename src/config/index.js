@@ -13,6 +13,7 @@ const logging = require("./logging.config");
 const storage = require("./storage.config");
 const product = require("./product.config");
 const realtime = require("./realtime.config");
+const runtime = require("./runtime.config");
 
 const config = Object.freeze({
   server,
@@ -26,6 +27,7 @@ const config = Object.freeze({
   storage,
   product,
   realtime,
+  runtime,
 });
 
 module.exports = config;

@@ -1,14 +1,31 @@
 const { logInfo } = require("../utils/logger");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const {
-  scheduleApplicationRealtimePublish,
-  scheduleRevivePublish,
-} = require("./applicationRealtimePublisher");
+  enqueuePostCommitPublish,
+  markApplicationPublishCommitted,
+  flushPostCommitPublishes,
+} = require("../realtime/postCommitPublishQueue");
 const {
   isTerminalApplicationStatus,
   _incrementOrchestrationVersion: incrementOrchestrationVersion,
   _bumpOrchestrationEpoch: bumpOrchestrationEpoch,
 } = require("./orchestrationVersion");
+
+function isTransactionalClient(client) {
+  return Boolean(client && typeof client.release === "function");
+}
+
+function schedulePublishAfterTransition(client, applicationId, userId, options = {}) {
+  enqueuePostCommitPublish(applicationId, userId, options);
+  if (!isTransactionalClient(client)) {
+    markApplicationPublishCommitted(applicationId);
+    void flushPostCommitPublishes();
+  }
+}
+
+function scheduleRevivePublish(client, applicationId, userId) {
+  schedulePublishAfterTransition(client, applicationId, userId, { forceRevive: true });
+}
 
 class StateTransitionConflict extends Error {
   constructor(message, meta = {}) {
@@ -55,7 +72,7 @@ async function transitionApplicationState(client, params) {
       return { ok: false, conflict: true, currentStatus: null };
     }
     if (row.user_id) {
-      scheduleRevivePublish(applicationId, row.user_id);
+      scheduleRevivePublish(client, applicationId, row.user_id);
     }
     return { ok: true, row, orchestrationMeta: meta };
   }
@@ -141,9 +158,9 @@ async function transitionApplicationState(client, params) {
   if (row.user_id) {
     const enteringTerminal = isTerminalApplicationStatus(nextStatus);
     if (orchestrationBump === "revive_with_transition") {
-      scheduleRevivePublish(applicationId, row.user_id);
+      scheduleRevivePublish(client, applicationId, row.user_id);
     } else {
-      scheduleApplicationRealtimePublish(applicationId, row.user_id, { enteringTerminal });
+      schedulePublishAfterTransition(client, applicationId, row.user_id, { enteringTerminal });
     }
   }
 

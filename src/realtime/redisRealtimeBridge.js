@@ -2,8 +2,10 @@ const IORedis = require("ioredis");
 const config = require("../config");
 const { EVENT_APPLICATION_UPDATED } = require("../contracts/applicationEvents");
 const { logInfo, logError } = require("../utils/logger");
+const { logRealtimeLifecycle, envelopeFromPayload } = require("./realtimeLifecycleLog");
+const { attachRedisErrorHandler } = require("../observability/networkError");
 const { broadcastToUser } = require("./sseConnectionRegistry");
-const { formatSseEvent } = require("./sseFormat");
+const { writeSseEvent } = require("./sseFormat");
 const {
   redisRealtimeEnabled,
   ensureRealtimePublisher,
@@ -18,7 +20,10 @@ function startRedisRealtimeBridge() {
   bridgeStarted = true;
 
   subscriber = new IORedis(config.redis.redisUrl, { maxRetriesPerRequest: null });
-  subscriber.on("error", (err) => logError("REALTIME_REDIS_SUBSCRIBER_ERROR", err));
+  attachRedisErrorHandler(subscriber, "redis_pubsub_subscriber", {
+    hypothesisId: "C",
+    role: "subscriber",
+  });
 
   subscriber.subscribe(config.redis.realtimeChannel, (err) => {
     if (err) {
@@ -34,13 +39,22 @@ function startRedisRealtimeBridge() {
       if (payload?.type !== EVENT_APPLICATION_UPDATED || !payload.userId) return;
 
       const sent = broadcastToUser(payload.userId, (res) => {
-        res.write(formatSseEvent("application.updated", payload));
+        const result = writeSseEvent(
+          res,
+          payload.userId,
+          "application.updated",
+          payload,
+          payload.eventId
+        );
+        return result.ok;
       });
 
       if (sent > 0) {
         const { metrics } = require("../observability/orchestrationMetrics");
         metrics.increment("orchestration.sse.event_sent", { via: "redis" }, sent);
+        logRealtimeLifecycle("SSE_EVENT_SENT", envelopeFromPayload(payload, { sent, via: "redis" }));
       }
+      logRealtimeLifecycle("REDIS_MESSAGE_RECEIVED", envelopeFromPayload(payload));
     } catch (err) {
       logError("REALTIME_REDIS_MESSAGE_PARSE_FAILED", err);
     }

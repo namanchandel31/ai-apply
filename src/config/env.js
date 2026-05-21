@@ -80,6 +80,18 @@ function validateStartup() {
 
   requireEnv(required);
 
+  const redisUrl = str("REDIS_URL", null);
+  if (redisUrl && !/^redis(s)?:\/\//i.test(redisUrl)) {
+    // eslint-disable-next-line no-console
+    console.error(
+      "[config] REDIS_URL must be a redis:// or rediss:// connection string (required for BullMQ queues)"
+    );
+    process.exit(1);
+  }
+
+  const { assertQueueConfiguration } = require("../constants/queues");
+  assertQueueConfiguration();
+
   if (!isProduction && !str("OPENAI_API_KEY", null)) {
     // eslint-disable-next-line no-console
     console.warn("[config] OPENAI_API_KEY is not set — AI features will be limited");

@@ -1,0 +1,6 @@
+export const MAX_LIVE_QUEUE_EVENTS = 2000;
+export const MAX_REPLAY_BACKLOG = 5000;
+export const MAX_BATCH_COALESCE_MAP = 500;
+export const MAX_LIVE_QUEUE_DURING_REPLAY = 1000;
+
+export const QUEUE_PRESSURE_RATIO = 0.8;

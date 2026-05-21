@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { api, type ApplicationRecord } from "@/lib/api";
-import {
-  useApplicationStatusPoll,
-  requestPollEtagClear,
-} from "@/hooks/useApplicationStatusPoll";
-import { useRealtime } from "@/contexts/RealtimeProvider";
+import { useRealtime } from "@/contexts/useRealtime";
 import { globalOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
+import {
+  displayCompany,
+  displayRole,
+  getApplicationsQueryOptions,
+  patchApplicationAfterMutation,
+  refreshApplicationsList,
+} from "@/queries/applicationsCache";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -48,84 +52,21 @@ function StatusBadge({ app }: { app: ApplicationRecord }) {
 }
 
 export function ApplicationTable() {
-  const [apps, setApps] = useState<ApplicationRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const [continueEmail, setContinueEmail] = useState<Record<string, string>>({});
   const [actionId, setActionId] = useState<string | null>(null);
-  const timeoutToastShownRef = useRef<Set<string>>(new Set());
-  const errorToastShownRef = useRef<Set<string>>(new Set());
+  const { isDegraded, broadcastRevive, resetDegraded } = useRealtime();
 
-  const { connectionState, subscribe, broadcastRevive } = useRealtime();
-
-  useEffect(() => {
-    return subscribe((event) => {
-      if (event.type !== "application.updated") return;
-      setApps((current) =>
-        current.map((app) => {
-          if (app.id !== event.applicationId) return app;
-          return {
-            ...app,
-            status: event.status,
-            uiStatus: event.uiStatus,
-            terminal: event.terminal,
-            executionTerminal: event.executionTerminal,
-            pollable: event.pollable,
-            canRetry: event.canRetry,
-            canContinue: event.canContinue,
-            reviewReason: event.reviewReason ?? undefined,
-          };
-        })
-      );
-    });
-  }, [subscribe]);
-
-  const pollCallbacks = useMemo(
-    () => ({
-      onPollTimeout: (applicationId: string) => {
-        if (timeoutToastShownRef.current.has(applicationId)) return;
-        timeoutToastShownRef.current.add(applicationId);
-        toast.message("Processing is taking longer than expected");
-      },
-      onPollError: (applicationId: string, message: string) => {
-        if (errorToastShownRef.current.has(applicationId)) return;
-        errorToastShownRef.current.add(applicationId);
-        toast.error(message);
-      },
-    }),
-    []
-  );
-
-  const fetchApps = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    try {
-      const res = await api.getApplications();
-      setApps(res.data);
-    } catch (err) {
-      console.error(err);
-      if (isRefresh) toast.error("Failed to load applications");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchApps();
-  }, [fetchApps]);
-
-  useApplicationStatusPoll(apps, setApps, {
-    ...pollCallbacks,
-    connectionState,
-  });
+  const {
+    data: apps = [],
+    isLoading,
+    isFetching,
+  } = useQuery(getApplicationsQueryOptions());
 
   const reviveBeforeAction = (id: string) => {
     const current = globalOrchestrationRegistry.get(id);
     const nextEpoch = (current?.orchestrationEpoch ?? 0) + 1;
     broadcastRevive(id, nextEpoch);
-    requestPollEtagClear(id);
-    timeoutToastShownRef.current.delete(id);
-    errorToastShownRef.current.delete(id);
   };
 
   const handleRetry = async (id: string) => {
@@ -138,8 +79,13 @@ export function ApplicationTable() {
       if (typeof epoch === "number") {
         broadcastRevive(id, epoch);
       }
+      patchApplicationAfterMutation(queryClient, id, {
+        status: res.data.status,
+        uiStatus: "queued",
+        pollable: true,
+        terminal: false,
+      });
       toast.success("Retry queued");
-      await fetchApps(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Retry failed");
     } finally {
@@ -157,9 +103,14 @@ export function ApplicationTable() {
     setActionId(id);
     reviveBeforeAction(id);
     try {
-      await api.continueApplication(id, email);
+      const res = await api.continueApplication(id, email);
+      patchApplicationAfterMutation(queryClient, id, {
+        status: res.data.status,
+        uiStatus: "sending",
+        pollable: true,
+        terminal: false,
+      });
       toast.success("Send queued");
-      await fetchApps(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Continue failed");
     } finally {
@@ -167,7 +118,7 @@ export function ApplicationTable() {
     }
   };
 
-  if (loading && apps.length === 0) {
+  if (isLoading && apps.length === 0) {
     return (
       <div className="flex justify-center p-8 border rounded-md bg-card">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -178,9 +129,24 @@ export function ApplicationTable() {
   return (
     <div className="rounded-md border bg-card shadow-sm overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b bg-muted/20">
-        <h2 className="font-medium">Recent Applications</h2>
-        <Button variant="ghost" size="sm" onClick={() => fetchApps(true)} disabled={refreshing}>
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+        <div>
+          <h2 className="font-medium">Recent Applications</h2>
+          {isDegraded && (
+            <p className="text-xs text-amber-600 mt-1">
+              Live updates temporarily unavailable.{" "}
+              <button type="button" className="underline" onClick={() => void resetDegraded()}>
+                Refresh status
+              </button>
+            </p>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => refreshApplicationsList(queryClient)}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
         </Button>
       </div>
       <Table>
@@ -203,8 +169,8 @@ export function ApplicationTable() {
           ) : (
             apps.map((app) => (
               <TableRow key={app.id}>
-                <TableCell className="font-medium">{app.role || "Unknown Role"}</TableCell>
-                <TableCell>{app.company || "Unknown Company"}</TableCell>
+                <TableCell className="font-medium">{displayRole(app)}</TableCell>
+                <TableCell>{displayCompany(app)}</TableCell>
                 <TableCell>
                   <StatusBadge app={app} />
                 </TableCell>

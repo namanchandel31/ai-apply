@@ -119,6 +119,39 @@ class OrchestrationRegistry {
     return next;
   }
 
+  syncFromPresentation(apps) {
+    const seen = new Set();
+    for (const app of apps) {
+      seen.add(app.id);
+      const existing = this.states.get(app.id) ?? defaultState(app.id);
+      const terminal =
+        app.terminal === true ||
+        isTerminalUiStatus(app.uiStatus || app.status);
+      const pollable = !terminal && app.pollable !== false;
+      this.states.set(app.id, {
+        ...existing,
+        terminal,
+        pollable,
+        sseSubscribed: !terminal,
+      });
+      if (terminal) this.markTerminal(app.id);
+    }
+    for (const id of [...this.states.keys()]) {
+      if (!seen.has(id)) {
+        const existing = this.states.get(id);
+        if (existing) {
+          this.states.set(id, {
+            ...existing,
+            terminal: true,
+            pollable: false,
+            sseSubscribed: false,
+            prunedAt: Date.now(),
+          });
+        }
+      }
+    }
+  }
+
   getPollableIds(maxAttempts, now = Date.now()) {
     const ids = [];
     for (const state of this.states.values()) {
