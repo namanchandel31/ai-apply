@@ -9,7 +9,7 @@
 
 const { metrics } = require("../observability/orchestrationMetrics");
 const { logRealtimeLifecycle } = require("./realtimeLifecycleLog");
-const { publishApplicationUpdate } = require("./publishApplicationUpdate");
+const { enqueuePublishBatch } = require("./publishBatchProcessor");
 
 const MAX_PENDING = 500;
 const UNCOMMITTED_TTL_MS = 60_000;
@@ -200,7 +200,10 @@ async function flushOne(entry) {
   if (inFlightFlush.has(applicationId)) return;
   inFlightFlush.add(applicationId);
   try {
-    await publishApplicationUpdate(applicationId, userId, options);
+    enqueuePublishBatch(applicationId, userId, {
+      ...options,
+      publishSource: options.publishSource || options.source || "post_commit_queue",
+    });
     pending.delete(applicationId);
     metrics.increment("orchestration.post_commit.flushed");
     logRealtimeLifecycle("REALTIME_PUBLISH_FLUSHED", {
@@ -234,6 +237,8 @@ async function flushPostCommitPublishes() {
     for (const entry of committed) {
       await flushOne(entry);
     }
+    const { flushPublishBatchNow } = require("./publishBatchProcessor");
+    await flushPublishBatchNow();
   } finally {
     flushing = false;
   }
@@ -275,7 +280,9 @@ function resetPostCommitQueueForTests() {
 
 /** Immediate publish for non-transactional API paths. */
 async function publishImmediately(applicationId, userId, options = {}) {
-  await publishApplicationUpdate(applicationId, userId, options);
+  const { flushPublishBatchNow } = require("./publishBatchProcessor");
+  enqueuePublishBatch(applicationId, userId, options);
+  await flushPublishBatchNow();
 }
 
 function scheduleApplicationRealtimePublish(applicationId, userId, options = {}) {

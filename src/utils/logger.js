@@ -40,9 +40,18 @@ const buildLogPayload = (event, metadata = {}) => {
   if (safe.model && safe.tokens_in != null && safe.tokens_out != null) {
     safe.estimated_cost = computeEstimatedCost(safe.model, safe.tokens_in, safe.tokens_out);
   }
+  let traceFromStore = {};
+  try {
+    const { getTraceFields } = require("../observability/orchestrationTraceContext");
+    traceFromStore = getTraceFields();
+  } catch {
+    /* optional during early boot */
+  }
   return {
     event,
-    requestId: safe.reqId || safe.requestId || "UNKNOWN",
+    traceId: safe.traceId || traceFromStore.traceId,
+    requestId: safe.reqId || safe.requestId || traceFromStore.requestId,
+    orchestrationId: safe.orchestrationId || traceFromStore.orchestrationId,
     userId: safe.userId || undefined,
     applicationId: safe.applicationId || undefined,
     retryCount: safe.retryCount ?? safe.attempt ?? undefined,

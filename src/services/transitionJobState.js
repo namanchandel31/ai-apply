@@ -1,9 +1,6 @@
 const { logInfo } = require("../utils/logger");
 const { enqueuePostCommitPublish } = require("../realtime/postCommitPublishQueue");
-
-function isTransactionalClient(client) {
-  return Boolean(client && typeof client.release === "function");
-}
+const { bumpVersionForJobTransition } = require("./orchestrationVersion");
 
 function normalizeExpected(expectedStatus) {
   return Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
@@ -16,6 +13,7 @@ async function transitionJobState(client, params) {
     nextStatus,
     lastError = undefined,
     patch = {},
+    schedulePublish = true,
   } = params;
 
   const expected = normalizeExpected(expectedStatus);
@@ -64,22 +62,23 @@ async function transitionJobState(client, params) {
   }
 
   const row = rows[0];
-  if (row.application_id) {
+  if (schedulePublish && row.application_id) {
     const appRes = await client.query(
-      `SELECT user_id FROM applications WHERE id = $1`,
+      `SELECT user_id, application_status FROM applications WHERE id = $1`,
       [row.application_id]
     );
-    const userId = appRes.rows[0]?.user_id;
+    const appRow = appRes.rows[0];
+    const userId = appRow?.user_id;
     if (userId) {
-      enqueuePostCommitPublish(row.application_id, userId, { source: "job_transition" });
-      if (!isTransactionalClient(client)) {
-        const {
-          markApplicationPublishCommitted,
-          flushPostCommitPublishes,
-        } = require("../realtime/postCommitPublishQueue");
-        markApplicationPublishCommitted(row.application_id);
-        void flushPostCommitPublishes();
-      }
+      const orchMeta = await bumpVersionForJobTransition(client, row.application_id, {
+        triggeringTransition: `job_${nextStatus}`,
+        fromStatus: appRow.application_status,
+      });
+      enqueuePostCommitPublish(row.application_id, userId, {
+        source: "job_transition",
+        publishSource: "job_transition",
+        expectedVersion: Number(orchMeta?.orchestration_version) || 0,
+      });
     }
   }
   return { ok: true, row };

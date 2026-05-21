@@ -8,11 +8,13 @@ const {
 } = require("./pgClient");
 
 const SLOW_QUERY_MS = 100;
+const EXPLAIN_SLOW_MS = 50;
 const STATUS_QUERY_NAMES = new Set([
   "status_snapshot",
   "status_jobs_latest",
   "status_bundle",
   "status_fingerprint",
+  "orchestration_active",
 ]);
 
 const logging = require("../config/logging.config");
@@ -225,6 +227,40 @@ async function instrumentedQuery(
     logQueryEvent("DB_QUERY", meta);
   }
 
+  if (
+    isStatusPath &&
+    durationMs >= EXPLAIN_SLOW_MS &&
+    (queryShapeLoggingEnabled() || process.env.NODE_ENV !== "production")
+  ) {
+    try {
+      const explainTarget =
+        !isPoolClient && client && typeof client._rawQuery === "function"
+          ? { query: client._rawQuery.bind(client) }
+          : client;
+      const explainRes = await execQuery(
+        explainTarget,
+        `EXPLAIN (FORMAT JSON) ${typeof text === "string" ? text : config.text}`,
+        values
+      );
+      const plan = explainRes.rows?.[0]?.["QUERY PLAN"];
+      const planJson = Array.isArray(plan) ? plan[0] : plan;
+      const planNode = planJson?.Plan || planJson;
+      logQueryEvent("QUERY_EXPLAIN_SLOW", {
+        queryName,
+        durationMs,
+        planRows: planNode?.["Plan Rows"],
+        indexScan: JSON.stringify(planJson).includes("Index Scan"),
+        seqScan: JSON.stringify(planJson).includes("Seq Scan"),
+      });
+    } catch (explainErr) {
+      logQueryEvent("QUERY_EXPLAIN_SLOW", {
+        queryName,
+        durationMs,
+        explainError: explainErr?.message,
+      });
+    }
+  }
+
   return result;
 }
 
@@ -344,7 +380,7 @@ function wrapPoolQuery(pool) {
 
 let poolMetricsInterval = null;
 
-function startPoolMetricsLogging(pool, intervalMs = 60_000) {
+function startPoolMetricsLogging(pool, intervalMs = 60_000, meta = {}) {
   if (poolMetricsInterval) return;
   const config = require("../config");
   if (config.server.isProduction && !logging.hasDebugScope("query")) {
@@ -352,9 +388,15 @@ function startPoolMetricsLogging(pool, intervalMs = 60_000) {
   }
 
   poolMetricsInterval = setInterval(() => {
-    const metrics = getPoolMetrics(pool);
-    if (metrics.poolWaiting > 0 || metrics.poolIdle === 0) {
-      logQueryEvent("POOL_METRICS", metrics);
+    const m = getPoolMetrics(pool);
+    if (m.poolWaiting > 0 || m.poolIdle === 0) {
+      let poolOwner;
+      try {
+        poolOwner = require("../db").POOL_OWNER;
+      } catch {
+        poolOwner = undefined;
+      }
+      logQueryEvent("POOL_METRICS", { ...m, poolOwner, poolInstanceId: meta.poolInstanceId });
     }
   }, intervalMs);
 

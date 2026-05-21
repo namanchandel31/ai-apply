@@ -5,6 +5,7 @@ const { logRealtimeLifecycle, envelopeFromPayload } = require("./realtimeLifecyc
 const { metrics } = require("../observability/orchestrationMetrics");
 const { broadcastToUser } = require("./sseConnectionRegistry");
 const { writeSseEvent } = require("./sseFormat");
+const { wasAlreadyEmitted } = require("./publishDedupeRegistry");
 
 const config = require("../config");
 const HEARTBEAT_MS = config.realtime.SSE_HEARTBEAT_MS;
@@ -13,6 +14,17 @@ let gatewayStarted = false;
 let busHandler = null;
 
 function broadcastApplicationUpdated(payload) {
+  if (
+    payload?.applicationId != null &&
+    wasAlreadyEmitted(
+      payload.applicationId,
+      Number(payload.version) || 0,
+      Number(payload.orchestrationEpoch) || 0
+    )
+  ) {
+    return;
+  }
+
   const eventId = payload.eventId;
   const sent = broadcastToUser(payload.userId, (res) => {
     const result = writeSseEvent(

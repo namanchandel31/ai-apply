@@ -68,10 +68,22 @@ export function createEventBatchProcessor(
     const started = performance.now();
     const payloads = [...pending.values()];
     const size = payloads.length;
+    const droppedIntermediateCount = coalescedTotal;
     pending.clear();
     onFlush(payloads);
+    const durationMs = Math.round(performance.now() - started);
     if (isDebugEnabled("reconciliation")) {
-      logDebug("BATCH_FLUSH", { size, coalesced: coalescedTotal, durationMs: Math.round(performance.now() - started) }, "reconciliation");
+      logDebug(
+        "BATCH_FLUSH",
+        {
+          coalescedEventCount: size,
+          droppedIntermediateCount,
+          coalesced: coalescedTotal,
+          flushDurationMs: durationMs,
+          durationMs,
+        },
+        "reconciliation"
+      );
     }
     coalescedTotal = 0;
   };

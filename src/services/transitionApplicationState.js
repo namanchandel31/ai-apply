@@ -16,7 +16,10 @@ function isTransactionalClient(client) {
 }
 
 function schedulePublishAfterTransition(client, applicationId, userId, options = {}) {
-  enqueuePostCommitPublish(applicationId, userId, options);
+  enqueuePostCommitPublish(applicationId, userId, {
+    publishSource: "app_transition",
+    ...options,
+  });
   if (!isTransactionalClient(client)) {
     markApplicationPublishCommitted(applicationId);
     void flushPostCommitPublishes();
@@ -60,7 +63,10 @@ async function transitionApplicationState(client, params) {
   } = params;
 
   if (orchestrationBump === "revive") {
-    const meta = await bumpOrchestrationEpoch(client, applicationId);
+    const meta = await bumpOrchestrationEpoch(client, applicationId, {
+      bumpMode: "revive",
+      triggeringTransition: "revive",
+    });
     const rowRes = await client.query(
       userId
         ? `SELECT * FROM applications WHERE id = $1 AND user_id = $2`
@@ -152,15 +158,30 @@ async function transitionApplicationState(client, params) {
   const row = rows[0];
   const orchestrationMeta =
     orchestrationBump === "revive_with_transition"
-      ? await bumpOrchestrationEpoch(client, applicationId)
-      : await incrementOrchestrationVersion(client, applicationId);
+      ? await bumpOrchestrationEpoch(client, applicationId, {
+          bumpMode: "revive_with_transition",
+          fromStatus: expected[0],
+          toStatus: nextStatus,
+          triggeringTransition: `${expected[0]}_to_${nextStatus}`,
+        })
+      : await incrementOrchestrationVersion(client, applicationId, {
+          bumpMode: "app_transition",
+          fromStatus: expected[0],
+          toStatus: nextStatus,
+          triggeringTransition: `${expected[0]}_to_${nextStatus}`,
+        });
 
   if (row.user_id) {
     const enteringTerminal = isTerminalApplicationStatus(nextStatus);
+    const publishSource = orchestrationBump === "revive_with_transition" ? "revive" : "app_transition";
     if (orchestrationBump === "revive_with_transition") {
       scheduleRevivePublish(client, applicationId, row.user_id);
     } else {
-      schedulePublishAfterTransition(client, applicationId, row.user_id, { enteringTerminal });
+      schedulePublishAfterTransition(client, applicationId, row.user_id, {
+        enteringTerminal,
+        publishSource,
+        expectedVersion: Number(orchestrationMeta?.orchestration_version) || 0,
+      });
     }
   }
 

@@ -49,4 +49,16 @@ Defer: per-phase batch histograms, granular replay trim analytics
 - Tier 2: max **50** targeted status fetches (5 concurrent, 200ms gap)
 - Tier 3: single `GET /api/orchestration/active` with 3-attempt / 5m cooldown
 
-See also: [realtime-ordering.md](./realtime-ordering.md), [realtime-failure-scenarios.md](./realtime-failure-scenarios.md)
+## Query performance targets (local/light load)
+
+- Simple indexed reads: under 20ms
+- `status_bundle`: under 50ms p95 (see migration `015_status_bundle_indexes.sql`)
+- Slow status queries log `QUERY_EXPLAIN_SLOW` when `DEBUG=query` or non-production
+
+## Publish correctness (v2)
+
+- Dedupe key: `(applicationId, orchestration_version, orchestration_epoch)` — not `status:updatedAt`
+- Server 75ms publish batch coalesces post-commit flushes
+- Job transitions bump `orchestration_version` before publish
+
+See also: [realtime-ordering.md](./realtime-ordering.md), [realtime-failure-scenarios.md](./realtime-failure-scenarios.md), [request-lifecycle.md](./request-lifecycle.md)

@@ -39,8 +39,21 @@ function nextEventId() {
   return `${Date.now()}-${sequence}`;
 }
 
-async function appendReplayEvent(userId, payload) {
-  const eventId = nextEventId();
+const { wasAlreadyEmitted } = require("./publishDedupeRegistry");
+
+async function appendReplayEvent(userId, payload, options = {}) {
+  if (
+    payload?.applicationId != null &&
+    wasAlreadyEmitted(
+      payload.applicationId,
+      Number(payload.version) || 0,
+      Number(payload.orchestrationEpoch) || 0
+    )
+  ) {
+    return { eventId: payload.eventId, payload, skipped: true };
+  }
+
+  const eventId = payload.eventId || nextEventId();
   const entry = { eventId, payload: { ...payload, eventId }, ts: Date.now() };
 
   const redis = getRedis();

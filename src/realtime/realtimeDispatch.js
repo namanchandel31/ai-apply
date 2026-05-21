@@ -5,6 +5,7 @@ const { realtimeBus } = require("../events/realtimeBus");
 const { logError } = require("../utils/logger");
 const { logRealtimeLifecycle, envelopeFromPayload } = require("./realtimeLifecycleLog");
 const { attachRedisErrorHandler } = require("../observability/networkError");
+const { wasAlreadyEmitted } = require("./publishDedupeRegistry");
 
 let redisPublisher = null;
 
@@ -40,7 +41,18 @@ async function publishToRedis(payload) {
   }
 }
 
-function fanOutRealtimePayload(payload) {
+function fanOutRealtimePayload(payload, meta = {}) {
+  if (
+    payload?.applicationId != null &&
+    wasAlreadyEmitted(
+      payload.applicationId,
+      Number(payload.version) || 0,
+      Number(payload.orchestrationEpoch) || 0
+    )
+  ) {
+    return;
+  }
+
   if (redisRealtimeEnabled()) {
     logRealtimeLifecycle("REDIS_FANOUT_SCHEDULED", envelopeFromPayload(payload));
     void publishToRedis(payload);

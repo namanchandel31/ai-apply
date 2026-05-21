@@ -19,6 +19,7 @@ const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/ui
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
 const { safePersistApplicationFailure } = require("../services/safePersistApplicationFailure");
+const { runWithTrace } = require("../observability/orchestrationTraceContext");
 
 const REVIEW_REASON = {
   MISSING_CONTACT: "missing_contact_email",
@@ -26,6 +27,19 @@ const REVIEW_REASON = {
 
 async function processor(job) {
   const { applicationId, userId, dbJobId } = job.data;
+  return runWithTrace(
+    {
+      traceId: job.data.traceId || job.id,
+      requestId: job.data.requestId || job.id,
+      orchestrationId: applicationId,
+      jobId: job.id,
+      component: "worker",
+    },
+    async () => processorInner(job, { applicationId, userId, dbJobId })
+  );
+}
+
+async function processorInner(job, { applicationId, userId, dbJobId }) {
   const reqId = job.id;
 
   const app = await getApplicationById(applicationId, userId);

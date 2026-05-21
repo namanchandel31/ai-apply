@@ -1,22 +1,18 @@
 const crypto = require("crypto");
+const { runWithTrace } = require("../observability/orchestrationTraceContext");
 
 /**
- * Tracing middleware.
- *
- * Generates a UUID v4 requestId for every incoming HTTP request, attaches it
- * to `req.requestId`, and echoes it back in the `X-Request-Id` response header.
- *
- * Must be the FIRST middleware mounted in index.js so that all downstream
- * middleware, route handlers, and services can read `req.requestId`.
- *
- * Replaces the ad-hoc `crypto.randomBytes(6).toString('hex')` pattern spread
- * across individual controllers — single source of truth for request tracing.
+ * Tracing middleware — requestId + traceId (AsyncLocalStorage for downstream logs).
  */
 const tracingMiddleware = (req, res, next) => {
   const requestId = crypto.randomUUID();
+  const traceId = req.headers["x-trace-id"] || requestId;
   req.requestId = requestId;
+  req.traceId = traceId;
   res.setHeader("X-Request-Id", requestId);
-  next();
+  res.setHeader("X-Trace-Id", traceId);
+
+  runWithTrace({ traceId, requestId, component: "api" }, () => next());
 };
 
 module.exports = tracingMiddleware;

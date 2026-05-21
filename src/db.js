@@ -52,8 +52,25 @@ function attachPoolErrorHandler(pool, poolInstanceId) {
   });
 }
 
+function detectPoolOwner() {
+  const argv1 = process.argv[1] || "";
+  if (argv1.includes("workers/") || argv1.includes("workers\\")) return "worker";
+  if (argv1.includes("runMigration")) return "migration";
+  if (argv1.includes("processApplication.worker") || argv1.includes("sendApplication.worker")) {
+    return "worker";
+  }
+  return "api";
+}
+
+const POOL_OWNER = detectPoolOwner();
+
 function getOrCreatePool() {
   if (global[GLOBAL_POOL_KEY]) {
+    logInfo("POOL_REUSED", {
+      poolInstanceId: global[GLOBAL_POOL_ID_KEY],
+      poolOwner: POOL_OWNER,
+      pid: process.pid,
+    });
     return {
       pool: global[GLOBAL_POOL_KEY],
       poolInstanceId: global[GLOBAL_POOL_ID_KEY],
@@ -67,8 +84,10 @@ function getOrCreatePool() {
   wrapPoolQuery(created);
   global[GLOBAL_POOL_KEY] = created;
   global[GLOBAL_POOL_ID_KEY] = poolInstanceId;
-  logInfo("PG_POOL_CREATED", {
+  logInfo("POOL_CREATED", {
+    event: "PG_POOL_CREATED",
     poolInstanceId,
+    poolOwner: POOL_OWNER,
     max: buildPoolConfig().max,
     pid: process.pid,
   });
@@ -96,6 +115,7 @@ async function testConnection() {
 module.exports = {
   pool,
   POOL_INSTANCE_ID,
+  POOL_OWNER,
   testConnection,
   instrumentedQuery,
   getPoolMetrics,

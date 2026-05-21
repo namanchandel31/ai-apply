@@ -15,7 +15,7 @@ flowchart TD
 
 | Order | Middleware | Purpose |
 |-------|------------|---------|
-| 1 | `tracingMiddleware` | `req.requestId` for correlation |
+| 1 | `tracingMiddleware` | `req.requestId` + `req.traceId` (`X-Trace-Id`); AsyncLocalStorage for downstream logs |
 | 2 | `pino-http` | Structured access logs |
 | 3 | `cors`, `express.json` | CORS + body |
 | 4 | Tiered rate limits | `upload`, `apply`, `read`, `autoApply` |
@@ -72,9 +72,22 @@ Errors use [`httpErrorResponse.js`](../../src/utils/httpErrorResponse.js) / [`re
 
 Production serves Vite build from `public/`; API routes take precedence; fallback to `index.html`.
 
+## Correlation IDs
+
+| Field | Scope | Propagation |
+|-------|-------|-------------|
+| `traceId` | End-to-end flow | `X-Trace-Id` header or same as `requestId`; AsyncLocalStorage |
+| `requestId` | HTTP request | `X-Request-Id` |
+| `orchestrationId` | Per application | `applicationId` |
+| `jobId` | Worker job | Bull `job.id` + `job.data.requestId` when enqueued |
+| `eventId` | SSE/replay transport | Replay buffer only — not business ordering |
+
+Workers run inside `runWithTrace()` so logs avoid `requestId: UNKNOWN`. Realtime publish logs include `traceId`, `applicationId`, `version`, `eventId`, `publishSource`.
+
 ## Related Documentation
 
 - [async-processing.md](async-processing.md)
+- [db-pool-lifecycle.md](db-pool-lifecycle.md)
 - [ownership-boundaries.md](ownership-boundaries.md)
 - [../api/README.md](../api/README.md)
 - [../backend/middleware.md](../backend/middleware.md)

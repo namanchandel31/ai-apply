@@ -6,6 +6,7 @@ const { logRealtimeLifecycle, envelopeFromPayload } = require("./realtimeLifecyc
 const { attachRedisErrorHandler } = require("../observability/networkError");
 const { broadcastToUser } = require("./sseConnectionRegistry");
 const { writeSseEvent } = require("./sseFormat");
+const { wasAlreadyEmitted } = require("./publishDedupeRegistry");
 const {
   redisRealtimeEnabled,
   ensureRealtimePublisher,
@@ -37,6 +38,17 @@ function startRedisRealtimeBridge() {
     try {
       const payload = JSON.parse(message);
       if (payload?.type !== EVENT_APPLICATION_UPDATED || !payload.userId) return;
+
+      if (
+        payload.applicationId != null &&
+        wasAlreadyEmitted(
+          payload.applicationId,
+          Number(payload.version) || 0,
+          Number(payload.orchestrationEpoch) || 0
+        )
+      ) {
+        return;
+      }
 
       const sent = broadcastToUser(payload.userId, (res) => {
         const result = writeSseEvent(

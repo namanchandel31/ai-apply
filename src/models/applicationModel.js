@@ -100,6 +100,11 @@ const createApplication = async ({
      DO UPDATE SET
         updated_at = NOW(),
         application_status = EXCLUDED.application_status,
+        orchestration_version = CASE
+          WHEN applications.application_status IS DISTINCT FROM EXCLUDED.application_status
+          THEN applications.orchestration_version + 1
+          ELSE applications.orchestration_version
+        END,
         review_reason = EXCLUDED.review_reason,
         recipient_email = EXCLUDED.recipient_email,
         resume_snapshot_path = EXCLUDED.resume_snapshot_path,

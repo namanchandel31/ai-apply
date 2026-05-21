@@ -1,39 +1,32 @@
 const {
-  shouldSkipDuplicatePublish,
-  resetRealtimePublishStateForTests,
-} = require("../src/services/applicationRealtimePublisher");
-const { metrics } = require("../src/observability/orchestrationMetrics");
+  shouldEmitPublish,
+  recordEmitted,
+  publishKey,
+  resetPublishDedupeForTests,
+} = require("../src/realtime/publishDedupeRegistry");
 
-describe("shouldSkipDuplicatePublish", () => {
+describe("publish dedupe (triple key)", () => {
   beforeEach(() => {
-    resetRealtimePublishStateForTests();
-    metrics.reset();
+    resetPublishDedupeForTests();
   });
 
-  it("allows first publish and skips duplicate within dedupe window", () => {
-    const payload = {
-      applicationId: "app-1",
-      status: "draft",
-      updatedAt: "2026-05-20T12:00:00.000Z",
-    };
+  const base = {
+    applicationId: "app-dedupe",
+    version: 3,
+    orchestrationEpoch: 1,
+    publishSource: "unit_test",
+  };
 
-    expect(shouldSkipDuplicatePublish(payload)).toBe(false);
-    expect(shouldSkipDuplicatePublish(payload)).toBe(true);
-
-    const snap = metrics.getSnapshot();
-    expect(snap.counters["orchestration.realtime.dedupe_skip"]).toBe(1);
+  it("blocks duplicate triple within TTL", () => {
+    expect(shouldEmitPublish(base).allow).toBe(true);
+    recordEmitted(publishKey(base.applicationId, base.version, base.orchestrationEpoch), {});
+    expect(shouldEmitPublish(base).allow).toBe(false);
   });
 
-  it("allows publish when updatedAt changes", () => {
-    const base = {
-      applicationId: "app-1",
-      status: "draft",
-    };
+  it("allows same app with bumped version", () => {
+    recordEmitted(publishKey(base.applicationId, 2, 1), {});
     expect(
-      shouldSkipDuplicatePublish({ ...base, updatedAt: "2026-05-20T12:00:00.000Z" })
-    ).toBe(false);
-    expect(
-      shouldSkipDuplicatePublish({ ...base, updatedAt: "2026-05-20T12:01:00.000Z" })
-    ).toBe(false);
+      shouldEmitPublish({ ...base, version: 3 }).allow
+    ).toBe(true);
   });
 });

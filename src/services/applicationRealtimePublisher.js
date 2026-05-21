@@ -4,14 +4,20 @@ const {
   publishApplicationUpdate,
   clearPublishCache,
   buildRealtimePayload,
-  shouldSkipDuplicatePublish,
   resetPublishStateForTests,
 } = require("../realtime/publishApplicationUpdate");
+const {
+  shouldEmitPublish,
+  resetPublishDedupeForTests,
+} = require("../realtime/publishDedupeRegistry");
 
 function resetRealtimePublishStateForTests() {
   resetPublishStateForTests();
+  resetPublishDedupeForTests();
   const { resetPostCommitQueueForTests } = require("../realtime/postCommitPublishQueue");
+  const { resetPublishBatchForTests } = require("../realtime/publishBatchProcessor");
   resetPostCommitQueueForTests();
+  resetPublishBatchForTests();
 }
 
 function scheduleRevivePublish(applicationId, userId) {
@@ -32,6 +38,6 @@ module.exports = {
   scheduleRevivePublish,
   clearPublishCache,
   buildRealtimePayload,
-  shouldSkipDuplicatePublish,
+  shouldEmitPublish,
   resetRealtimePublishStateForTests,
 };
