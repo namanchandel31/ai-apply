@@ -16,7 +16,11 @@ const SESSION_INVALID_CODES = new Set([
   "INVALID_TOKEN",
   "INVALID_ISSUER",
   "INVALID_AUDIENCE",
+  "MALFORMED_AUTH_HEADER",
 ]);
+
+/** Missing bearer on request — often race before hydration; do not always force logout. */
+const SOFT_AUTH_CODES = new Set(["MISSING_AUTH_HEADER", "MISSING_AUTH_TOKEN"]);
 
 export function parseApiErrorCode(body: Record<string, unknown>): string | undefined {
   const top = body.code;
@@ -33,6 +37,7 @@ export function shouldForceLogout({ status, code }: AuthErrorContext): boolean {
   if (status === 403) return false;
   if (code && NON_LOGOUT_AUTH_CODES.has(code)) return false;
   if (status === 401) {
+    if (code && SOFT_AUTH_CODES.has(code)) return false;
     if (code && SESSION_INVALID_CODES.has(code)) return true;
     if (!code) return true;
     return !NON_LOGOUT_AUTH_CODES.has(code);

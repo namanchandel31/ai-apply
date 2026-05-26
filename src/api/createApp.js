@@ -36,7 +36,7 @@ function createApp() {
     })
   );
 
-  app.use(cors());
+  app.use(cors(config.cors.buildCorsMiddlewareOptions()));
   app.use(express.json());
 
   const {

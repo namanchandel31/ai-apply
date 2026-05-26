@@ -1,7 +1,7 @@
 import { notifyAuthFailure } from "@/lib/api";
 import { apiUrl } from "@/lib/apiBase";
 import { parseApiErrorCode } from "@/lib/authErrors";
-import { getCachedAccessToken, getSupabaseAccessToken } from "@/lib/supabaseClient";
+import { buildAuthorizedHeaders } from "@/lib/authRequest";
 import { getTabId } from "@/services/orchestration/orchestrationBroadcast";
 import { getLastEventId, setLastEventId } from "../replay/lastEventIdStore";
 import { parseSseBlock, parseSseChunk } from "../events/parseSseFrame";
@@ -148,8 +148,9 @@ export function createSseTransport(options: SseTransportOptions) {
       return;
     }
 
-    const token = getCachedAccessToken() ?? (await getSupabaseAccessToken());
-    if (!token) {
+    const { headers: authHeaders, hasToken } = await buildAuthorizedHeaders();
+    const bearer = authHeaders.get("Authorization");
+    if (!hasToken || !bearer) {
       setState("disconnected");
       return;
     }
@@ -168,7 +169,7 @@ export function createSseTransport(options: SseTransportOptions) {
     const lastEventId = getLastEventId();
     const tabId = getTabId();
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
+      Authorization: bearer,
       Accept: "text/event-stream",
     };
     if (lastEventId) {
@@ -184,6 +185,7 @@ export function createSseTransport(options: SseTransportOptions) {
       const res = await fetch(url, {
         method: "GET",
         headers,
+        mode: "cors",
         signal: abortController.signal,
       });
 

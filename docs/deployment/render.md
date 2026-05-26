@@ -29,6 +29,8 @@ OPENAI_API_KEY=
 
 Optional: `SENTRY_DSN`, `LOG_LEVEL`.
 
+`CORS_ORIGIN` must include your Vercel app URL(s), comma-separated. See [vercel-render-auth.md](./vercel-render-auth.md).
+
 ## Frontend (Vercel)
 
 Set `VITE_API_URL` to your Render service URL (e.g. `https://ai-apply-api.onrender.com`).

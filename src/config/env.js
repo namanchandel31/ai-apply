@@ -101,6 +101,20 @@ function validateStartup() {
     // eslint-disable-next-line no-console
     console.warn("[config] OPENAI_API_KEY is not set — AI features will be limited");
   }
+
+  if (isProduction && !str("SUPABASE_URL", null)) {
+    // eslint-disable-next-line no-console
+    console.error("[config] SUPABASE_URL is required in production for JWT verification");
+    process.exit(1);
+  }
+
+  const corsOrigin = str("CORS_ORIGIN", "");
+  if (isProduction && !corsOrigin) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[config] CORS_ORIGIN is not set — all browser origins are reflected. Set to your Vercel URL(s) for production."
+    );
+  }
 }
 
 module.exports = {

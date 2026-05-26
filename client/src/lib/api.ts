@@ -5,7 +5,8 @@ import {
   type AuthErrorContext,
 } from "@/lib/authErrors";
 import { apiUrl } from "@/lib/apiBase";
-import { getSupabaseAccessToken, supabase } from "@/lib/supabaseClient";
+import { buildAuthorizedHeaders, logAuthRequest } from "@/lib/authRequest";
+import { supabase } from "@/lib/supabaseClient";
 
 export type ApiError = Error & {
   status?: number;
@@ -109,11 +110,14 @@ async function tryRefreshSupabaseSession(): Promise<boolean> {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers = new Headers(options.headers);
-  const token = await getSupabaseAccessToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const { headers, hasToken } = await buildAuthorizedHeaders(options.headers);
+  logAuthRequest(path, hasToken);
 
-  const res = await fetch(apiUrl(path), { ...options, headers });
+  const res = await fetch(apiUrl(path), {
+    ...options,
+    headers,
+    mode: "cors",
+  });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
@@ -123,7 +127,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (
       !options._authRetried &&
       res.status === 401 &&
-      code === "TOKEN_EXPIRED" &&
+      (code === "TOKEN_EXPIRED" ||
+        code === "MISSING_AUTH_HEADER" ||
+        code === "MISSING_AUTH_TOKEN") &&
       (await tryRefreshSupabaseSession())
     ) {
       return request<T>(path, { ...options, _authRetried: true });
@@ -154,16 +160,17 @@ async function requestApplicationStatus(
   applicationId: string,
   options?: { signal?: AbortSignal; ifNoneMatch?: string }
 ): Promise<ApplicationStatusResponse> {
-  const headers = new Headers();
-  const token = await getSupabaseAccessToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const path = `/api/applications/${applicationId}/status`;
+  const { headers, hasToken } = await buildAuthorizedHeaders();
+  logAuthRequest(path, hasToken);
   if (options?.ifNoneMatch) {
     headers.set("If-None-Match", options.ifNoneMatch);
   }
 
-  const res = await fetch(apiUrl(`/api/applications/${applicationId}/status`), {
+  const res = await fetch(apiUrl(path), {
     method: "GET",
     headers,
+    mode: "cors",
     signal: options?.signal,
   });
 

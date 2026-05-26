@@ -3,6 +3,7 @@ const { supabaseAuth } = require("../config");
 const {
   logAuthVerifyFailed,
   logAuthEmailRejected,
+  logAuthConfigReady,
 } = require("./authObservability");
 
 /** OAuth IdPs verify email before issuing tokens; Supabase sets app_metadata.provider. */
@@ -75,11 +76,33 @@ function describeEmailVerificationState(payload) {
 }
 
 let jwks;
+let configLogged = false;
+
+function ensureAuthConfigLogged() {
+  if (configLogged) return;
+  configLogged = true;
+  if (!supabaseAuth.jwksUrl || !supabaseAuth.issuer) {
+    logAuthVerifyFailed({ reason: "supabase_url_not_configured" });
+    return;
+  }
+  let jwksHost = null;
+  try {
+    jwksHost = new URL(supabaseAuth.jwksUrl).host;
+  } catch {
+    jwksHost = "invalid";
+  }
+  logAuthConfigReady({
+    issuer: supabaseAuth.issuer,
+    jwksHost,
+  });
+}
+
 function getJwks() {
   if (!jwks) {
     if (!supabaseAuth.jwksUrl) {
       throw new Error("SUPABASE_URL is not configured");
     }
+    ensureAuthConfigLogged();
     jwks = createRemoteJWKSet(new URL(supabaseAuth.jwksUrl));
   }
   return jwks;
@@ -171,7 +194,12 @@ async function verifySupabaseAccessToken(token, { requestId, path } = {}) {
       throw err;
     }
     const reason = mapVerifyError(err);
-    logAuthVerifyFailed({ reason, requestId, path });
+    logAuthVerifyFailed({
+      reason,
+      requestId,
+      path,
+      claim: err?.claim,
+    });
     const wrapped = new Error("Unauthorized");
     wrapped.code = "UNAUTHORIZED";
     wrapped.authReason = reason;
