@@ -70,7 +70,6 @@ function validateStartup() {
 
   const required = [
     "DATABASE_URL",
-    "REDIS_URL",
     "INTERNAL_API_KEY",
     "ENCRYPTION_KEY",
     "SUPABASE_URL",
@@ -79,11 +78,18 @@ function validateStartup() {
 
   requireEnv(required);
 
-  const redisUrl = str("REDIS_URL", null);
-  if (redisUrl && !/^redis(s)?:\/\//i.test(redisUrl)) {
+  const redisUrl = str("REDIS_URL", null) || str("UPSTASH_REDIS_URL", null);
+  if (!redisUrl) {
     // eslint-disable-next-line no-console
     console.error(
-      "[config] REDIS_URL must be a redis:// or rediss:// connection string (required for BullMQ queues)"
+      "[config] REDIS_URL or UPSTASH_REDIS_URL is required for BullMQ queues"
+    );
+    process.exit(1);
+  }
+  if (!/^redis(s)?:\/\//i.test(redisUrl)) {
+    // eslint-disable-next-line no-console
+    console.error(
+      "[config] Redis URL must be a redis:// or rediss:// connection string"
     );
     process.exit(1);
   }

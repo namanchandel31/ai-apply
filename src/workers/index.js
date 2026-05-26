@@ -1,49 +1,44 @@
 #!/usr/bin/env node
 /**
- * Run all BullMQ workers (process + send) in a dedicated process.
- * Usage: npm run worker
+ * Worker-only entrypoint (local: npm run worker).
+ * Production combined mode uses src/bootstrap.js instead.
  */
 require("dotenv").config();
 
-const { logInfo, logError } = require("../utils/logger");
+const { logError } = require("../utils/logger");
 const {
   registerProcessLifecycleHandlers,
   startRuntimeDiagnostics,
+  markBootPhaseComplete,
 } = require("../observability/processLifecycle");
+const { registerGracefulShutdown, registerShutdownHook } = require("../runtime/shutdown");
+const { startWorkers, stopWorkers } = require("./startWorkers");
 
 registerProcessLifecycleHandlers();
 startRuntimeDiagnostics(30000);
-const { registerRuntimeOwnership } = require("../runtime/runtimeOwnership");
-registerRuntimeOwnership({ role: "worker", sseGatewayOwner: false });
-const { startPostCommitSweep } = require("../realtime/postCommitPublishQueue");
-startPostCommitSweep();
-const { validateQueueSystem } = require("../queues/validateQueueSystem");
-
-async function bootWorkers() {
-  await validateQueueSystem({ role: "worker" });
-  const {
-    redisRealtimeEnabled,
-    ensureRealtimePublisher,
-  } = require("../realtime/redisRealtimeBridge");
-  if (redisRealtimeEnabled()) {
-    ensureRealtimePublisher();
+registerGracefulShutdown();
+registerShutdownHook("workers", stopWorkers, { priority: 100 });
+registerShutdownHook("redis", async () => {
+  const { connection } = require("../queues/connection");
+  if (connection.status !== "end") {
+    await connection.quit();
   }
-  require("./processApplication.worker");
-  require("./sendApplication.worker");
-  const { pool, startPoolMetricsLogging } = require("../db");
-  startPoolMetricsLogging(pool);
-  const { markBootPhaseComplete } = require("../observability/processLifecycle");
+}, { priority: 20 });
+registerShutdownHook("postgres", async () => {
+  const { pool } = require("../db");
+  await pool.end();
+}, { priority: 10 });
+
+async function main() {
+  await startWorkers();
   markBootPhaseComplete();
-  logInfo("ALL_WORKERS_STARTED", {
-    queues: ["process-application", "send-application"],
-  });
 }
 
 if (require.main === module) {
-  bootWorkers().catch((err) => {
-    logError("WORKER_BOOT_FAILED", err);
+  main().catch((err) => {
+    logError("WORKER_BOOT_FAILED", err, { component: "worker" });
     process.exit(1);
   });
 }
 
-module.exports = { bootWorkers };
+module.exports = { startWorkers, stopWorkers, main };

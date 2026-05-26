@@ -23,6 +23,15 @@ describe("SSE-only architecture", () => {
     delete process.env.WORKER_MODE;
   });
 
+  it("WORKER_MODE=combined marks combined deployment", () => {
+    jest.resetModules();
+    process.env.WORKER_MODE = "combined";
+    const queue = require("../src/config/queue.config");
+    expect(queue.isCombinedProcess()).toBe(true);
+    expect(queue.workerDeploymentMode()).toBe("combined");
+    delete process.env.WORKER_MODE;
+  });
+
   it("defines reconnect tier thresholds", () => {
     const src = fs.readFileSync(
       path.join(__dirname, "../client/src/services/realtime/reconnectRecoveryConfig.ts"),
