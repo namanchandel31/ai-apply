@@ -1,5 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { ApplicationRecord, ApplicationStatusPayload } from "@/lib/api";
+import type {
+  ApplicationRecord,
+  ApplicationStatusPayload,
+  ApplicationsListResponse,
+} from "@/lib/api";
 import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchestrationRegistry";
 import { globalOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
 import {
@@ -9,7 +13,12 @@ import {
 import { logDebug } from "@/services/logging/orchestrationLogger";
 import { metrics } from "@/services/logging/metricsHooks";
 import { isDebugEnabled } from "@/services/logging/debugFlags";
-import { APPLICATIONS_QUERY_KEY } from "@/queries/applicationsCache";
+import { applicationsListQueryKey } from "@/queries/applicationsListQuery";
+import { getActiveListParams } from "./activeListParamsRegistry";
+import {
+  normalizeApplicationsListData,
+  recomputeListPages,
+} from "@/lib/applicationsListResponse";
 import { schedulePartialHydration } from "./partialHydrationScheduler";
 import { PARTIAL_ROW_TTL_MS } from "../convergenceConfig";
 
@@ -40,6 +49,9 @@ function mergeDisplayFields(
     patch.company = incoming.company;
   }
   if (incoming.jdEnrichment !== undefined) patch.jdEnrichment = incoming.jdEnrichment;
+  if (typeof incoming.matchScore === "number" && !Number.isNaN(incoming.matchScore)) {
+    patch.matchScore = incoming.matchScore;
+  }
   return patch;
 }
 
@@ -54,6 +66,7 @@ function buildPartialRow(event: ApplicationUpdatedPayload): ApplicationRecord {
     pollable: event.pollable ?? true,
     canRetry: event.canRetry ?? false,
     canContinue: event.canContinue ?? false,
+    createdAt: event.updatedAt ?? new Date().toISOString(),
     updatedAt: event.updatedAt ?? new Date().toISOString(),
     role: event.role ?? (ACTIVE_UI.has(ui) ? "Parsing JD…" : "Unknown Role"),
     company: event.company ?? (ACTIVE_UI.has(ui) ? "Parsing JD…" : "Unknown Company"),
@@ -61,21 +74,35 @@ function buildPartialRow(event: ApplicationUpdatedPayload): ApplicationRecord {
   } as ApplicationRecord;
 }
 
-function applyPatchToList(
-  current: ApplicationRecord[] | undefined,
+function applyPatchToPaginatedList(
+  current: ApplicationsListResponse | ApplicationRecord[] | undefined,
   applicationId: string,
   buildPatch: (existing: ApplicationRecord | undefined) => Partial<ApplicationRecord> | null
-): ApplicationRecord[] | undefined {
-  const list = current ?? [];
-  const idx = list.findIndex((a) => a.id === applicationId);
-  const existing = idx >= 0 ? list[idx] : undefined;
+): ApplicationsListResponse | undefined {
+  const page = normalizeApplicationsListData(current);
+  const items = page.items ?? [];
+  const idx = items.findIndex((a) => a.id === applicationId);
+  const existing = idx >= 0 ? items[idx] : undefined;
   const patch = buildPatch(existing);
-  if (!patch || Object.keys(patch).length === 0) return current;
+  if (!patch || Object.keys(patch).length === 0) {
+    if (idx >= 0 && (existing as { _partial?: boolean } | undefined)?._partial) {
+      const nextItems = [...items];
+      const merged = { ...existing! } as ApplicationRecord & { _partial?: boolean };
+      delete merged._partial;
+      partialSince.delete(applicationId);
+      nextItems[idx] = merged;
+      return { ...page, items: nextItems };
+    }
+    return current as ApplicationsListResponse | undefined;
+  }
 
   if (idx >= 0) {
-    const next = [...list];
-    next[idx] = { ...existing!, ...patch };
-    return next;
+    const nextItems = [...items];
+    const merged = { ...existing!, ...patch } as ApplicationRecord & { _partial?: boolean };
+    // Authoritative patches must not leave placeholder rows stuck in partial-hydrate loop.
+    delete merged._partial;
+    nextItems[idx] = merged;
+    return { ...page, items: nextItems };
   }
 
   const partial = buildPartialRow({
@@ -87,7 +114,11 @@ function applyPatchToList(
   } as ApplicationUpdatedPayload);
   partialSince.set(applicationId, Date.now());
   metrics.increment("orchestration.cache.partial_upsert");
-  return [partial, ...list];
+  return recomputeListPages({
+    ...page,
+    items: [partial, ...items],
+    totalItems: page.totalItems + 1,
+  });
 }
 
 function logCachePatchDecision(
@@ -119,51 +150,109 @@ function logCachePatchDecision(
   );
 }
 
-export function applyRealtimeEventToCache(
-  queryClient: QueryClient,
-  event: ApplicationUpdatedPayload
-): void {
-  if (event.type && event.type !== "application.updated") return;
-
-  const registry = globalOrchestrationRegistry.get(event.applicationId);
-  const registryEpoch = registry?.orchestrationEpoch ?? 0;
-
-  queryClient.setQueryData<ApplicationRecord[]>(APPLICATIONS_QUERY_KEY, (current) =>
-    applyPatchToList(current, event.applicationId, (existing) => {
-      const orch = orchPatchFromEvent(event, existing, registryEpoch);
-      const display = mergeDisplayFields(existing ?? ({} as ApplicationRecord), {
-        role: event.role,
-        company: event.company,
-        jdEnrichment: event.jdEnrichment,
-        updatedAt: event.updatedAt,
-      });
-      const merged = { ...orch, ...display };
-      logCachePatchDecision(event, existing, merged);
-      if (Object.keys(merged).length === 0) {
-        metrics.increment("orchestration.sse.event_rejected", {
-          reason: "row_guard_or_empty",
-        });
-        return null;
-      }
-      return merged;
-    })
-  );
-
-  const row = queryClient
-    .getQueryData<ApplicationRecord[]>(APPLICATIONS_QUERY_KEY)
-    ?.find((a) => a.id === event.applicationId);
-
-  if ((row as { _partial?: boolean } | undefined)?._partial) {
-    schedulePartialHydration(queryClient, event.applicationId);
-  } else {
-    markRowConverged(event.applicationId);
-    metrics.increment("orchestration.sse.event_applied");
+function buildEventRowPatch(
+  event: ApplicationUpdatedPayload,
+  existing: ApplicationRecord | undefined,
+  registryEpoch: number
+): Partial<ApplicationRecord> | null {
+  const orch = orchPatchFromEvent(event, existing, registryEpoch);
+  const display = mergeDisplayFields(existing ?? ({} as ApplicationRecord), {
+    role: event.role,
+    company: event.company,
+    jdEnrichment: event.jdEnrichment,
+    matchScore: event.matchScore,
+    updatedAt: event.updatedAt,
+  });
+  const merged = { ...orch, ...display };
+  if (
+    isDebugEnabled("reconciliation") &&
+    typeof event.matchScore === "number" &&
+    existing?.matchScore !== event.matchScore
+  ) {
     logDebug(
-      "SSE_EVENT_APPLIED",
-      { applicationId: event.applicationId, component: "cache" },
+      "CACHE_MATCH_SCORE_PATCH",
+      {
+        applicationId: event.applicationId,
+        previous: existing?.matchScore ?? null,
+        incoming: event.matchScore,
+        applied: merged.matchScore === event.matchScore,
+        component: "cache",
+      },
       "reconciliation"
     );
   }
+  logCachePatchDecision(event, existing, merged);
+  if (Object.keys(merged).length === 0) {
+    metrics.increment("orchestration.sse.event_rejected", {
+      reason: "row_guard_or_empty",
+    });
+    return null;
+  }
+  return merged;
+}
+
+export type ApplyRealtimeCacheOptions = {
+  /** When true, do not enqueue partial-row hydration (used by hydration itself). */
+  skipPartialSchedule?: boolean;
+};
+
+/** Apply multiple SSE/poll events in one list cache write (one React Query notify). */
+export function applyRealtimeEventsToCache(
+  queryClient: QueryClient,
+  events: ApplicationUpdatedPayload[],
+  options?: ApplyRealtimeCacheOptions
+): void {
+  const valid = events.filter((e) => !e.type || e.type === "application.updated");
+  if (!valid.length) return;
+
+  const listKey = applicationsListQueryKey(getActiveListParams());
+  queryClient.setQueryData<ApplicationsListResponse>(listKey, (current) => {
+    let page = normalizeApplicationsListData(current);
+    for (const event of valid) {
+      const registry = globalOrchestrationRegistry.get(event.applicationId);
+      const registryEpoch = registry?.orchestrationEpoch ?? 0;
+      const next = applyPatchToPaginatedList(page, event.applicationId, (existing) =>
+        buildEventRowPatch(event, existing, registryEpoch)
+      );
+      if (next) {
+        page = normalizeApplicationsListData(next);
+      }
+    }
+    return page;
+  });
+
+  const page = normalizeApplicationsListData(
+    queryClient.getQueryData<ApplicationsListResponse>(listKey)
+  );
+  if (options?.skipPartialSchedule) {
+    for (const event of valid) {
+      markRowConverged(event.applicationId);
+    }
+    return;
+  }
+
+  for (const event of valid) {
+    const row = page.items.find((a) => a.id === event.applicationId);
+    if ((row as { _partial?: boolean } | undefined)?._partial) {
+      schedulePartialHydration(queryClient, event.applicationId);
+    } else {
+      markRowConverged(event.applicationId);
+      metrics.increment("orchestration.sse.event_applied");
+      logDebug(
+        "SSE_EVENT_APPLIED",
+        { applicationId: event.applicationId, component: "cache" },
+        "reconciliation"
+      );
+    }
+  }
+}
+
+export function applyRealtimeEventToCache(
+  queryClient: QueryClient,
+  event: ApplicationUpdatedPayload,
+  options?: ApplyRealtimeCacheOptions
+): void {
+  applyRealtimeEventsToCache(queryClient, [event], options);
 }
 
 export function applyPollStatusToCache(
@@ -179,6 +268,7 @@ export function applyPollStatusToCache(
     updatedAt: status.updatedAt ?? new Date().toISOString(),
     role: status.role,
     company: status.company,
+    matchScore: status.matchScore,
     jdEnrichment: status.jdEnrichment,
   };
   applyRealtimeEventToCache(queryClient, event);

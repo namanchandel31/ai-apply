@@ -107,6 +107,9 @@ function mergeDisplayFields(existing, incoming) {
     patch.company = incoming.company;
   }
   if (incoming.jdEnrichment !== undefined) patch.jdEnrichment = incoming.jdEnrichment;
+  if (typeof incoming.matchScore === "number" && !Number.isNaN(incoming.matchScore)) {
+    patch.matchScore = incoming.matchScore;
+  }
   return patch;
 }
 
@@ -116,6 +119,7 @@ function mergeCachePatch(existing, event, registryEpoch = 0) {
     role: event.role,
     company: event.company,
     jdEnrichment: event.jdEnrichment,
+    matchScore: event.matchScore,
     updatedAt: event.updatedAt,
   });
   return { ...orch, ...display };
@@ -134,6 +138,7 @@ function mergePartialWithListRow(partial, authoritative) {
     "updatedAt",
     "role",
     "company",
+    "matchScore",
     "jdEnrichment",
   ];
   const merged = { ...partial };

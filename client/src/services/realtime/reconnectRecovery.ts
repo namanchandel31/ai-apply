@@ -56,8 +56,12 @@ async function runTier2TargetedHeal(
       const id = ids[idx++];
       try {
         const res = await api.getApplicationStatus(id);
-        const data = res.data as ApplicationUpdatedPayload & { applicationId?: string };
-        actions.applyStatusToRegistry(id, { ...data, applicationId: id });
+        if (res.notModified) continue;
+        actions.applyStatusToRegistry(id, {
+          ...res.data,
+          applicationId: id,
+          updatedAt: res.data.updatedAt ?? new Date().toISOString(),
+        });
       } catch {
         // skip failed row — watchdog may retry
       }

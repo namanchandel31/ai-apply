@@ -21,6 +21,7 @@ describe("applicationRealtimePublisher", () => {
         updatedAt: "2026-05-20T12:00:00.000Z",
         role: "Software Engineer",
         company: "Acme Corp",
+        matchScore: 82,
         terminal: false,
       },
       { version: 1, epoch: 0 }
@@ -33,6 +34,7 @@ describe("applicationRealtimePublisher", () => {
     expect(payload.terminal).toBe(false);
     expect(payload.role).toBe("Software Engineer");
     expect(payload.company).toBe("Acme Corp");
+    expect(payload.matchScore).toBe(82);
     expect(payload.updatedAt).toBe("2026-05-20T12:00:00.000Z");
     expect(payload.jdEnrichment).toBe("complete");
     expect(payload).not.toHaveProperty("emailBody");

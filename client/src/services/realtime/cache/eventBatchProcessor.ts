@@ -21,7 +21,12 @@ function pickNewer(
   if (be !== ae) return be > ae ? b : a;
   const at = a.updatedAt ?? "";
   const bt = b.updatedAt ?? "";
-  return bt >= at ? b : a;
+  if (bt !== at) return bt >= at ? b : a;
+  const aScore = a.matchScore;
+  const bScore = b.matchScore;
+  if (typeof aScore === "number" && typeof bScore !== "number") return a;
+  if (typeof bScore === "number" && typeof aScore !== "number") return b;
+  return b;
 }
 
 export type EventBatchProcessor = {

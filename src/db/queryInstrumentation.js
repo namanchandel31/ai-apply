@@ -15,6 +15,7 @@ const STATUS_QUERY_NAMES = new Set([
   "status_bundle",
   "status_fingerprint",
   "orchestration_active",
+  "applications_list",
 ]);
 
 const logging = require("../config/logging.config");

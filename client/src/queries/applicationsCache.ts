@@ -1,69 +1,69 @@
 /**
- * Single owner for ["applications"] React Query cache mutations.
- * Events transport state; React Query is the frontend source of truth.
- *
- * Anti-overfetch guardrails (do not regress):
- * - SSE/poll/optimistic/mutations patch rows here only — never invalidate on routine updates.
- * - Poll runs only when SSE is not ready on the leader tab (see useApplicationStatusPoll).
- * - refreshApplicationsList() is for explicit user refresh only.
+ * Single owner for applications list React Query cache mutations.
  */
 import type { QueryClient } from "@tanstack/react-query";
-import type { ApplicationRecord, ApplicationStatusPayload } from "@/lib/api";
+import type {
+  ApplicationRecord,
+  ApplicationStatusPayload,
+  ApplicationsListResponse,
+} from "@/lib/api";
 import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchestrationRegistry";
 import { applyRealtimeEventToCache, applyPollStatusToCache } from "@/services/realtime/cache/cacheSyncApi";
 import { shouldApplyDisplayPatch } from "@/services/realtime/reconciliation/shouldApplyRealtimeEvent";
-import { applicationsQueryOptions } from "@/queries/bootstrapQueries";
+import {
+  applicationsListQueryKey,
+  getApplicationsListQueryOptions as buildListOptions,
+} from "@/queries/applicationsListQuery";
+import { getActiveListParams } from "@/services/realtime/cache/activeListParamsRegistry";
+import { defaultApplicationsListParams } from "@/lib/normalizeApplicationsListParams";
+import {
+  normalizeApplicationsListData,
+  recomputeListPages,
+} from "@/lib/applicationsListResponse";
 
+/** @deprecated use applicationsListQueryKey */
 export const APPLICATIONS_QUERY_KEY = ["applications"] as const;
 
 const ACTIVE_UI = new Set(["processing", "sending", "queued", "retrying", "draft"]);
 
+export function getListQueryKey() {
+  return applicationsListQueryKey(getActiveListParams());
+}
+
 export function getApplicationsQueryOptions() {
-  return applicationsQueryOptions;
+  return buildListOptions(getActiveListParams());
 }
 
 export { shouldApplyDisplayPatch };
 
-function mergeDisplayFields(
-  existing: ApplicationRecord,
-  incoming: Partial<ApplicationRecord>
-): Partial<ApplicationRecord> {
-  if (!shouldApplyDisplayPatch(existing, incoming)) {
-    return {};
-  }
-  const patch: Partial<ApplicationRecord> = {};
-  if (incoming.updatedAt) patch.updatedAt = incoming.updatedAt;
-  if (incoming.role != null && String(incoming.role).trim() !== "") {
-    patch.role = incoming.role;
-  }
-  if (incoming.company != null && String(incoming.company).trim() !== "") {
-    patch.company = incoming.company;
-  }
-  if (incoming.jdEnrichment !== undefined) {
-    patch.jdEnrichment = incoming.jdEnrichment;
-  }
-  return patch;
-}
-
-function patchRow(
-  current: ApplicationRecord[] | undefined,
+function patchItemsArray(
+  items: ApplicationRecord[],
   applicationId: string,
   buildPatch: (existing: ApplicationRecord | undefined) => Partial<ApplicationRecord> | null
-): ApplicationRecord[] | undefined {
-  if (!current) return current;
+): { items: ApplicationRecord[]; changed: boolean } {
   let found = false;
-  const next = current.map((app) => {
+  const next = items.map((app) => {
     if (app.id !== applicationId) return app;
     found = true;
     const patch = buildPatch(app);
     if (!patch || Object.keys(patch).length === 0) return app;
     return { ...app, ...patch };
   });
-  if (!found) return current;
-  return next;
+  return { items: found ? next : items, changed: found };
 }
 
-/** @deprecated Use applyRealtimeEventToCache from cacheSyncApi */
+function patchPaginatedList(
+  current: ApplicationsListResponse | ApplicationRecord[] | undefined,
+  applicationId: string,
+  buildPatch: (existing: ApplicationRecord | undefined) => Partial<ApplicationRecord> | null
+): ApplicationsListResponse | undefined {
+  if (!current) return current;
+  const page = normalizeApplicationsListData(current);
+  const { items, changed } = patchItemsArray(page.items, applicationId, buildPatch);
+  if (!changed) return page;
+  return { ...page, items };
+}
+
 export function patchApplicationFromEvent(
   queryClient: QueryClient,
   event: ApplicationUpdatedPayload
@@ -71,7 +71,6 @@ export function patchApplicationFromEvent(
   applyRealtimeEventToCache(queryClient, event);
 }
 
-/** @deprecated Use applyPollStatusToCache from cacheSyncApi */
 export function patchApplicationFromStatus(
   queryClient: QueryClient,
   applicationId: string,
@@ -84,12 +83,21 @@ export function upsertOptimisticApplication(
   queryClient: QueryClient,
   row: ApplicationRecord
 ): void {
-  queryClient.setQueryData<ApplicationRecord[]>(APPLICATIONS_QUERY_KEY, (current) => {
-    const list = current ?? [];
-    if (list.some((a) => a.id === row.id)) {
-      return list.map((a) => (a.id === row.id ? { ...a, ...row } : a));
+  const key = applicationsListQueryKey(defaultApplicationsListParams());
+  queryClient.setQueryData<ApplicationsListResponse>(key, (current) => {
+    const page = normalizeApplicationsListData(current);
+    const exists = page.items.some((a) => a.id === row.id);
+    if (exists) {
+      return {
+        ...page,
+        items: page.items.map((a) => (a.id === row.id ? { ...a, ...row } : a)),
+      };
     }
-    return [row, ...list];
+    return recomputeListPages({
+      ...page,
+      items: [row, ...page.items],
+      totalItems: page.totalItems + 1,
+    });
   });
 }
 
@@ -98,14 +106,14 @@ export function patchApplicationAfterMutation(
   applicationId: string,
   patch: Partial<ApplicationRecord>
 ): void {
-  queryClient.setQueryData<ApplicationRecord[]>(APPLICATIONS_QUERY_KEY, (current) =>
-    patchRow(current, applicationId, () => patch)
+  const key = getListQueryKey();
+  queryClient.setQueryData<ApplicationsListResponse>(key, (current) =>
+    patchPaginatedList(current, applicationId, () => patch)
   );
 }
 
-/** Explicit user refresh only — not for SSE or row updates. */
 export function refreshApplicationsList(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: APPLICATIONS_QUERY_KEY });
+  return queryClient.invalidateQueries({ queryKey: ["applications", "list"] });
 }
 
 export function displayRole(app: ApplicationRecord): string {
@@ -125,3 +133,9 @@ export function displayCompany(app: ApplicationRecord): string {
   }
   return "Unknown Company";
 }
+
+export {
+  EMPTY_APPLICATIONS_LIST,
+  normalizeApplicationsListData,
+  getApplicationsListItems,
+} from "@/lib/applicationsListResponse";

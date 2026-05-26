@@ -128,6 +128,29 @@ describe("cache orchestration row patch", () => {
     expect(merged.status).toBe("generated");
   });
 
+  it("patches matchScore from realtime event without overwriting on undefined", () => {
+    const existing = {
+      id: "app-1",
+      status: "draft",
+      uiStatus: "processing",
+      matchScore: null,
+      updatedAt: "2026-05-20T12:00:00.000Z",
+    };
+    const event = {
+      applicationId: "app-1",
+      version: 7,
+      orchestrationEpoch: 1,
+      updatedAt: "2026-05-20T12:03:00.000Z",
+      status: "generated",
+      uiStatus: "generated",
+      matchScore: 84,
+      terminal: false,
+      pollable: true,
+    };
+    const merged = mergeCachePatch(existing, event, 1);
+    expect(merged.matchScore).toBe(84);
+  });
+
   it("applies orch patch when display updatedAt is stale", () => {
     const existing = {
       id: "app-1",

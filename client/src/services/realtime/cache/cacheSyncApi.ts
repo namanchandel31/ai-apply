@@ -1,18 +1,18 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { ApplicationStatusPayload } from "@/lib/api";
-import { api } from "@/lib/api";
-import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchestrationRegistry";
 import {
-  applyRealtimeEventToCache,
   applyPollStatusToCache,
   getStaleApplicationIds,
-  markRowConverged,
 } from "./applicationCacheSync";
+import { hydrateApplicationStatuses } from "./partialHydrationScheduler";
 import { assertLeaderOnly } from "../leaderGuards";
 import { logDebug } from "@/services/logging/orchestrationLogger";
 import { MAX_STALE_CONVERGENCE_MS } from "../convergenceConfig";
 
-export { applyRealtimeEventToCache, applyPollStatusToCache };
+export {
+  applyRealtimeEventToCache,
+  applyRealtimeEventsToCache,
+  applyPollStatusToCache,
+} from "./applicationCacheSync";
 
 export type RunConvergenceHealOptions = {
   isLeader: boolean;
@@ -30,22 +30,19 @@ export async function runConvergenceHeal(
   const staleIds = getStaleApplicationIds(now, MAX_STALE_CONVERGENCE_MS);
   if (!staleIds.length) return;
 
-  for (const applicationId of staleIds) {
-    logDebug(
-      "CONVERGENCE_HEAL_TRIGGERED",
-      { applicationId, stage: "status_fetch", component: "cache" },
-      "cache"
-    );
+  logDebug(
+    "CONVERGENCE_HEAL_TRIGGERED",
+    { count: staleIds.length, stage: "status_fetch_batch", component: "cache" },
+    "cache"
+  );
 
-    try {
-      const res = await api.getApplicationStatus(applicationId);
-      const data = res.data as ApplicationUpdatedPayload & { applicationId?: string };
-      applyRealtimeEventToCache(queryClient, { ...data, applicationId });
-      markRowConverged(applicationId);
+  try {
+    const healed = await hydrateApplicationStatuses(queryClient, staleIds);
+    for (const applicationId of staleIds.slice(0, healed)) {
       options.fetchStatus?.(applicationId);
-    } catch {
-      // skip — next watchdog cycle may retry
     }
+  } catch {
+    // watchdog will retry on next interval
   }
 }
 

@@ -1,4 +1,4 @@
-const { pool } = require("../db");
+const { pool, instrumentedQuery } = require("../db");
 const { transitionApplicationState } = require("../services/transitionApplicationState");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 
@@ -225,6 +225,38 @@ const listApplicationsForUser = async (userId, client = pool) => {
   return rows;
 };
 
+const { buildApplicationsListSql } = require("../services/applicationsListQuery");
+
+const listApplicationsPaginated = async (userId, validatedParams, client = pool) => {
+  const { sql, values, filterCount } = buildApplicationsListSql({
+    userId,
+    params: validatedParams,
+  });
+  const started = performance.now();
+  const { rows } = await instrumentedQuery(
+    client,
+    "applications_list",
+    sql,
+    values,
+    pool,
+    { source: "applications_list", filterCount }
+  );
+  const durationMs = Math.round(performance.now() - started);
+  const { logInfo } = require("../utils/logger");
+  const { metrics } = require("../observability/orchestrationMetrics");
+  logInfo("APPLICATIONS_LIST_QUERY", {
+    page: validatedParams.page,
+    pageSize: validatedParams.pageSize,
+    sort: validatedParams.sort,
+    order: validatedParams.order,
+    filterCount,
+    durationMs,
+    rowCount: rows.length,
+  });
+  metrics.increment("applications.list.query", { pageSize: String(validatedParams.pageSize) });
+  return { rows, durationMs };
+};
+
 module.exports = {
   getApplicationByResumeAndJD,
   getApplicationStatusSnapshot,
@@ -238,5 +270,6 @@ module.exports = {
   markSentFromGenerated,
   markApplicationFailed,
   listApplicationsForUser,
+  listApplicationsPaginated,
   transitionApplicationState,
 };

@@ -27,7 +27,6 @@ const POLICIES: Record<InvalidatePolicy, PolicyConfig> = {
 const counts = new Map<string, { count: number; windowStart: number }>();
 let suppressUntil = 0;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingPolicy: InvalidatePolicy | null = null;
 let pendingRun: (() => void) | null = null;
 
 export function isInvalidateSuppressed(): boolean {
@@ -62,14 +61,12 @@ export function scheduleListInvalidation(
   bucket.count += 1;
   counts.set(key, bucket);
 
-  pendingPolicy = policy;
   pendingRun = run;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
     const fn = pendingRun;
     pendingRun = null;
-    pendingPolicy = null;
     fn?.();
   }, cfg.debounceMs);
   return true;
@@ -80,6 +77,5 @@ export function resetInvalidatePolicyForTests() {
   suppressUntil = 0;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = null;
-  pendingPolicy = null;
   pendingRun = null;
 }

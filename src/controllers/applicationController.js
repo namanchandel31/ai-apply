@@ -1,5 +1,5 @@
 const {
-  listApplicationsForUser,
+  listApplicationsPaginated,
   getApplicationById,
   getApplicationStatusBundle,
   getApplicationStatusSnapshot,
@@ -8,7 +8,11 @@ const { getApplicationStatusForPoll } = require("../services/applicationStatusFo
 const { pool, getPoolMetrics } = require("../db");
 const { orchestrationDedupe } = require("../utils/logDedupe");
 const { metrics } = require("../observability/orchestrationMetrics");
-const { getLatestJobsForApplication, getJobById } = require("../models/applicationJobModel");
+const { getJobById } = require("../models/applicationJobModel");
+const { validateApplicationsListQuery } = require("../schemas/validateApplicationsListQuery");
+const { serializeApplicationsListResult } = require("../services/applicationListSerializer");
+const { serializeApplicationDetail } = require("../services/applicationDetailSerializer");
+const { listEventsForApplication } = require("../models/applicationEventModel");
 const {
   buildStatusFingerprint,
   buildSnapshotFingerprint,
@@ -16,7 +20,6 @@ const {
   etagMatches,
   parseIfNoneMatch,
 } = require("../services/applicationStatusEtag");
-const { serializeApplication } = require("../services/applicationSerializer");
 const {
   continueApplication,
   retryApplication,
@@ -76,13 +79,19 @@ function handleCommandError(res, err, req) {
 
 const listApplicationsController = async (req, res) => {
   try {
-    const rows = await listApplicationsForUser(req.user.id);
-    const data = await Promise.all(
-      rows.map(async (row) => {
-        const jobs = await getLatestJobsForApplication(row.id);
-        return serializeApplication(row, jobs);
-      })
-    );
+    const validated = validateApplicationsListQuery(req.query);
+    if (!validated.ok) {
+      const message = validated.error.issues.map((i) => i.message).join("; ") || "Invalid query";
+      return sendError(res, {
+        status: 400,
+        code: ERROR_CODES.BAD_REQUEST,
+        message,
+        retryable: false,
+      });
+    }
+
+    const { rows } = await listApplicationsPaginated(req.user.id, validated.data);
+    const data = serializeApplicationsListResult(rows, validated.data);
     return ok(res, data);
   } catch (err) {
     logError("GET_APPLICATIONS_ERROR", err, buildLogContext({ userId: req.user.id }));
@@ -106,8 +115,17 @@ const getApplicationController = async (req, res) => {
         retryable: false,
       });
     }
-    const jobs = await getLatestJobsForApplication(row.id);
-    return ok(res, serializeApplication(row, jobs));
+    const events = await listEventsForApplication(req.params.id, 50);
+    const detail = serializeApplicationDetail(row);
+    detail.events = events.map((e) => ({
+      id: e.id,
+      eventType: e.event_type,
+      actorType: e.actor_type,
+      actorId: e.actor_id,
+      metadata: e.metadata,
+      createdAt: e.created_at,
+    }));
+    return ok(res, detail);
   } catch (err) {
     return sendError(res, {
       status: 500,
@@ -205,6 +223,7 @@ const getApplicationStatusController = async (req, res) => {
       updatedAt: serialized.updatedAt,
       role: serialized.role ?? null,
       company: serialized.company ?? null,
+      matchScore: serialized.matchScore ?? null,
       jdEnrichment: serialized.jdEnrichment,
     });
   } catch (err) {

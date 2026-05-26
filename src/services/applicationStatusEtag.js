@@ -12,6 +12,7 @@ function buildSnapshotFingerprint(row) {
     String(row.orchestration_version ?? 0),
     String(row.orchestration_epoch ?? 0),
     row.updated_at ? new Date(row.updated_at).toISOString() : "",
+    row.match_score != null ? String(row.match_score) : "",
   ];
   return parts.join("|");
 }
@@ -31,6 +32,7 @@ function buildStatusFingerprint(row) {
       : "",
     row.send_job_status ?? "",
     row.send_job_updated_at ? new Date(row.send_job_updated_at).toISOString() : "",
+    row.match_score != null ? String(row.match_score) : "",
   ];
   return parts.join("|");
 }

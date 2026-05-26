@@ -156,16 +156,16 @@ export function createRealtimeCoordinator(
     for (const patch of patches) {
       const payload: ApplicationUpdatedPayload = {
         applicationId: patch.applicationId,
-        status: patch.status ?? "",
-        uiStatus: patch.uiStatus,
+        status: patch.status ?? patch.uiStatus ?? "draft",
+        uiStatus: patch.uiStatus ?? patch.status ?? "draft",
         version: patch.version,
         orchestrationEpoch: patch.orchestrationEpoch,
         updatedAt: patch.updatedAt ?? new Date().toISOString(),
-        terminal: patch.terminal,
-        executionTerminal: patch.executionTerminal,
-        pollable: patch.pollable,
-        canRetry: patch.canRetry,
-        canContinue: patch.canContinue,
+        terminal: patch.terminal ?? false,
+        executionTerminal: patch.executionTerminal ?? false,
+        pollable: patch.pollable ?? false,
+        canRetry: patch.canRetry ?? false,
+        canContinue: patch.canContinue ?? false,
         role: patch.role,
         company: patch.company,
       };
@@ -177,8 +177,15 @@ export function createRealtimeCoordinator(
     if (!assertLeaderOnly(isLeader, "tier2_fetch")) return;
     try {
       const res = await api.getApplicationStatus(applicationId);
-      const data = res.data as ApplicationUpdatedPayload & { applicationId?: string };
-      applyEvent({ ...data, applicationId }, false);
+      if (res.notModified) return;
+      applyEvent(
+        {
+          ...res.data,
+          applicationId,
+          updatedAt: res.data.updatedAt ?? new Date().toISOString(),
+        },
+        false
+      );
     } catch {
       // ignore — convergence watchdog may retry
     }

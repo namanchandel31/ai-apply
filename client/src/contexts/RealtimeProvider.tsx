@@ -27,10 +27,8 @@ export function shutdownRealtimeSession() {
   shutdownCoordinatorSession();
 }
 
-let cacheSyncBound = false;
-
 export function resetRealtimeProviderCacheBinding() {
-  cacheSyncBound = false;
+  /* binding reset handled in realtimeSession */
 }
 
 function subscribeTransportState(listener: () => void) {
@@ -43,6 +41,12 @@ function getTransportSnapshot(): ConnectionState {
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const disableRealtime =
+    typeof window !== "undefined" && window.localStorage.getItem("debug:disableRealtime") === "1";
+
+  const disableLeaderPoll =
+    typeof window !== "undefined" && window.localStorage.getItem("debug:disableLeaderPoll") === "1";
+
   const connectionState = useSyncExternalStore(
     subscribeTransportState,
     getTransportSnapshot,
@@ -66,6 +70,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       return removeListener;
     }
 
+    if (disableRealtime) {
+      shutdownCoordinatorSession();
+      clearConnectionListeners();
+      setIsLeader(false);
+      return removeListener;
+    }
+
     ensureCoordinatorSession();
     setIsLeader(getSharedCoordinatorRef()?.isLeader() ?? false);
 
@@ -75,17 +86,21 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       void queryClient.ensureQueryData(applicationsQueryOptions);
     }
 
-    const leaderPoll = setInterval(() => {
-      setIsLeader(getSharedCoordinatorRef()?.isLeader() ?? false);
-    }, 1000);
+    const leaderPoll = disableLeaderPoll
+      ? null
+      : setInterval(() => {
+          const next = getSharedCoordinatorRef()?.isLeader() ?? false;
+          setIsLeader((prev) => (prev === next ? prev : next));
+        }, 3000);
 
     return () => {
-      clearInterval(leaderPoll);
+      if (leaderPoll) clearInterval(leaderPoll);
       removeListener();
     };
   }, [queryClient]);
 
   useEffect(() => {
+    if (disableRealtime) return;
     if (!api.getToken() || !coordinator || isCacheSyncBound()) return;
     markCacheSyncBound();
     return bindCacheSyncToCoordinator(queryClient, coordinator, () => ({
@@ -94,6 +109,35 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       connectionState: getTransportSnapshot(),
     }));
   }, [queryClient, coordinator]);
+
+  const safeValue = useMemo(
+    () => ({
+      connectionState: disableRealtime ? ("disconnected" as ConnectionState) : connectionState,
+      sseConnected: disableRealtime ? false : sseConnected,
+      isLeader: disableRealtime ? false : isLeader,
+      isDegraded: disableRealtime ? false : isDegraded,
+      subscribe: (handler: (event: ApplicationUpdatedPayload) => void) => {
+        if (disableRealtime) return () => {};
+        if (!coordinator) return () => {};
+        return coordinator.subscribePresentation(handler);
+      },
+      reviveApplication: (applicationId: string, nextEpoch: number) => {
+        if (disableRealtime) return;
+        coordinator?.reviveApplication(applicationId, nextEpoch);
+      },
+      broadcastRevive: (applicationId: string, nextEpoch: number) => {
+        if (disableRealtime) return;
+        coordinator?.broadcastRevive(applicationId, nextEpoch);
+      },
+      hydrate: () => (disableRealtime ? Promise.resolve() : coordinator?.hydrate({ force: true }) ?? Promise.resolve()),
+      resetDegraded: () => {
+        if (disableRealtime) return;
+        coordinator?.resetDegraded();
+        void coordinator?.hydrate({ force: true });
+      },
+    }),
+    [disableRealtime, connectionState, sseConnected, isLeader, isDegraded, coordinator]
+  );
 
   const subscribe = useCallback((handler: (event: ApplicationUpdatedPayload) => void) => {
     if (!coordinator) return () => {};
@@ -143,7 +187,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
+  return <RealtimeContext.Provider value={disableRealtime ? safeValue : value}>{children}</RealtimeContext.Provider>;
 }
 
 export { useRealtime } from "./useRealtime";

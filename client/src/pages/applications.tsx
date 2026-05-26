@@ -1,16 +1,14 @@
-import { ApplicationTable } from "@/components/ApplicationTable";
+import { ApplicationsDashboard } from "@/components/applications/ApplicationsDashboard";
 
 export function Applications() {
+  const disableTable =
+    typeof window !== "undefined" && window.localStorage.getItem("debug:disableApplicationsTable") === "1";
+  if (disableTable) {
+    return <div className="p-6 lg:p-10 max-w-7xl mx-auto w-full">test</div>;
+  }
   return (
-    <div className="p-8 lg:p-10 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="font-serif text-3xl">Applications</h1>
-        <p className="mt-1 text-muted-foreground">
-          Track the status of your AI-tailored job applications.
-        </p>
-      </div>
-
-      <ApplicationTable />
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto w-full">
+      <ApplicationsDashboard />
     </div>
   );
 }

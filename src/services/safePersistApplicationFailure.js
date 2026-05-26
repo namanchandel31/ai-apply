@@ -1,7 +1,7 @@
 const { transitionJobState } = require("./transitionJobState");
 const { transitionApplicationState } = require("./transitionApplicationState");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
-const { logError } = require("../utils/logger");
+const { logError, logInfo } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
 
 /**
@@ -16,9 +16,23 @@ async function safePersistApplicationFailure(
     failureStage = "unknown",
     lastError = "processing_error",
     expectedAppStatuses = [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
+    failureSource = "worker",
+    bullmqState = null,
+    retryBudget = null,
   }
 ) {
   const ctx = buildLogContext({ applicationId, jobId, userId });
+
+  logInfo("FAILURE_DECISION", {
+    ...ctx,
+    failureReason: lastError,
+    failureSource,
+    bullmqState,
+    workerState: "persisting_terminal",
+    retryBudget,
+    willPersist: true,
+    willRetry: false,
+  });
 
   if (jobId) {
     try {

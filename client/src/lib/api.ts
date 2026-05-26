@@ -1,3 +1,5 @@
+import { buildApplicationsListQueryString } from "@/lib/normalizeApplicationsListParams";
+
 export type ApiError = Error & {
   status?: number;
   code?: string;
@@ -381,11 +383,20 @@ export const api = {
     return request(`/api/ai/credentials/${id}`, { method: "DELETE" });
   },
 
-  getApplications() {
+  getApplicationsList(params: ApplicationsListParams, options?: { signal?: AbortSignal }) {
+    const qs = buildApplicationsListQueryString(params);
+    const path = qs ? `/api/applications?${qs}` : "/api/applications";
     return request<{
       success: boolean;
-      data: ApplicationRecord[];
-    }>("/api/applications", { method: "GET" });
+      data: ApplicationsListResponse;
+    }>(path, { method: "GET", signal: options?.signal });
+  },
+
+  getApplication(applicationId: string, options?: { signal?: AbortSignal }) {
+    return request<{
+      success: boolean;
+      data: ApplicationDetailRecord;
+    }>(`/api/applications/${applicationId}`, { method: "GET", signal: options?.signal });
   },
 
   getOrchestrationActive() {
@@ -449,7 +460,35 @@ export type ApplicationStatusPayload = {
   updatedAt?: string;
   role?: string | null;
   company?: string | null;
+  matchScore?: number | null;
   jdEnrichment?: JdEnrichmentState;
+};
+
+export type ApplicationsListSortField =
+  | "created_at"
+  | "updated_at"
+  | "match_score"
+  | "normalized_company_name"
+  | "application_status";
+
+export type ApplicationsListParams = {
+  page: number;
+  pageSize: number;
+  sort?: ApplicationsListSortField;
+  order?: "asc" | "desc";
+  status?: string[];
+  datePreset?: "today" | "last7" | "last30" | "custom";
+  dateFrom?: string;
+  dateTo?: string;
+  q?: string;
+};
+
+export type ApplicationsListResponse = {
+  items: ApplicationRecord[];
+  totalItems: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
 };
 
 export type ApplicationRecord = {
@@ -462,12 +501,49 @@ export type ApplicationRecord = {
   canRetry?: boolean;
   canContinue?: boolean;
   reviewReason?: string | null;
+  lastError?: string | null;
+  retryCount?: number;
   createdAt: string;
   updatedAt?: string;
   sentAt?: string | null;
+  completedAt?: string | null;
   role?: string | null;
   company?: string | null;
+  matchScore?: number | null;
+  normalizedCompanyName?: string | null;
+  normalizedJobTitle?: string | null;
   jdEnrichment?: JdEnrichmentState;
+};
+
+export type ApplicationEventRecord = {
+  id: string;
+  eventType: string;
+  actorType: string;
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ApplicationDetailRecord = ApplicationRecord & {
+  matchScore?: number | null;
+  emailSubject?: string | null;
+  emailBody?: string | null;
+  error?: unknown;
+  llmRawOutput?: string | null;
+  llmRawOutputTruncated?: boolean;
+  smtpMessageId?: string | null;
+  providerMessageId?: string | null;
+  orchestrationVersion?: number;
+  orchestrationEpoch?: number;
+  processingAttempts?: number | null;
+  failureStage?: string | null;
+  recipientEmail?: string | null;
+  parsedJdSnapshot?: unknown;
+  parsedResumeSnapshot?: unknown;
+  emailMetadata?: unknown;
+  emailFeedbackSignals?: unknown;
+  failedAt?: string | null;
+  events?: ApplicationEventRecord[];
 };
 
 export type AiCredentialSummary = {
@@ -490,7 +566,10 @@ export type ParsedResume = {
 
 export type ParsedJD = {
   job_title?: string;
+  roles?: string[];
   company_name?: string;
   contact_email?: string;
   skills?: string[];
+  parseOutcome?: string;
+  parseConfidence?: number;
 };

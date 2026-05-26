@@ -11,6 +11,7 @@ SELECT
   a.updated_at,
   a.sent_at,
   a.completed_at,
+  a.match_score,
   pj.id AS process_job_id,
   pj.status AS process_job_status,
   pj.created_at AS process_job_created_at,
@@ -71,6 +72,7 @@ function mapBundleRow(row) {
     updated_at: row.updated_at,
     sent_at: row.sent_at,
     completed_at: row.completed_at,
+    match_score: row.match_score,
     role: row.role,
     company: row.company,
     jd_title: row.role,
@@ -105,7 +107,7 @@ async function getApplicationStatusSnapshot(applicationId, userId, client = null
     queryClient,
     "status_snapshot",
     `SELECT id, application_status, review_reason, retry_count, last_error,
-            created_at, updated_at, sent_at, completed_at
+            created_at, updated_at, sent_at, completed_at, match_score
      FROM applications
      WHERE id = $1 AND user_id = $2`,
     [applicationId, userId],

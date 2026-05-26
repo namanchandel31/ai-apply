@@ -28,6 +28,12 @@ export function normalizeApplicationEvent(
     reviewReason: (raw.reviewReason as string | null) ?? null,
     role: (raw.role as string | null) ?? null,
     company: (raw.company as string | null) ?? null,
+    matchScore:
+      raw.matchScore != null
+        ? Number(raw.matchScore)
+        : raw.match_score != null
+          ? Number(raw.match_score)
+          : null,
     jdEnrichment: raw.jdEnrichment as ApplicationUpdatedPayload["jdEnrichment"],
   };
 }

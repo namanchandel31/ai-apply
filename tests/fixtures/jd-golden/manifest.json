@@ -1,0 +1,30 @@
+[
+  {
+    "id": "linkedin-multi-role",
+    "file": "linkedin-multi-role.txt",
+    "expectedRoles": ["Flutter Developer", "AI/ML Engineer", "Data Engineer"],
+    "expectedTitle": "Flutter Developer",
+    "resumeSkills": ["Flutter", "Dart"],
+    "shouldAccept": true
+  },
+  {
+    "id": "soft-skills-only",
+    "raw": "Requirements:\n• Strong communication skills\n• Passion for technology",
+    "expectedRoles": [],
+    "shouldAccept": false
+  },
+  {
+    "id": "spam-crypto",
+    "raw": "Earn $5000 daily from crypto. DM for details. Work from phone.",
+    "expectedRoles": [],
+    "shouldAccept": false,
+    "expectedOutcome": "spam_detected"
+  },
+  {
+    "id": "hiring-for-flutter",
+    "raw": "We're hiring for Flutter Developers. Bangalore. 3+ years.",
+    "expectedRoles": ["Flutter Developer"],
+    "expectedTitle": "Flutter Developer",
+    "shouldAccept": true
+  }
+]

@@ -12,9 +12,27 @@ const {
 const { transitionJobState } = require("../services/transitionJobState");
 const { transitionApplicationState } = require("../services/transitionApplicationState");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
+const {
+  inspectBullmqJob,
+  bullmqIsTerminalFailure,
+  maxAttemptsForJobType,
+} = require("../services/bullmqJobInspector");
+const {
+  resolveExecutionState,
+  assertExecutionInvariants,
+} = require("../services/executionStateResolver");
+const { logFailureDecision } = require("../services/failureDecision");
+
+function logRecoveryDecision(ctx, decision) {
+  logInfo("RECOVERY_DECISION", {
+    ...ctx,
+    ...decision,
+  });
+}
 
 /**
  * Recovery operates on latest active application_jobs per type — skips needs_review / sent / cancelled.
+ * BullMQ is execution truth; DB-only signals never alone cause terminal failure.
  */
 async function recoverStuckJobs(client) {
   const queued = await findRecoverableStuckQueuedJobs(5, client);
@@ -26,6 +44,60 @@ async function recoverStuckJobs(client) {
       queueName: bullmqQueueForJobType(row.job_type),
       jobType: row.job_type,
     });
+
+    const bullmq = await inspectBullmqJob(row.application_id, row.job_type);
+    const resolved = await resolveExecutionState(row.application_id, row.user_id, {
+      jobType: row.job_type,
+    });
+    assertExecutionInvariants(resolved, { source: "recovery_queued" });
+
+    const decision = {
+      jobExists: bullmq.jobExists,
+      jobState: bullmq.jobState,
+      applicationStatus: row.application_status,
+      retryCount: row.retry_count,
+      bullmqAttemptsMade: bullmq.attemptsMade,
+      willReenqueue: false,
+      willFail: false,
+      reason: null,
+    };
+
+    if (bullmq.jobExists && ["waiting", "delayed", "active"].includes(bullmq.jobState)) {
+      decision.reason = "bullmq_already_in_flight";
+      logRecoveryDecision(ctx, decision);
+      continue;
+    }
+
+    if (bullmq.jobExists && bullmq.jobState === "completed") {
+      if (["queued", "processing", "retrying"].includes(row.status)) {
+        const sync = await transitionJobState(client, {
+          jobId: row.id,
+          expectedStatus: ["queued", "processing", "retrying"],
+          nextStatus: "completed",
+          lastError: null,
+        });
+        decision.reason = sync.ok
+          ? "reconciled_db_job_to_match_bullmq_completed"
+          : "bullmq_completed_db_sync_skipped";
+        logRecoveryDecision(ctx, decision);
+        logInfo("RECOVERY_RECONCILED_EXECUTION", {
+          ...ctx,
+          dbJobSynced: sync.ok,
+          applicationStatus: row.application_status,
+        });
+      } else {
+        decision.reason = "bullmq_already_completed";
+        logRecoveryDecision(ctx, decision);
+      }
+      continue;
+    }
+
+    if (resolved.applicationIsTerminal) {
+      decision.reason = "application_already_terminal";
+      logRecoveryDecision(ctx, decision);
+      continue;
+    }
+
     try {
       let enqueueResult;
       if (row.job_type === "send_email") {
@@ -42,10 +114,14 @@ async function recoverStuckJobs(client) {
           dbJobId: row.id,
         });
       }
+      decision.willReenqueue = true;
+      decision.reason = enqueueResult?.alreadyQueued ? "already_queued_idempotent" : "reenqueued";
+      logRecoveryDecision(ctx, decision);
       logInfo("RECOVERY_REENQUEUED", {
         ...ctx,
         jobType: row.job_type,
         alreadyQueued: Boolean(enqueueResult?.alreadyQueued),
+        bullmqState: bullmq.jobState,
       });
     } catch (err) {
       logError("RECOVERY_REENQUEUE_FAILED", err, ctx);
@@ -53,7 +129,6 @@ async function recoverStuckJobs(client) {
   }
 
   const processing = await findRecoverableStuckProcessingJobs(15, client);
-  const MAX = require("../config").queue.SEND_JOB_MAX_ATTEMPTS;
 
   for (const row of processing) {
     const ctx = buildLogContext({
@@ -64,20 +139,97 @@ async function recoverStuckJobs(client) {
       jobType: row.job_type,
     });
 
-    if (row.retry_count >= MAX) {
+    const bullmq = await inspectBullmqJob(row.application_id, row.job_type);
+    const maxAttempts = maxAttemptsForJobType(row.job_type);
+    const resolved = await resolveExecutionState(row.application_id, row.user_id, {
+      jobType: row.job_type,
+    });
+    assertExecutionInvariants(resolved, { source: "recovery_processing" });
+
+    const decision = {
+      jobExists: bullmq.jobExists,
+      jobState: bullmq.jobState,
+      applicationStatus: row.application_status,
+      retryCount: row.retry_count,
+      bullmqAttemptsMade: bullmq.attemptsMade,
+      maxAttempts,
+      willReenqueue: false,
+      willFail: false,
+      reason: null,
+    };
+
+    if (bullmq.jobExists && ["waiting", "delayed", "active"].includes(bullmq.jobState)) {
+      decision.reason = "bullmq_still_executing";
+      logRecoveryDecision(ctx, decision);
+      continue;
+    }
+
+    if (resolved.applicationIsTerminal) {
+      decision.reason = "application_already_terminal";
+      logRecoveryDecision(ctx, decision);
+      continue;
+    }
+
+    const bullmqTerminal = bullmqIsTerminalFailure(bullmq);
+    const dbRetryExhausted = (row.retry_count ?? 0) >= maxAttempts;
+
+    if (bullmqTerminal || (bullmq.jobExists && bullmq.jobState === "failed" && bullmqTerminal)) {
+      decision.willFail = true;
+      decision.reason = "bullmq_retries_exhausted";
+      logRecoveryDecision(ctx, decision);
+
+      logFailureDecision({
+        applicationId: row.application_id,
+        jobId: row.id,
+        failureReason: "bullmq_retries_exhausted",
+        failureSource: "recovery",
+        bullmqState: bullmq.jobState,
+        workerState: row.status,
+        retryBudget: { made: bullmq.attemptsMade, max: maxAttempts },
+        willPersist: true,
+        willRetry: false,
+      });
+
       await transitionJobState(client, {
         jobId: row.id,
         expectedStatus: "processing",
         nextStatus: "failed",
-        lastError: "recovery_max_attempts",
+        lastError: "recovery_bullmq_exhausted",
       });
       await transitionApplicationState(client, {
         applicationId: row.application_id,
         expectedStatus: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
         nextStatus: APPLICATION_STATUS.FAILED,
-        patch: { lastError: "recovery_max_attempts", failureStage: "recovery" },
+        patch: { lastError: "recovery_bullmq_exhausted", failureStage: "recovery" },
       });
-      logInfo("RECOVERY_JOB_FAILED", ctx);
+      logInfo("RECOVERY_JOB_FAILED", { ...ctx, reason: decision.reason });
+      continue;
+    }
+
+    if (!bullmq.jobExists && dbRetryExhausted) {
+      decision.willFail = true;
+      decision.reason = "orphan_processing_db_retries_exhausted";
+      logRecoveryDecision(ctx, decision);
+
+      await transitionJobState(client, {
+        jobId: row.id,
+        expectedStatus: "processing",
+        nextStatus: "failed",
+        lastError: "recovery_orphan_exhausted",
+      });
+      await transitionApplicationState(client, {
+        applicationId: row.application_id,
+        expectedStatus: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
+        nextStatus: APPLICATION_STATUS.FAILED,
+        patch: { lastError: "recovery_orphan_exhausted", failureStage: "recovery" },
+      });
+      logInfo("RECOVERY_JOB_FAILED", { ...ctx, reason: decision.reason });
+      continue;
+    }
+
+    if (bullmq.jobExists && bullmq.jobState === "failed" && !bullmqTerminal) {
+      decision.reason = "bullmq_failed_retry_pending";
+      logRecoveryDecision(ctx, decision);
       continue;
     }
 
@@ -105,7 +257,10 @@ async function recoverStuckJobs(client) {
       await enqueueProcessApplicationJob(row.application_id, row.user_id, { dbJobId: newJob.id });
     }
 
-    logInfo("RECOVERY_PROCESSING_RESET", { ...ctx, newJobId: newJob.id });
+    decision.willReenqueue = true;
+    decision.reason = "processing_reset_reenqueue";
+    logRecoveryDecision(ctx, decision);
+    logInfo("RECOVERY_PROCESSING_RESET", { ...ctx, newJobId: newJob.id, bullmqState: bullmq.jobState });
   }
 }
 

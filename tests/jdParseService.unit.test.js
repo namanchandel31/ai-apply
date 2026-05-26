@@ -16,6 +16,7 @@ describe("parseJobDescription", () => {
   it("returns parsed JD when title and skills present", async () => {
     generateStructuredJson.mockResolvedValue({
       job_title: "Engineer",
+      roles: ["Engineer"],
       company_name: "Acme",
       skills: ["react"],
       contact_email: null,
@@ -30,12 +31,15 @@ describe("parseJobDescription", () => {
     });
     expect(data.job_title).toBe("Engineer");
     expect(data.skills).toContain("react");
+    expect(data.parseOutcome).toBeDefined();
+    expect(data.parseArtifacts).toBeDefined();
   });
 
-  it("throws NonRetryableError for invalid content without ReferenceError", async () => {
+  it("enriches informal multi-role post when LLM returns null title", async () => {
     generateStructuredJson.mockResolvedValue({
       job_title: null,
-      company_name: "Acme",
+      roles: [],
+      company_name: null,
       skills: [],
       contact_email: null,
       contact_number: null,
@@ -44,13 +48,40 @@ describe("parseJobDescription", () => {
       job_type: null,
     });
 
-    await expect(
-      parseJobDescription("Some job text without parseable fields", "user-1")
-    ).rejects.toThrow(NonRetryableError);
+    const raw = `Open Positions:
+• Flutter Developers
+• AI/ML Engineers`;
 
-    await expect(
-      parseJobDescription("Some job text without parseable fields", "user-1")
-    ).rejects.toMatchObject({ message: "invalid_parsed_content" });
+    const data = await parseJobDescription(raw, "user-1", {
+      resumeSkills: ["Flutter", "Dart"],
+    });
+
+    expect(data.job_title).toBe("Flutter Developer");
+    expect(data.skills.length).toBeGreaterThan(0);
+    expect(data.parseArtifacts.selection.selectedRole).toBe("Flutter Developer");
+  });
+
+  it("throws NonRetryableError for garbage content", async () => {
+    generateStructuredJson.mockResolvedValue({
+      job_title: null,
+      roles: [],
+      company_name: null,
+      skills: [],
+      contact_email: null,
+      contact_number: null,
+      contact_person: null,
+      location: null,
+      job_type: null,
+    });
+
+    await expect(parseJobDescription("asdf qwerty zxcv", "user-1")).rejects.toMatchObject({
+      name: "NonRetryableError",
+      code: "invalid_parsed_content",
+      retryable: false,
+      validation: expect.objectContaining({
+        hasUsableContent: false,
+      }),
+    });
   });
 
   it("rethrows RetryableError from gateway unchanged", async () => {
@@ -68,6 +99,9 @@ describe("parseJobDescription", () => {
       RetryableError
     );
     const snap = metrics.getSnapshot();
-    expect(snap.counters["orchestration.jd_parse.failure|retryable=true"]).toBe(1);
+    const failureCounter = Object.entries(snap.counters).find(
+      ([k]) => k.startsWith("orchestration.jd_parse.failure") && k.includes("retryable=true")
+    );
+    expect(failureCounter?.[1]).toBe(1);
   });
 });

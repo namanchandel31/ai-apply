@@ -1,9 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { RealtimeCoordinator } from "./realtimeCoordinator";
-import {
-  applyRealtimeEventToCache,
-  runConvergenceHeal,
-} from "./cache/cacheSyncApi";
+import { runConvergenceHeal } from "./cache/cacheSyncApi";
+import { createRealtimeCacheUpdateBatcher } from "./cache/realtimeCacheUpdateBatcher";
 import { STALE_WATCHDOG_INTERVAL_MS } from "./convergenceConfig";
 import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchestrationRegistry";
 import type { ConnectionState } from "./transport/sseTransport";
@@ -13,8 +11,9 @@ export function bindCacheSyncToCoordinator(
   coordinator: RealtimeCoordinator,
   getLeaderState: () => { isLeader: boolean; sseConnected: boolean; connectionState: ConnectionState }
 ): () => void {
+  const batcher = createRealtimeCacheUpdateBatcher(queryClient);
   const unsub = coordinator.subscribePresentation((event: ApplicationUpdatedPayload) => {
-    applyRealtimeEventToCache(queryClient, event);
+    batcher.enqueue(event);
   });
 
   const watchdog = setInterval(() => {
@@ -23,6 +22,8 @@ export function bindCacheSyncToCoordinator(
   }, STALE_WATCHDOG_INTERVAL_MS);
 
   return () => {
+    batcher.flushNow();
+    batcher.destroy();
     unsub();
     clearInterval(watchdog);
   };

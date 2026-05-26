@@ -10,12 +10,24 @@ const { recordEvent } = require("../models/applicationEventModel");
 const { updateJobDescriptionFromParsed } = require("../models/jdModel");
 const { getResumeById } = require("../models/resumeModel");
 const { parseJobDescription } = require("../services/jdParseService");
+const { classifyJdParseFailure } = require("../services/jdParseFailureClassifier");
+const { finalizeBullMqJobFailure, willBullMqRetry } = require("../queues/bullmqJobFailure");
+const { inspectBullmqJob } = require("../services/bullmqJobInspector");
+const {
+  shouldPersistTerminalFailure,
+  logFailureDecision,
+} = require("../services/failureDecision");
+const {
+  resolveExecutionState,
+  logExecutionTimeline,
+  assertExecutionInvariants,
+} = require("../services/executionStateResolver");
+const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { computeMatch } = require("../services/matchingService");
 const { generateApplicationEmail } = require("../services/emailService");
 const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
-const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
 const { safePersistApplicationFailure } = require("../services/safePersistApplicationFailure");
@@ -49,8 +61,23 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
   }
 
   if (app.application_status !== APPLICATION_STATUS.DRAFT) {
-    logInfo("process_worker_skip", { applicationId, status: app.application_status });
-    return;
+    const bullmq = await inspectBullmqJob(applicationId, "ai_process");
+    logInfo("process_worker_skip_terminal", {
+      applicationId,
+      status: app.application_status,
+      bullmqState: bullmq.jobState,
+      business_workflow: "skipped",
+    });
+    logExecutionTimeline("WORKER_SKIP_TERMINAL", {
+      applicationId,
+      jobId,
+      applicationStatus: app.application_status,
+      bullmqState: bullmq.jobState,
+    });
+    return {
+      skipped: true,
+      skipReason: `application_status_${app.application_status}`,
+    };
   }
 
   const processJobRow = dbJobId
@@ -68,8 +95,8 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     nextStatus: "processing",
   });
   if (!claim.ok) {
-    logInfo("process_worker_claim_skipped", { applicationId, jobId });
-    return;
+    logInfo("process_worker_claim_skipped", { applicationId, jobId, business_workflow: "skipped" });
+    return { skipped: true, skipReason: "job_claim_not_queued" };
   }
 
   logInfo(
@@ -102,11 +129,20 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     const rawText = jdRows[0]?.raw_text;
     if (!rawText) throw new Error("Missing job description text");
 
-    logInfo("ai_generation_started", { applicationId });
-    const parsedJd = await parseJobDescription(rawText, userId, { reqId });
-    logInfo("ai_generation_completed", { applicationId });
-
     const resume = await getResumeById(app.resume_id, userId);
+    if (!resume) throw new Error("Resume not found");
+
+    logInfo("ai_generation_started", { applicationId });
+    const parsedJd = await parseJobDescription(rawText, userId, {
+      reqId,
+      resumeSkills: resume.parsedJson?.skills || [],
+      jobDescriptionId: app.job_description_id,
+    });
+    logInfo("ai_generation_completed", {
+      applicationId,
+      parseOutcome: parsedJd.parseOutcome,
+      parseConfidence: parsedJd.parseConfidence,
+    });
     const matchResult = computeMatch(resume.parsedJson, parsedJd);
     const jobTitle = (parsedJd.job_title || "").toLowerCase().trim();
     const company = (parsedJd.company_name || "").toLowerCase().trim();
@@ -144,6 +180,9 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
           job_title: parsedJd.job_title,
           company_name: parsedJd.company_name,
           contact_email: parsedJd.contact_email,
+          parseOutcome: parsedJd.parseOutcome,
+          parseConfidence: parsedJd.parseConfidence,
+          roles: parsedJd.roles,
         },
         parsed_resume_snapshot: {
           name: resume.parsedJson?.name,
@@ -234,27 +273,90 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       })
     );
 
-    await safePersistApplicationFailure(pool, {
+    const bullmq = await inspectBullmqJob(applicationId, "ai_process");
+    const willRetry = willBullMqRetry(job, err);
+    const willPersist = shouldPersistTerminalFailure(job, err, bullmq);
+    const maxAttempts = job.opts?.attempts ?? 3;
+
+    logFailureDecision({
       applicationId,
-      userId,
       jobId,
-      failureStage: err.stage || "ai_process",
-      lastError: err.message,
-      expectedAppStatuses: [APPLICATION_STATUS.DRAFT],
-    });
-    await recordEvent({
-      applicationId,
-      eventType: "processing_failed",
-      actorType: "worker",
-      actorId: "process-application",
-      metadata: { message: err.message },
+      failureReason: err.message,
+      failureSource: "process-application.worker",
+      bullmqState: bullmq.jobState,
+      workerState: "catch",
+      retryBudget: { attemptsMade: job.attemptsMade, maxAttempts },
+      willPersist,
+      willRetry,
+      err,
     });
 
-    if (job.attemptsMade + 1 >= (job.opts?.attempts || 3)) {
-      logInfo("job_max_attempts_exceeded", { applicationId, jobId, jobType: "ai_process" });
+    const resolved = await resolveExecutionState(applicationId, userId, {
+      jobType: "ai_process",
+      bullmqJob: job,
+      err,
+    });
+    assertExecutionInvariants(resolved, { source: "process_worker_catch" });
+
+    logExecutionTimeline(willPersist ? "APPLICATION_FAILED" : willRetry ? "JOB_RETRIED" : "JOB_FAILED", {
+      applicationId,
+      jobId,
+      bullmqJobId: job.id,
+      attemptsMade: job.attemptsMade,
+      willPersist,
+      willRetry,
+    });
+
+    if (willPersist) {
+      await safePersistApplicationFailure(pool, {
+        applicationId,
+        userId,
+        jobId,
+        failureStage: err.stage || "ai_process",
+        lastError: err.message,
+        expectedAppStatuses: [APPLICATION_STATUS.DRAFT],
+        failureSource: "process-application.worker",
+        bullmqState: bullmq.jobState,
+        retryBudget: { attemptsMade: job.attemptsMade, maxAttempts },
+      });
+      await recordEvent({
+        applicationId,
+        eventType: "processing_failed",
+        actorType: "worker",
+        actorId: "process-application",
+        metadata: {
+          message: err.message,
+          error_type: err?.name,
+          retryable: false,
+          terminal: true,
+          validation: err?.validation || null,
+          parseOutcome: err?.parseOutcome || null,
+        },
+      });
+    } else {
+      await recordEvent({
+        applicationId,
+        eventType: willRetry ? "processing_retry_scheduled" : "processing_failed",
+        actorType: "worker",
+        actorId: "process-application",
+        metadata: {
+          message: err.message,
+          error_type: err?.name,
+          retryable: willRetry,
+          terminal: false,
+          attemptsMade: job.attemptsMade,
+        },
+      });
     }
 
-    throw err;
+    const action = classifyJdParseFailure(err, {
+      isApplyEligible: err?.isApplyEligible,
+      parseOutcome: err?.parseOutcome,
+    });
+
+    await finalizeBullMqJobFailure(job, err, {
+      forceUnrecoverable: action === "unrecoverable" || willPersist,
+    });
   }
   });
 }

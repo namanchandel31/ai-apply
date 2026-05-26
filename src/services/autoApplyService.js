@@ -49,7 +49,10 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   // 4. Parse Job Description
   let parsedJd;
   try {
-    parsedJd = await parseJobDescription(jobDescriptionText, userId, { reqId });
+    parsedJd = await parseJobDescription(jobDescriptionText, userId, {
+      reqId,
+      resumeSkills: resume.parsedJson?.skills || [],
+    });
     logInfo("JD_PARSED", { reqId, userId });
   } catch (error) {
     error.stage = "jd_parse";
@@ -148,7 +151,10 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
         location: parsedJd.location,
         job_type: parsedJd.job_type,
         skills: parsedJd.skills,
-        contact_email: parsedJd.contact_email
+        contact_email: parsedJd.contact_email,
+        roles: parsedJd.roles,
+        parseOutcome: parsedJd.parseOutcome,
+        parseConfidence: parsedJd.parseConfidence,
       },
       parsedResumeSnapshot: {
         name: resume.parsedJson?.name,

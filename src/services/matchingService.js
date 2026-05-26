@@ -33,9 +33,19 @@ const normalizeForMatch = (skillsArray) => {
  * @param {Object} jdData - Parsed JSON object from JD
  * @returns {Object} { score, matchedSkills, missingSkills, meta }
  */
+const { skillsForRoles } = require("../domain/jd/skillOntology");
+
+function augmentJdSkills(jdData) {
+  const base = [...(jdData?.skills || [])];
+  if (base.length >= 2) return base;
+  const fromRoles = skillsForRoles(jdData?.roles || []);
+  const fromTitle = jdData?.job_title ? skillsForRoles([jdData.job_title]) : [];
+  return [...new Set([...base, ...fromRoles, ...fromTitle])];
+}
+
 const computeMatch = (resumeData, jdData) => {
   const resumeSkills = normalizeForMatch(resumeData?.skills || []);
-  const jdSkills = normalizeForMatch(jdData?.skills || []);
+  const jdSkills = normalizeForMatch(augmentJdSkills(jdData));
 
   const matchedSkills = [];
   const missingSkills = [];

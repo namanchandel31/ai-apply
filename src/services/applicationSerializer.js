@@ -41,6 +41,7 @@ function serializeApplication(row, jobs = {}) {
     completedAt: row.completed_at,
     role: row.role ?? row.jd_title ?? null,
     company: row.company ?? row.company_name ?? null,
+    matchScore: row.match_score ?? null,
     emailSubject: row.email_subject,
     emailBody: row.email_body,
   };

@@ -50,9 +50,14 @@ function extractInitiative(rawText) {
   return null;
 }
 
+const { skillsForRoles } = require("../domain/jd/skillOntology");
+
 function extractProductMentions(parsedJd, rawText) {
   const fromTitle = parsedJd?.job_title ? [parsedJd.job_title] : [];
-  const skills = (parsedJd?.skills || []).slice(0, 5);
+  const fromOntology = skillsForRoles(
+    parsedJd?.roles?.length ? parsedJd.roles : fromTitle
+  );
+  const skills = [...(parsedJd?.skills || []), ...fromOntology].slice(0, 8);
   const combined = [...fromTitle, ...skills].filter(Boolean);
   if (combined.length) {
     return { value: combined, confidence: 0.7 };

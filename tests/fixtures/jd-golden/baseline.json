@@ -1,0 +1,6 @@
+{
+  "minRoleRecall": 0.8,
+  "maxFalsePositiveRate": 0.1,
+  "minParseAcceptanceRate": 0.75,
+  "minTitleSelectionAccuracy": 0.8
+}

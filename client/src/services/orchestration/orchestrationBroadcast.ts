@@ -1,4 +1,3 @@
-import type { ApplicationUpdatedPayload } from "./orchestrationRegistry";
 
 export const ORCHESTRATION_CHANNEL = "ai-apply-orchestration";
 

@@ -21,6 +21,17 @@ const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/ui
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
 const { safePersistApplicationFailure } = require("../services/safePersistApplicationFailure");
+const { finalizeBullMqJobFailure, willBullMqRetry } = require("../queues/bullmqJobFailure");
+const { inspectBullmqJob } = require("../services/bullmqJobInspector");
+const {
+  shouldPersistTerminalFailure,
+  logFailureDecision,
+} = require("../services/failureDecision");
+const {
+  resolveExecutionState,
+  logExecutionTimeline,
+  assertExecutionInvariants,
+} = require("../services/executionStateResolver");
 
 const processor = async (job) => {
   const { applicationId, userId, recipientEmail, dbJobId } = job.data;
@@ -161,28 +172,70 @@ const processor = async (job) => {
       })
     );
 
-    await safePersistApplicationFailure(pool, {
+    const bullmq = await inspectBullmqJob(applicationId, "send_email");
+    const willRetry = willBullMqRetry(job, err);
+    const willPersist = shouldPersistTerminalFailure(job, err, bullmq);
+    const maxAttempts = job.opts?.attempts ?? 5;
+
+    logFailureDecision({
       applicationId,
-      userId,
       jobId: jobRowId,
-      failureStage: err.stage || "smtp_send",
-      lastError: err.message,
-      expectedAppStatuses: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
-    });
-    await recordEvent({
-      applicationId,
-      eventType: "send_failed",
-      actorType: "worker",
-      actorId: "send-application",
-      metadata: { message: err.message },
+      failureReason: err.message,
+      failureSource: "send-application.worker",
+      bullmqState: bullmq.jobState,
+      workerState: "catch",
+      retryBudget: { attemptsMade: job.attemptsMade, maxAttempts },
+      willPersist,
+      willRetry,
+      err,
     });
 
-    if (job.attemptsMade + 1 >= (job.opts?.attempts || 5)) {
-      logInfo("job_max_attempts_exceeded", { applicationId, jobType: "send_email" });
+    const resolved = await resolveExecutionState(applicationId, userId, {
+      jobType: "send_email",
+      bullmqJob: job,
+      err,
+    });
+    assertExecutionInvariants(resolved, { source: "send_worker_catch" });
+
+    logExecutionTimeline(willPersist ? "APPLICATION_FAILED" : willRetry ? "JOB_RETRIED" : "JOB_FAILED", {
+      applicationId,
+      jobId: jobRowId,
+      willPersist,
+      willRetry,
+    });
+
+    if (willPersist) {
+      await safePersistApplicationFailure(pool, {
+        applicationId,
+        userId,
+        jobId: jobRowId,
+        failureStage: err.stage || "smtp_send",
+        lastError: err.message,
+        expectedAppStatuses: [APPLICATION_STATUS.DRAFT, APPLICATION_STATUS.GENERATED],
+        failureSource: "send-application.worker",
+        bullmqState: bullmq.jobState,
+        retryBudget: { attemptsMade: job.attemptsMade, maxAttempts },
+      });
+      await recordEvent({
+        applicationId,
+        eventType: "send_failed",
+        actorType: "worker",
+        actorId: "send-application",
+        metadata: { message: err.message, terminal: true, retryable: false },
+      });
+    } else {
+      await recordEvent({
+        applicationId,
+        eventType: willRetry ? "send_retry_scheduled" : "send_failed",
+        actorType: "worker",
+        actorId: "send-application",
+        metadata: { message: err.message, terminal: false, retryable: willRetry },
+      });
     }
 
-    if (err instanceof UnrecoverableError) throw err;
-    throw err;
+    await finalizeBullMqJobFailure(job, err, {
+      forceUnrecoverable: err instanceof UnrecoverableError || willPersist,
+    });
   }
 };
 

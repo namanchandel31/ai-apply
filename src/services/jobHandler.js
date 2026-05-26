@@ -409,39 +409,13 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
               skills: ["react", "node.js"],
             };
           } else {
-            const parsed = await callOpenAIJson({
-              systemPrompt: JD_SYSTEM_PROMPT,
-              userPrompt: cleanedText,
-              reqId,
-              jobId,
-              source: "jd",
-              attempt,
-              signal,
-              userId,
-            });
-
-            const result = JDSchema.safeParse(parsed);
-            if (!result.success) {
-              throw new NonRetryableError(
-                `Schema validation failed: ${JSON.stringify(result.error.flatten().fieldErrors)}`
-              );
+            const { parseJobDescription } = require("./jdParseService");
+            if (!userId) {
+              throw new NonRetryableError("userId is required for JD parsing");
             }
-
-            parsedData = result.data;
+            parsedData = await parseJobDescription(cleanedText, userId, { reqId });
             logInfo("llm_success", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
           }
-
-          if (!parsedData.skills?.length || !parsedData.job_title) {
-            throw new NonRetryableError("invalid_parsed_content");
-          }
-
-          parsedData.skills = normalizeSkills(parsedData.skills);
-          parsedData.job_title = nullifyEmpty(parsedData.job_title);
-          parsedData.company_name = nullifyEmpty(parsedData.company_name);
-          parsedData.contact_person = nullifyEmpty(parsedData.contact_person);
-          parsedData.location = nullifyEmpty(parsedData.location);
-          if (!isValidEmail(parsedData.contact_email)) parsedData.contact_email = null;
-          if (!isValidPhone(parsedData.contact_number)) parsedData.contact_number = null;
 
           setCache(fileHash, parsedData);
 
