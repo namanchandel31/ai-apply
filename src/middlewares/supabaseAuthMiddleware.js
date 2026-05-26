@@ -1,8 +1,9 @@
-const { verifySupabaseAccessToken } = require("../services/supabaseJwtVerifier");
+const { verifySupabaseAccessToken, authReasonToResponseCode } = require("../services/supabaseJwtVerifier");
 const { ensureLocalUser, touchLastLogin } = require("../services/userSyncService");
-const { logAuthRejected } = require("../services/authObservability");
+const { logAuthRejected, logAuthSyncFailed } = require("../services/authObservability");
+const { logError } = require("../utils/logger");
 
-function unauthorized(res, message, code = "UNAUTHORIZED", reason = code) {
+function unauthorized(res, message, code) {
   return res.status(401).json({
     success: false,
     error: message,
@@ -10,9 +11,47 @@ function unauthorized(res, message, code = "UNAUTHORIZED", reason = code) {
   });
 }
 
-function reject(res, { message, code, reason, requestId, path }) {
-  logAuthRejected({ reason, code, requestId, path });
-  return unauthorized(res, message, code, reason);
+function reject(res, { message, code, reason, requestId, path, phase = "jwt" }) {
+  logAuthRejected({ reason, code, requestId, path, phase });
+  return unauthorized(res, message, code);
+}
+
+function mapJwtErrorToResponse(err, { requestId, path }) {
+  if (err.code === "EMAIL_NOT_VERIFIED") {
+    return {
+      message: "Email not verified",
+      code: "EMAIL_NOT_VERIFIED",
+      reason: "email_not_verified",
+    };
+  }
+  if (err.code === "MISSING_SUB" || err.code === "MISSING_EMAIL") {
+    return {
+      message: err.code === "MISSING_EMAIL" ? "Email missing from token" : "Invalid token",
+      code: err.code === "MISSING_EMAIL" ? "MISSING_EMAIL" : "INVALID_TOKEN",
+      reason: err.code === "MISSING_EMAIL" ? "missing_email" : "missing_sub",
+    };
+  }
+  if (err.authReason) {
+    const code = err.code || authReasonToResponseCode(err.authReason);
+    const messages = {
+      TOKEN_EXPIRED: "Token expired",
+      INVALID_ISSUER: "Invalid token issuer",
+      INVALID_AUDIENCE: "Invalid token audience",
+      INVALID_TOKEN: "Invalid token",
+      JWKS_FETCH_FAILED: "Unable to verify token signing keys",
+      UNAUTHORIZED: "Unauthorized",
+    };
+    return {
+      message: messages[code] || "Unauthorized",
+      code,
+      reason: err.authReason,
+    };
+  }
+  return {
+    message: "Unauthorized",
+    code: "UNAUTHORIZED",
+    reason: "verification_failed",
+  };
 }
 
 async function supabaseAuthMiddleware(req, res, next) {
@@ -51,37 +90,17 @@ async function supabaseAuthMiddleware(req, res, next) {
     });
   }
 
+  let claims;
   try {
-    const claims = await verifySupabaseAccessToken(token, { requestId, path });
-
-    const localUser = await ensureLocalUser(claims);
-    await touchLastLogin(localUser.id);
-
-    req.user = {
-      id: localUser.id,
-      supabaseUserId: localUser.supabase_user_id,
-      email: localUser.email,
-      fullName: localUser.full_name ?? null,
-      avatarUrl: localUser.avatar_url ?? null,
-    };
-
-    return next();
+    claims = await verifySupabaseAccessToken(token, { requestId, path });
   } catch (err) {
-    if (err.code === "EMAIL_NOT_VERIFIED") {
-      return reject(res, {
-        message: "Email not verified",
-        code: "EMAIL_NOT_VERIFIED",
-        reason: "email_not_verified",
-        requestId,
-        path,
-      });
-    }
     if (err.code === "LEGACY_USER_PENDING_MANUAL_LINK") {
       logAuthRejected({
         reason: "legacy_user_pending_link",
         code: "LEGACY_USER_PENDING_MANUAL_LINK",
         requestId,
         path,
+        phase: "sync",
       });
       return res.status(403).json({
         success: false,
@@ -96,6 +115,7 @@ async function supabaseAuthMiddleware(req, res, next) {
         code: "LEGACY_USER_AMBIGUOUS_EMAIL",
         requestId,
         path,
+        phase: "sync",
       });
       return res.status(403).json({
         success: false,
@@ -103,66 +123,73 @@ async function supabaseAuthMiddleware(req, res, next) {
         code: "LEGACY_USER_AMBIGUOUS_EMAIL",
       });
     }
-    if (err.code === "MISSING_SUB") {
-      return reject(res, {
-        message: "Invalid token",
-        code: "INVALID_TOKEN",
-        reason: "missing_sub",
+
+    const mapped = mapJwtErrorToResponse(err, { requestId, path });
+    return reject(res, { ...mapped, requestId, path, phase: "jwt" });
+  }
+
+  try {
+    const localUser = await ensureLocalUser(claims);
+    await touchLastLogin(localUser.id);
+
+    req.user = {
+      id: localUser.id,
+      supabaseUserId: localUser.supabase_user_id,
+      email: localUser.email,
+      fullName: localUser.full_name ?? null,
+      avatarUrl: localUser.avatar_url ?? null,
+    };
+
+    return next();
+  } catch (err) {
+    if (err.code === "LEGACY_USER_PENDING_MANUAL_LINK") {
+      logAuthRejected({
+        reason: "legacy_user_pending_link",
+        code: "LEGACY_USER_PENDING_MANUAL_LINK",
         requestId,
         path,
+        phase: "sync",
+      });
+      return res.status(403).json({
+        success: false,
+        error: err.message,
+        code: "LEGACY_USER_PENDING_MANUAL_LINK",
+        internalUserId: err.internalUserId,
       });
     }
-    if (err.code === "MISSING_EMAIL") {
-      return reject(res, {
-        message: "Invalid token",
-        code: "INVALID_TOKEN",
-        reason: "missing_email",
+    if (err.code === "LEGACY_USER_AMBIGUOUS_EMAIL") {
+      logAuthRejected({
+        reason: "legacy_user_ambiguous_email",
+        code: "LEGACY_USER_AMBIGUOUS_EMAIL",
         requestId,
         path,
+        phase: "sync",
+      });
+      return res.status(403).json({
+        success: false,
+        error: err.message,
+        code: "LEGACY_USER_AMBIGUOUS_EMAIL",
       });
     }
-    if (err.authReason === "expired") {
-      return reject(res, {
-        message: "Token expired",
-        code: "TOKEN_EXPIRED",
-        reason: "expired",
-        requestId,
-        path,
-      });
-    }
-    if (err.authReason === "wrong_issuer") {
-      return reject(res, {
-        message: "Invalid token issuer",
-        code: "INVALID_ISSUER",
-        reason: "wrong_issuer",
-        requestId,
-        path,
-      });
-    }
-    if (err.authReason === "wrong_audience") {
-      return reject(res, {
-        message: "Invalid token audience",
-        code: "INVALID_AUDIENCE",
-        reason: "wrong_audience",
-        requestId,
-        path,
-      });
-    }
-    if (err.authReason === "invalid_signature" || err.authReason === "malformed_token") {
-      return reject(res, {
-        message: "Invalid token",
-        code: "INVALID_TOKEN",
-        reason: err.authReason,
-        requestId,
-        path,
-      });
-    }
-    return reject(res, {
-      message: "Unauthorized",
-      code: "UNAUTHORIZED",
-      reason: err.authReason || "verification_failed",
+
+    logAuthSyncFailed({
+      supabaseUserId: claims.sub,
       requestId,
       path,
+      errorClass: err?.name || "Error",
+      pgCode: err?.code,
+    });
+    logError("AUTH_USER_SYNC_ERROR", err, {
+      component: "auth",
+      requestId,
+      path,
+      supabaseUserId: claims.sub,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to resolve user account",
+      code: "AUTH_USER_SYNC_FAILED",
     });
   }
 }

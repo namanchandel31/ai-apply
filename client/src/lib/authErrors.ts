@@ -17,6 +17,8 @@ const SESSION_INVALID_CODES = new Set([
   "INVALID_ISSUER",
   "INVALID_AUDIENCE",
   "MALFORMED_AUTH_HEADER",
+  "JWKS_FETCH_FAILED",
+  "MISSING_EMAIL",
 ]);
 
 /** Missing bearer on request — often race before hydration; do not always force logout. */

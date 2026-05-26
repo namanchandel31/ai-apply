@@ -16,7 +16,17 @@ function logAuthVerifyFailed({ reason, requestId, path, userId, supabaseUserId, 
   );
 }
 
-function logAuthRejected({ reason, requestId, path, code }) {
+function logAuthVerifyDebug(ctx) {
+  logInfo(
+    "AUTH_VERIFY_DEBUG",
+    buildLogContext({
+      ...ctx,
+      component: "auth",
+    })
+  );
+}
+
+function logAuthRejected({ reason, requestId, path, code, phase }) {
   logInfo(
     "AUTH_REJECTED",
     buildLogContext({
@@ -24,6 +34,7 @@ function logAuthRejected({ reason, requestId, path, code }) {
       code,
       requestId,
       path,
+      phase,
       component: "auth",
     })
   );
@@ -35,8 +46,10 @@ function logAuthEmailRejected({
   supabaseUserId,
   emailVerifiedClaim,
   hasEmailConfirmedAt,
+  userMetadataEmailVerified,
   providers,
   oauthProviderMatch,
+  oauthAmr,
 }) {
   logInfo(
     "AUTH_EMAIL_REJECTED",
@@ -46,31 +59,36 @@ function logAuthEmailRejected({
       supabaseUserId,
       emailVerifiedClaim,
       hasEmailConfirmedAt,
+      userMetadataEmailVerified,
       providers,
       oauthProviderMatch,
+      oauthAmr,
       component: "auth",
     })
   );
 }
 
-function logAuthSyncFailed({ supabaseUserId, requestId, errorClass }) {
+function logAuthSyncFailed({ supabaseUserId, requestId, path, errorClass, pgCode }) {
   logInfo(
     "AUTH_SYNC_FAILED",
     buildLogContext({
       supabaseUserId,
       requestId,
+      path,
       errorClass,
+      pgCode,
       component: "auth",
     })
   );
 }
 
-function logAuthConfigReady({ issuer, jwksHost }) {
+function logAuthConfigReady({ issuer, jwksHost, audience }) {
   logInfo(
     "AUTH_CONFIG_READY",
     buildLogContext({
       issuer,
       jwksHost,
+      audience,
       component: "auth",
     })
   );
@@ -78,6 +96,7 @@ function logAuthConfigReady({ issuer, jwksHost }) {
 
 module.exports = {
   logAuthVerifyFailed,
+  logAuthVerifyDebug,
   logAuthRejected,
   logAuthEmailRejected,
   logAuthSyncFailed,

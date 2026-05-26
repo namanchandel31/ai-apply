@@ -36,10 +36,16 @@ Redeploy after changing `VITE_*` — they are baked in at build time.
 | Symptom | Fix |
 |---------|-----|
 | Request URL is `vercel.app/api/...` | Set `VITE_API_URL` on Vercel |
-| `INVALID_ISSUER` / `INVALID_AUDIENCE` | Align `SUPABASE_URL` on Render with frontend project |
+| `INVALID_ISSUER` / `INVALID_AUDIENCE` | Align `SUPABASE_URL` on Render with frontend project; check `iss`/`aud` in JWT |
+| `JWKS_FETCH_FAILED` | Render cannot reach Supabase JWKS — network or wrong `SUPABASE_URL` |
 | `MISSING_AUTH_HEADER` | Session not ready — refresh; check Supabase env on Vercel |
-| `EMAIL_NOT_VERIFIED` | Backend email rules — ensure Google OAuth path (fixed in verifier) |
+| `EMAIL_NOT_VERIFIED` | Rare for Google — enable `AUTH_DEBUG=1` on Render and check `AUTH_EMAIL_REJECTED` logs |
+| `AUTH_USER_SYNC_FAILED` (500) | JWT OK but DB user sync failed — check migrations / `DATABASE_URL` |
 | CORS error (no 401) | Set `CORS_ORIGIN` on Render |
+
+## Debug on Render
+
+Set `AUTH_DEBUG=1` temporarily. Logs emit `AUTH_VERIFY_DEBUG` with decoded claim snapshot (no raw token). Disable after fixing.
 
 ## Debug (dev only)
 
