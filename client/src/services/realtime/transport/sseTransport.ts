@@ -1,4 +1,6 @@
-import { api } from "@/lib/api";
+import { notifyAuthFailure } from "@/lib/api";
+import { parseApiErrorCode } from "@/lib/authErrors";
+import { getCachedAccessToken, getSupabaseAccessToken } from "@/lib/supabaseClient";
 import { getTabId } from "@/services/orchestration/orchestrationBroadcast";
 import { getLastEventId, setLastEventId } from "../replay/lastEventIdStore";
 import { parseSseBlock, parseSseChunk } from "../events/parseSseFrame";
@@ -45,6 +47,7 @@ export function createSseTransport(options: SseTransportOptions) {
   let replayMode = false;
   let disconnectedAt: number | null = null;
   let lastReplayStatus: string | null = null;
+  let authFatal = false;
 
   const setPhase = (next: TransportPhase) => {
     if (phase === next) return;
@@ -91,7 +94,7 @@ export function createSseTransport(options: SseTransportOptions) {
   };
 
   const scheduleReconnect = (fromTimeout = false) => {
-    if (disposed) return;
+    if (disposed || authFatal) return;
     const now = Date.now();
     if (reconnectWindowStart === 0 || now - reconnectWindowStart > RECONNECT_WINDOW_MS) {
       reconnectWindowStart = now;
@@ -139,7 +142,12 @@ export function createSseTransport(options: SseTransportOptions) {
     if (now - lastConnectAt < MIN_CONNECT_GAP_MS) return;
     lastConnectAt = now;
 
-    const token = api.getToken();
+    if (authFatal) {
+      setState("disconnected");
+      return;
+    }
+
+    const token = getCachedAccessToken() ?? (await getSupabaseAccessToken());
     if (!token) {
       setState("disconnected");
       return;
@@ -185,6 +193,17 @@ export function createSseTransport(options: SseTransportOptions) {
         metrics.increment("orchestration.replay.tier3_replay_expired");
       } else if (lastReplayStatus === "miss") {
         metrics.increment("orchestration.replay.miss_count");
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        authFatal = true;
+        metrics.increment("orchestration.sse.auth_failure");
+        abortController?.abort();
+        setState("disconnected");
+        setPhase("idle");
+        const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        notifyAuthFailure({ status: res.status, code: parseApiErrorCode(body) });
+        return;
       }
 
       if (!res.ok || !res.body) {

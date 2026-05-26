@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuthReady } from "@/auth/AuthContext";
 import { Loader2, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -51,6 +52,7 @@ export function ApplicationDetailsSheet({
 }: Props) {
   const queryClient = useQueryClient();
   const { broadcastRevive } = useRealtime();
+  const { isResolved, isAuthenticated } = useAuthReady();
   const [continueEmail, setContinueEmail] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
 
@@ -65,7 +67,7 @@ export function ApplicationDetailsSheet({
       const res = await api.getApplication(applicationId!, { signal });
       return res.data;
     },
-    enabled: open && !!applicationId,
+    enabled: isResolved && isAuthenticated && open && !!applicationId,
     staleTime: 30_000,
   });
 

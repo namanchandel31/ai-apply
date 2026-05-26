@@ -1,9 +1,24 @@
 const express = require('express');
 const { getUserDefaultsController, setUserDefaultsController } = require('../controllers/userDefaultsController');
-const { getSetupStatusController } = require('../controllers/userController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { getSetupStatusController, getMeController } = require('../controllers/userController');
+const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
+
+/**
+ * @openapi
+ * /api/user/me:
+ *   get:
+ *     tags:
+ *       - User
+ *     summary: Get current user profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user profile
+ */
+router.get('/user/me', supabaseAuthMiddleware, getMeController);
 
 /**
  * @openapi
@@ -18,7 +33,7 @@ const router = express.Router();
  *       200:
  *         description: User defaults fetched
  */
-router.get('/user/defaults', authMiddleware, getUserDefaultsController);
+router.get('/user/defaults', supabaseAuthMiddleware, getUserDefaultsController);
 
 /**
  * @openapi
@@ -42,7 +57,7 @@ router.get('/user/defaults', authMiddleware, getUserDefaultsController);
  *       200:
  *         description: User defaults updated
  */
-router.put('/user/defaults', authMiddleware, setUserDefaultsController);
+router.put('/user/defaults', supabaseAuthMiddleware, setUserDefaultsController);
 
 /**
  * @openapi
@@ -57,6 +72,6 @@ router.put('/user/defaults', authMiddleware, setUserDefaultsController);
  *       200:
  *         description: Setup status returned successfully
  */
-router.get('/user/setup-status', authMiddleware, getSetupStatusController);
+router.get('/user/setup-status', supabaseAuthMiddleware, getSetupStatusController);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const express = require('express');
 const { sendApplicationController } = require('../controllers/sendController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 const { applyRateLimit } = require('../middlewares/rateLimitMiddleware');
 
 const router = express.Router();
@@ -63,6 +63,6 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/send-application/:applicationId', authMiddleware, applyRateLimit, sendApplicationController);
+router.post('/send-application/:applicationId', supabaseAuthMiddleware, applyRateLimit, sendApplicationController);
 
 module.exports = router;

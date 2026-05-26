@@ -1,4 +1,10 @@
 import { buildApplicationsListQueryString } from "@/lib/normalizeApplicationsListParams";
+import {
+  parseApiErrorCode,
+  shouldRetryAfterAuthError,
+  type AuthErrorContext,
+} from "@/lib/authErrors";
+import { getSupabaseAccessToken, supabase } from "@/lib/supabaseClient";
 
 export type ApiError = Error & {
   status?: number;
@@ -9,7 +15,11 @@ export type ApiError = Error & {
 
 export type RequestOptions = RequestInit & {
   signal?: AbortSignal;
+  /** @internal single retry after session refresh */
+  _authRetried?: boolean;
 };
+
+export type AuthFailureHandler = (ctx: AuthErrorContext) => void;
 
 function parseRetryAfterMs(res: Response, body: Record<string, unknown>): number | undefined {
   const header = res.headers.get("Retry-After");
@@ -46,53 +56,86 @@ function parseRetryAfterMs(res: Response, body: Record<string, unknown>): number
  */
 const ENABLE_LEGACY_ERROR_COMPAT = true;
 
-const getToken = () => localStorage.getItem("ai_apply_token");
-const setToken = (token: string | null) => {
-  if (token) localStorage.setItem("ai_apply_token", token);
-  else localStorage.removeItem("ai_apply_token");
-};
+let unauthorizedHandler: AuthFailureHandler | null = null;
+let authFailureHandler: AuthFailureHandler | null = null;
 
-let unauthorizedHandler: (() => void) | null = null;
+export function setAuthFailureHandler(handler: AuthFailureHandler | null): void {
+  authFailureHandler = handler;
+}
 
-export function setUnauthorizedHandler(handler: (() => void) | null): void {
+export function notifyAuthFailure(ctx: AuthErrorContext): void {
+  const handler = authFailureHandler ?? unauthorizedHandler;
+  handler?.(ctx);
+}
+
+export function setUnauthorizedHandler(handler: AuthFailureHandler | null): void {
   unauthorizedHandler = handler;
+}
+
+function parseApiErrorBody(body: Record<string, unknown>): {
+  message: string;
+  code?: string;
+  retryable?: boolean;
+} {
+  const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
+  if (typeof e === "object" && e !== null) {
+    return {
+      message: e.message ?? "Request failed",
+      code: e.code ?? parseApiErrorCode(body),
+      retryable: e.retryable,
+    };
+  }
+  if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
+    return {
+      message: e,
+      code: parseApiErrorCode(body),
+    };
+  }
+  return {
+    message: (body as { message?: string }).message ?? "Request failed",
+    code: ENABLE_LEGACY_ERROR_COMPAT ? parseApiErrorCode(body) : undefined,
+  };
+}
+
+function dispatchAuthFailure(ctx: AuthErrorContext): void {
+  const handler = authFailureHandler ?? unauthorizedHandler;
+  handler?.(ctx);
+}
+
+async function tryRefreshSupabaseSession(): Promise<boolean> {
+  const { data, error } = await supabase.auth.refreshSession();
+  return !error && Boolean(data.session?.access_token);
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  const token = getToken();
+  const token = await getSupabaseAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(path, { ...options, headers });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
-    if (res.status === 401 && unauthorizedHandler) {
-      unauthorizedHandler();
-    }
-    const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
-    let message: string;
-    let code: string | undefined;
-    let retryable: boolean | undefined;
+    const { message, code, retryable } = parseApiErrorBody(body);
+    const authCtx: AuthErrorContext = { status: res.status, code };
 
-    if (typeof e === "object" && e !== null) {
-      message = e.message ?? "Request failed";
-      code = e.code;
-      retryable = e.retryable;
-    } else if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
-      message = e;
-      code = (body as { code?: string }).code;
-    } else {
-      message = (body as { message?: string }).message ?? `Request failed (${res.status})`;
-      if (ENABLE_LEGACY_ERROR_COMPAT) {
-        code = (body as { code?: string }).code;
-      }
+    if (
+      !options._authRetried &&
+      res.status === 401 &&
+      code === "TOKEN_EXPIRED" &&
+      (await tryRefreshSupabaseSession())
+    ) {
+      return request<T>(path, { ...options, _authRetried: true });
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      dispatchAuthFailure(authCtx);
     }
 
     const err = new Error(message) as ApiError;
     err.status = res.status;
     err.code = code;
-    err.retryable = retryable;
+    err.retryable = retryable ?? shouldRetryAfterAuthError(authCtx);
     if (res.status === 429) {
       err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
     }
@@ -111,7 +154,7 @@ async function requestApplicationStatus(
   options?: { signal?: AbortSignal; ifNoneMatch?: string }
 ): Promise<ApplicationStatusResponse> {
   const headers = new Headers();
-  const token = getToken();
+  const token = await getSupabaseAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (options?.ifNoneMatch) {
     headers.set("If-None-Match", options.ifNoneMatch);
@@ -133,32 +176,17 @@ async function requestApplicationStatus(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
-    if (res.status === 401 && unauthorizedHandler) {
-      unauthorizedHandler();
-    }
-    const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
-    let message: string;
-    let code: string | undefined;
-    let retryable: boolean | undefined;
+    const { message, code, retryable } = parseApiErrorBody(body);
+    const authCtx: AuthErrorContext = { status: res.status, code };
 
-    if (typeof e === "object" && e !== null) {
-      message = e.message ?? "Request failed";
-      code = e.code;
-      retryable = e.retryable;
-    } else if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
-      message = e;
-      code = (body as { code?: string }).code;
-    } else {
-      message = (body as { message?: string }).message ?? `Request failed (${res.status})`;
-      if (ENABLE_LEGACY_ERROR_COMPAT) {
-        code = (body as { code?: string }).code;
-      }
+    if (res.status === 401 || res.status === 403) {
+      dispatchAuthFailure(authCtx);
     }
 
     const err = new Error(message) as ApiError;
     err.status = res.status;
     err.code = code;
-    err.retryable = retryable;
+    err.retryable = retryable ?? shouldRetryAfterAuthError(authCtx);
     if (res.status === 429) {
       err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
     }
@@ -173,31 +201,21 @@ async function requestApplicationStatus(
   };
 }
 
+export type UserMe = {
+  id: string;
+  email: string;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+  subscriptionTier: string;
+  flags: Record<string, unknown>;
+  createdAt: string;
+};
+
 export const api = {
-  getToken,
-  setToken,
   setUnauthorizedHandler,
 
-  signup(email: string, password: string) {
-    return request<{ success: boolean; data: { user: { id: string; email: string } } }>(
-      "/auth/signup",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      }
-    );
-  },
-
-  login(email: string, password: string) {
-    return request<{
-      success: boolean;
-      data: { token: string; user: { id: string; email: string } };
-    }>("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+  getMe() {
+    return request<{ success: boolean; data: UserMe }>("/api/user/me");
   },
 
   saveCredentials(email: string, appPassword: string) {

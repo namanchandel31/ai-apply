@@ -52,10 +52,7 @@ type ApplicationTableRowProps = {
 const ApplicationTableRow = memo(function ApplicationTableRow({
   row,
   selectedId,
-  actionId,
   onSelectRow,
-  onRetry,
-  onContinue,
 }: ApplicationTableRowProps) {
   return (
     <TableRow

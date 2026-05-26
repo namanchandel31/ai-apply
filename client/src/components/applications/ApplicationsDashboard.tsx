@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { registerActiveListParams } from "@/services/realtime/cache/activeListParamsRegistry";
 import { useEffect } from "react";
+import { useAuthReady } from "@/auth/AuthContext";
 
 function ApplicationsDashboardInner() {
   const { params, patchParams, hasActiveFilters } = useApplicationsListParams();
@@ -34,7 +35,16 @@ function ApplicationsDashboardInner() {
     registerActiveListParams(params);
   }, [params]);
 
-  const { data, isLoading, isFetching } = useQuery(getApplicationsListQueryOptions(params));
+  const { isResolved, isAuthenticated } = useAuthReady();
+  const { data, isLoading, isFetching } = useQuery({
+    ...getApplicationsListQueryOptions(params),
+    enabled: isResolved && isAuthenticated,
+    retry: (failureCount, error) => {
+      const status = (error as { status?: number })?.status;
+      if (status === 401 || status === 403) return false;
+      return failureCount < 1;
+    },
+  });
   const page = normalizeApplicationsListData(data ?? EMPTY_APPLICATIONS_LIST);
   const items = getApplicationsListItems(page);
 

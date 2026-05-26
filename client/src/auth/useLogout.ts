@@ -7,11 +7,11 @@ import { logout } from "@/auth/logout";
 export function useLogout() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { clearAuthState } = useAuth();
 
   return () => {
-    logout(queryClient, navigate);
-    setUser(null);
-    toast.info("Signed out");
+    void logout({ queryClient, navigate, clearAuthState }).then(() => {
+      toast.info("Signed out");
+    });
   };
 }

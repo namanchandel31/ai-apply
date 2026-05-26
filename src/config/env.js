@@ -71,7 +71,6 @@ function validateStartup() {
   const required = [
     "DATABASE_URL",
     "REDIS_URL",
-    "JWT_SECRET",
     "INTERNAL_API_KEY",
     "ENCRYPTION_KEY",
     "SUPABASE_URL",

@@ -55,13 +55,12 @@ app.use(express.json());
 // Rate limit middleware (tiered)
 // ---------------------------------------------------------------------------
 
-const { applyRateLimit, uploadRateLimit, readRateLimit, autoApplyRateLimit } = require("./src/middlewares/rateLimitMiddleware");
+const { applyRateLimit, uploadRateLimit, readRateLimit, aiRateLimit, autoApplyRateLimit } = require("./src/middlewares/rateLimitMiddleware");
 
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
 
-const authRoutes       = require("./src/routes/authRoutes");
 const resumeRoutes     = require("./src/routes/resumeRoutes");
 const jdRoutes         = require("./src/routes/jdRoutes");
 const applyRoutes      = require("./src/routes/applyRoutes");
@@ -96,9 +95,6 @@ if (!config.server.isProduction) {
   });
 }
 
-// Auth (no rate limit — handled internally)
-app.use("/auth", authRoutes);
-
 // Upload routes — 20 req/min per user
 app.use("/api", uploadRateLimit, resumeRoutes);
 app.use("/api", uploadRateLimit, jdRoutes);
@@ -116,7 +112,7 @@ app.use("/api", readRateLimit, applicationRoutes);
 app.use("/api", realtimeRoutes);
 app.use("/api", orchestrationRoutes);
 app.use("/api", readRateLimit, userRoutes);
-app.use("/api", readRateLimit, aiRoutes);
+app.use("/api", aiRateLimit, aiRoutes);
 
 // Internal Queue Health
 app.get("/internal/queue-health", async (req, res) => {

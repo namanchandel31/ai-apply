@@ -153,6 +153,7 @@ const RATE_LIMITS = {
   USER_APPLY_SEND: { limit: 10,  windowSeconds: 60 },
   USER_UPLOAD:     { limit: 20,  windowSeconds: 60 },
   USER_READ:       { limit: 120, windowSeconds: 60 },
+  USER_AI:         { limit: 60,  windowSeconds: 60 },
   USER_AUTO_APPLY_HOURLY: {
     limit: require("../config").product.autoApplyHourlyLimit,
     windowSeconds: 3600,

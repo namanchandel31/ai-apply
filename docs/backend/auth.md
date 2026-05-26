@@ -1,26 +1,25 @@
 # Authentication
 
-JWT bearer tokens via [`authService.js`](../../src/services/authService.js).
+AI Apply uses **Supabase Auth** with **Google OAuth** only. The API verifies Supabase access tokens via **JWKS** (`jose` + `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
 
 ## Flow
 
-1. `POST /auth/signup` or `/auth/login`
-2. Client stores token; sends `Authorization: Bearer <token>`
-3. `authMiddleware` sets `req.userId`
+1. User signs in with Google in the SPA (`signInWithOAuth`).
+2. Supabase returns a session; the client sends `Authorization: Bearer <access_token>` to the API.
+3. `supabaseAuthMiddleware` verifies the JWT (issuer, audience, signature, expiration).
+4. `userSyncService` upserts a local `users` row keyed by `supabase_user_id`.
+5. `req.user.id` is the internal UUID used for all ownership checks.
 
-## Token payload
+## Endpoints
 
-Minimal: `{ userId }`. Expiry 7d. Issuer `ai-apply`.
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/user/me` | Bearer (Supabase access token) |
 
-## Limitations
+Legacy `/auth/signup` and `/auth/login` are removed.
 
-- No revocation/blacklist yet — see [../security/replay-attack-limitation.md](../security/replay-attack-limitation.md)
-- Rotate `JWT_SECRET` requires all users re-login
+## Rules
 
-## Internal API
-
-`x-internal-api-key` header for `/internal/*` — not JWT.
-
-## Related Documentation
-
-- [../api/authentication.md](../api/authentication.md)
+- Never accept `userId` from the request body for authorization.
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only (storage); never bundle in the client.
+- Client uses `VITE_SUPABASE_ANON_KEY` only.

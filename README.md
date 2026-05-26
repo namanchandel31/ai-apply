@@ -17,7 +17,8 @@ Automated job application platform: parse resume and job description, generate a
 
 ```bash
 npm install
-cp .env.example .env   # DATABASE_URL, REDIS_URL, JWT_SECRET, ENCRYPTION_KEY, Supabase, etc.
+cp .env.example .env   # DATABASE_URL, REDIS_URL, ENCRYPTION_KEY, SUPABASE_*, etc.
+cp client/.env.example client/.env   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 npm run migrate
 cd client && npm install && cd ..
 npm run build:ui

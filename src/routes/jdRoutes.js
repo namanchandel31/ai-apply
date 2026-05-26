@@ -1,6 +1,6 @@
 const express = require('express');
 const { uploadJDController } = require('../controllers/jdController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
 
@@ -58,6 +58,6 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/upload-jd', authMiddleware, uploadJDController);
+router.post('/upload-jd', supabaseAuthMiddleware, uploadJDController);
 
 module.exports = router;

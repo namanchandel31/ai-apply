@@ -8,6 +8,7 @@ const redis = require("./redis.config");
 const queue = require("./queue.config");
 const ai = require("./ai.config");
 const auth = require("./auth.config");
+const supabaseAuth = require("./supabaseAuth.config");
 const mail = require("./mail.config");
 const logging = require("./logging.config");
 const storage = require("./storage.config");
@@ -22,6 +23,7 @@ const config = Object.freeze({
   queue,
   ai,
   auth,
+  supabaseAuth,
   mail,
   logging,
   storage,

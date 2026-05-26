@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middlewares/authMiddleware");
+const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
 const {
   listApplicationsController,
@@ -12,12 +12,12 @@ const {
   getApplicationJobController,
 } = require("../controllers/applicationController");
 
-router.get("/applications", authMiddleware, listApplicationsController);
-router.get("/applications/:id", authMiddleware, getApplicationController);
-router.get("/applications/:id/status", authMiddleware, getApplicationStatusController);
-router.post("/applications/:id/continue", authMiddleware, applyRateLimit, continueApplicationController);
-router.post("/applications/:id/retry", authMiddleware, applyRateLimit, retryApplicationController);
-router.post("/applications/:id/cancel", authMiddleware, cancelApplicationController);
-router.get("/application-jobs/:id", authMiddleware, getApplicationJobController);
+router.get("/applications", supabaseAuthMiddleware, listApplicationsController);
+router.get("/applications/:id", supabaseAuthMiddleware, getApplicationController);
+router.get("/applications/:id/status", supabaseAuthMiddleware, getApplicationStatusController);
+router.post("/applications/:id/continue", supabaseAuthMiddleware, applyRateLimit, continueApplicationController);
+router.post("/applications/:id/retry", supabaseAuthMiddleware, applyRateLimit, retryApplicationController);
+router.post("/applications/:id/cancel", supabaseAuthMiddleware, cancelApplicationController);
+router.get("/application-jobs/:id", supabaseAuthMiddleware, getApplicationJobController);
 
 module.exports = router;

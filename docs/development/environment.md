@@ -8,7 +8,8 @@ All application config loads through [`src/config/`](../../src/config/). Do not 
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `REDIS_URL` | BullMQ + realtime pub/sub |
-| `JWT_SECRET` | JWT signing |
+| `SUPABASE_URL` | JWKS + storage (required) |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Frontend Google OAuth (client `.env`) |
 | `INTERNAL_API_KEY` | `/internal/*` routes |
 | `ENCRYPTION_KEY` | 32-byte hex for credential encryption |
 | `SUPABASE_URL` | Storage API |

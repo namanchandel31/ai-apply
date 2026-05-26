@@ -1,8 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import {
-  applyPollStatusToCache,
-  getStaleApplicationIds,
-} from "./applicationCacheSync";
+import { getStaleApplicationIds } from "./applicationCacheSync";
 import { hydrateApplicationStatuses } from "./partialHydrationScheduler";
 import { assertLeaderOnly } from "../leaderGuards";
 import { logDebug } from "@/services/logging/orchestrationLogger";

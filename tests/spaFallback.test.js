@@ -6,12 +6,12 @@ describe("SPA fallback routing", () => {
       expect(isSpaFallbackRoute("/")).toBe(true);
       expect(isSpaFallbackRoute("/settings")).toBe(true);
       expect(isSpaFallbackRoute("/apply/step-2")).toBe(true);
+      expect(isSpaFallbackRoute("/auth/callback")).toBe(true);
     });
 
-    it("does not match API, auth, health, or docs paths", () => {
+    it("does not match API, health, or docs paths", () => {
       expect(isSpaFallbackRoute("/api/upload-resume")).toBe(false);
       expect(isSpaFallbackRoute("/api/apply")).toBe(false);
-      expect(isSpaFallbackRoute("/auth/login")).toBe(false);
       expect(isSpaFallbackRoute("/health")).toBe(false);
       expect(isSpaFallbackRoute("/docs")).toBe(false);
       expect(isSpaFallbackRoute("/openapi.json")).toBe(false);

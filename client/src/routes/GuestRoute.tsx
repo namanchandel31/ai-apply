@@ -1,9 +1,21 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { api } from "@/lib/api";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/auth/AuthContext";
 
 export function GuestRoute() {
-  if (api.getToken()) {
+  const { session, isResolved } = useAuth();
+
+  if (!isResolved) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (session) {
     return <Navigate to="/dashboard" replace />;
   }
+
   return <Outlet />;
 }

@@ -126,5 +126,6 @@ module.exports = {
   applyRateLimit:  createRateLimit("USER_APPLY_SEND"),
   uploadRateLimit: createRateLimit("USER_UPLOAD"),
   readRateLimit:   createRateLimit("USER_READ"),
+  aiRateLimit:     createRateLimit("USER_AI"),
   autoApplyRateLimit: createDualRateLimit("USER_AUTO_APPLY_HOURLY", "USER_AUTO_APPLY_DAILY"),
 };

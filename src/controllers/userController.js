@@ -83,6 +83,27 @@ const getSetupStatusController = async (req, res) => {
   }
 };
 
+const { buildUserMeResponse } = require('../services/userMeService');
+
+const getMeController = async (req, res) => {
+  try {
+    const me = await buildUserMeResponse(req.user.id);
+    return ok(res, me);
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return sendError(res, {
+        status: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: 'User not found',
+        retryable: false,
+      });
+    }
+    logError('GET_ME_ERROR', err, { userId: req.user.id, reqId: req.requestId });
+    return error(res, 500, 'Failed to fetch profile', ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
 module.exports = {
-  getSetupStatusController
+  getSetupStatusController,
+  getMeController,
 };

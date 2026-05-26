@@ -1,6 +1,6 @@
 const express = require('express');
 const { saveEmailCredentialsController } = require('../controllers/credentialController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
 
@@ -49,6 +49,6 @@ const router = express.Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/save-email-credentials', authMiddleware, saveEmailCredentialsController);
+router.post('/save-email-credentials', supabaseAuthMiddleware, saveEmailCredentialsController);
 
 module.exports = router;

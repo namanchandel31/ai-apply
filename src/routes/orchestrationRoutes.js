@@ -1,9 +1,9 @@
 const express = require("express");
-const authMiddleware = require("../middlewares/authMiddleware");
+const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const { getActiveOrchestrationController } = require("../controllers/orchestrationController");
 
 const router = express.Router();
 
-router.get("/orchestration/active", authMiddleware, getActiveOrchestrationController);
+router.get("/orchestration/active", supabaseAuthMiddleware, getActiveOrchestrationController);
 
 module.exports = router;

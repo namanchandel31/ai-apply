@@ -8,34 +8,18 @@
 jest.mock("../src/realtime/sseGateway", () => ({ startSseGateway: jest.fn() }));
 jest.mock("../src/jobs/recovery.job", () => ({ recoveryLoop: jest.fn().mockResolvedValue(undefined) }));
 
+const { installSupabaseAuthTestMocks } = require("./helpers/supabaseAuthTest");
+installSupabaseAuthTestMocks();
+
 const request = require("supertest");
 const app = require("../index");
 
-// Test data
-const testUser = {
-  email: 'security-test@example.com',
-  password: 'testPassword123'
-};
-
-let authToken = '';
+let authToken = "test-supabase-access-token";
 let testResumeId = '';
 let testJDId = '';
 let testApplicationId = '';
 
 describe('Security Tests', () => {
-  beforeAll(async () => {
-    // Create test user and get auth token
-    const signupResponse = await request(app)
-      .post('/api/auth/signup')
-      .send(testUser);
-    
-    const loginResponse = await request(app)
-      .post('/api/auth/login')
-      .send(testUser);
-    
-    authToken = loginResponse.body.token;
-  });
-
   describe('1. Authentication & Authorization', () => {
     test('Should reject requests without Bearer token', async () => {
       const response = await request(app)
@@ -160,14 +144,15 @@ describe('Security Tests', () => {
   });
 
   describe('6. Data Exposure Prevention', () => {
-    test('Should not expose password hashes', async () => {
+    test('Should not expose password fields on user profile', async () => {
       const response = await request(app)
-        .post('/api/auth/login')
-        .send(testUser);
-      
-      expect(response.body.user).toBeDefined();
-      expect(response.body.user.password_hash).toBeUndefined();
-      expect(response.body.user.passwordHash).toBeUndefined();
+        .get('/api/user/me')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data?.id).toBeDefined();
+      expect(response.body.data?.password_hash).toBeUndefined();
+      expect(response.body.data?.passwordHash).toBeUndefined();
     });
 
     test('Should mask sensitive data in logs', async () => {

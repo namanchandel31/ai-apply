@@ -21,7 +21,7 @@ const options = {
 
     // ── Global tag definitions — controls Swagger UI grouping order ─────────
     tags: [
-      { name: "Auth",         description: "Register and authenticate users"           },
+      { name: "Auth",         description: "Supabase Google OAuth (Bearer access token)" },
       { name: "Upload",       description: "Resume and job description ingestion"       },
       { name: "Applications", description: "Apply and send application emails"          },
       { name: "AutoApply",    description: "One-click automated job applications"       },
@@ -31,7 +31,7 @@ const options = {
     ],
 
     // ── Global security — bearerAuth applied to ALL endpoints by default ────
-    // Public endpoints (/auth/signup, /auth/login, /health) override with: security: []
+    // Public endpoints (/health) override with: security: []
     security: [
       { bearerAuth: [] },
     ],
@@ -44,7 +44,7 @@ const options = {
           type:         "http",
           scheme:       "bearer",
           bearerFormat: "JWT",
-          description:  "Paste the JWT token returned from /auth/login",
+          description:  "Supabase session access_token (Google OAuth)",
         },
       },
 

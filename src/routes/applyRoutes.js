@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { processApplication } = require("../controllers/applyController");
 const { listApplicationsLegacyController } = require("../controllers/applicationController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
 
 /**
@@ -54,7 +54,7 @@ const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post("/", authMiddleware, applyRateLimit, processApplication);
+router.post("/", supabaseAuthMiddleware, applyRateLimit, processApplication);
 
 /**
  * @openapi
@@ -69,6 +69,6 @@ router.post("/", authMiddleware, applyRateLimit, processApplication);
  *       200:
  *         description: List of applications returned successfully
  */
-router.get("/", authMiddleware, listApplicationsLegacyController);
+router.get("/", supabaseAuthMiddleware, listApplicationsLegacyController);
 
 module.exports = router;

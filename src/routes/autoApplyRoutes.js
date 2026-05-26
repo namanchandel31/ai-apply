@@ -1,6 +1,6 @@
 const express = require('express');
 const { autoApplyController } = require('../controllers/autoApplyController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
 
@@ -36,6 +36,6 @@ const router = express.Router();
  *       500:
  *         description: Internal error
  */
-router.post('/auto-apply', authMiddleware, autoApplyController);
+router.post('/auto-apply', supabaseAuthMiddleware, autoApplyController);
 
 module.exports = router;

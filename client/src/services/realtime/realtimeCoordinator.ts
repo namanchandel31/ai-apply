@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { getCachedAccessToken } from "@/lib/supabaseClient";
 import {
   globalOrchestrationRegistry,
   type ApplicationUpdatedPayload,
@@ -262,7 +263,7 @@ export function createRealtimeCoordinator(
 
   const hydrateBootstrap = async () => {
     if (!assertLeaderOnly(isLeader, "hydrate")) return;
-    if (!api.getToken()) return;
+    if (!getCachedAccessToken()) return;
     const started = performance.now();
     registry.resetHydration();
     const res = await api.getOrchestrationActive();
@@ -393,7 +394,7 @@ export function createRealtimeCoordinator(
 
   return {
     start: () => {
-      if (!api.getToken()) return () => {};
+      if (!getCachedAccessToken()) return () => {};
       ensureBroadcast();
       const stopLeader = tabLeader.start();
       return () => {

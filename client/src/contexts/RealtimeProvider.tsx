@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useAuthReady } from "@/auth/AuthContext";
+import { logAuthLifecycle } from "@/auth/authLifecycleLog";
 import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchestrationRegistry";
 import type { ConnectionState } from "@/services/realtime/transport/sseTransport";
 import { getRealtimeTransportManager } from "@/services/realtime/RealtimeTransportManager";
@@ -22,9 +23,10 @@ import {
 } from "@/services/realtime/realtimeSession";
 import { RealtimeContext } from "./realtimeContext";
 
-/** Call before logout so the next login gets a fresh coordinator + broadcast channel. */
+/** Call before logout so the next login gets a fresh coordinator + SSE transport. */
 export function shutdownRealtimeSession() {
   shutdownCoordinatorSession();
+  getRealtimeTransportManager().shutdown();
 }
 
 export function resetRealtimeProviderCacheBinding() {
@@ -41,6 +43,7 @@ function getTransportSnapshot(): ConnectionState {
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { isResolved, isAuthenticated, session } = useAuthReady();
   const disableRealtime =
     typeof window !== "undefined" && window.localStorage.getItem("debug:disableRealtime") === "1";
 
@@ -63,7 +66,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setIsLeader(getSharedCoordinatorRef()?.isLeader() ?? false);
     });
 
-    if (!api.getToken()) {
+    if (!isResolved || !isAuthenticated || !session?.access_token) {
+      if (!isAuthenticated) {
+        getRealtimeTransportManager().shutdown();
+      }
       shutdownCoordinatorSession();
       clearConnectionListeners();
       setIsLeader(false);
@@ -82,8 +88,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     if (!isBootstrapPrefetchDone()) {
       markBootstrapPrefetchDone();
-      void queryClient.ensureQueryData(setupStatusQueryOptions);
-      void queryClient.ensureQueryData(applicationsQueryOptions);
+      logAuthLifecycle("BOOTSTRAP_PREFETCH_START");
+      void queryClient.ensureQueryData({
+        ...setupStatusQueryOptions,
+        queryKey: setupStatusQueryOptions.queryKey,
+      });
+      void queryClient.ensureQueryData({
+        ...applicationsQueryOptions,
+        queryKey: applicationsQueryOptions.queryKey,
+      });
     }
 
     const leaderPoll = disableLeaderPoll
@@ -97,18 +110,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (leaderPoll) clearInterval(leaderPoll);
       removeListener();
     };
-  }, [queryClient]);
+  }, [queryClient, isResolved, isAuthenticated, session?.access_token, disableRealtime, disableLeaderPoll]);
 
   useEffect(() => {
     if (disableRealtime) return;
-    if (!api.getToken() || !coordinator || isCacheSyncBound()) return;
+    if (!session?.access_token || !coordinator || isCacheSyncBound()) return;
     markCacheSyncBound();
     return bindCacheSyncToCoordinator(queryClient, coordinator, () => ({
       isLeader: coordinator.isLeader(),
       sseConnected: getTransportSnapshot() === "connected" && coordinator.isLeader(),
       connectionState: getTransportSnapshot(),
     }));
-  }, [queryClient, coordinator]);
+  }, [queryClient, coordinator, session?.access_token, disableRealtime]);
 
   const safeValue = useMemo(
     () => ({
