@@ -4,6 +4,7 @@ import {
   shouldRetryAfterAuthError,
   type AuthErrorContext,
 } from "@/lib/authErrors";
+import { apiUrl } from "@/lib/apiBase";
 import { getSupabaseAccessToken, supabase } from "@/lib/supabaseClient";
 
 export type ApiError = Error & {
@@ -112,7 +113,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const token = await getSupabaseAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, { ...options, headers });
+  const res = await fetch(apiUrl(path), { ...options, headers });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
@@ -160,7 +161,7 @@ async function requestApplicationStatus(
     headers.set("If-None-Match", options.ifNoneMatch);
   }
 
-  const res = await fetch(`/api/applications/${applicationId}/status`, {
+  const res = await fetch(apiUrl(`/api/applications/${applicationId}/status`), {
     method: "GET",
     headers,
     signal: options?.signal,

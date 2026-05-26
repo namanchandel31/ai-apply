@@ -1,4 +1,5 @@
 import { notifyAuthFailure } from "@/lib/api";
+import { apiUrl } from "@/lib/apiBase";
 import { parseApiErrorCode } from "@/lib/authErrors";
 import { getCachedAccessToken, getSupabaseAccessToken } from "@/lib/supabaseClient";
 import { getTabId } from "@/services/orchestration/orchestrationBroadcast";
@@ -179,7 +180,7 @@ export function createSseTransport(options: SseTransportOptions) {
     }
 
     try {
-      const url = `/api/realtime/stream?tabId=${encodeURIComponent(tabId)}`;
+      const url = apiUrl(`/api/realtime/stream?tabId=${encodeURIComponent(tabId)}`);
       const res = await fetch(url, {
         method: "GET",
         headers,
