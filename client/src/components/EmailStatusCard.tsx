@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, CheckCircle2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,13 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
+/** Google Account → Security → App passwords (requires 2-Step Verification). */
+const GMAIL_APP_PASSWORDS_URL = "https://myaccount.google.com/apppasswords";
+
 interface Props {
   email: string | null | undefined;
   onUpdate: () => void;
+  defaultExpanded?: boolean;
 }
 
-export function EmailStatusCard({ email, onUpdate }: Props) {
-  const [isEditing, setIsEditing] = useState(!email);
+export function EmailStatusCard({ email, onUpdate, defaultExpanded }: Props) {
+  const [isEditing, setIsEditing] = useState(!email || !!defaultExpanded);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -73,11 +77,33 @@ export function EmailStatusCard({ email, onUpdate }: Props) {
           <Mail className="h-5 w-5" />
           Email Configuration
         </CardTitle>
-        <CardDescription>
-          Connect Gmail with a 16-character app password to send applications.
-        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <p>
+            We ask for this so One Tap can send job application emails{" "}
+            <strong className="text-foreground">from your Gmail address</strong>. Recruiters see mail from you,
+            in your name—not from a generic platform address.
+          </p>
+          <p>
+            Use a Google <strong className="text-foreground">app password</strong> (a one-time 16-character
+            code), not your normal Gmail password. Google creates it for trusted apps; we store it encrypted
+            and use it only to send applications you trigger. We do not read your inbox or change your account
+            settings.
+          </p>
+          <p>
+            <a
+              href={GMAIL_APP_PASSWORDS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Generate a Gmail app password
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            </a>
+            <span> (opens Google; 2-Step Verification must be on)</span>
+          </p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="cred-email">Gmail address</Label>
@@ -91,7 +117,11 @@ export function EmailStatusCard({ email, onUpdate }: Props) {
               type="password"
               placeholder="xxxx xxxx xxxx xxxx"
               required
+              autoComplete="off"
             />
+            <p className="text-xs text-muted-foreground">
+              Paste the 16-character code Google shows you. Spaces are optional.
+            </p>
           </div>
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>

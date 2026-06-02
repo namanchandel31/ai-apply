@@ -7,11 +7,56 @@ const SELECT_FIELDS = `
   base_url as "baseUrl", label, is_active as "isActive",
   allow_platform_fallback as "allowPlatformFallback",
   priority, health_status as "healthStatus", health_updated_at as "healthUpdatedAt",
+  credential_status as "credentialStatus", last_validated_at as "lastValidatedAt",
   in_fallback_chain as "inFallbackChain",
   encrypted_api_key as "encryptedApiKey",
   encrypted_api_key IS NOT NULL as "hasApiKey",
   created_at as "createdAt", updated_at as "updatedAt"
 `;
+
+async function getVerifiedCredentialForUser(userId) {
+  const { rows } = await pool.query(
+    `SELECT ${SELECT_FIELDS}
+     FROM user_ai_credentials
+     WHERE user_id = $1
+       AND credential_status = 'valid'
+       AND last_validated_at IS NOT NULL
+     ORDER BY priority ASC
+     LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+async function updateCredentialVerification(credentialId, userId, { credentialStatus, lastValidatedAt }) {
+  const { rows } = await pool.query(
+    `UPDATE user_ai_credentials
+     SET credential_status = $3,
+         last_validated_at = $4,
+         health_status = CASE
+           WHEN $3 = 'valid' THEN 'healthy'
+           WHEN $3 = 'invalid' THEN 'invalid'
+           ELSE health_status
+         END,
+         health_updated_at = CASE WHEN $3 IN ('valid', 'invalid') THEN NOW() ELSE health_updated_at END,
+         updated_at = NOW()
+     WHERE id = $1 AND user_id = $2
+     RETURNING ${SELECT_FIELDS}`,
+    [credentialId, userId, credentialStatus, lastValidatedAt]
+  );
+  return rows[0] || null;
+}
+
+async function setCredentialPending(credentialId, userId) {
+  const { rows } = await pool.query(
+    `UPDATE user_ai_credentials
+     SET credential_status = 'pending', last_validated_at = NULL, updated_at = NOW()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
+    [credentialId, userId]
+  );
+  return rows[0] || null;
+}
 
 async function listByUser(userId) {
   const { rows } = await pool.query(
@@ -92,6 +137,8 @@ async function upsertCredential({
            selected_model = $4,
            base_url = $5,
            allow_platform_fallback = $6,
+           credential_status = 'pending',
+           last_validated_at = NULL,
            health_status = CASE WHEN health_status = 'invalid' THEN health_status ELSE 'healthy' END,
            updated_at = NOW()
          WHERE id = $1 AND user_id = $7
@@ -127,8 +174,9 @@ async function upsertCredential({
       const { rows } = await client.query(
         `INSERT INTO user_ai_credentials
           (user_id, provider, provider_type, encrypted_api_key, selected_model, base_url, label,
-           allow_platform_fallback, is_active, priority, health_status, in_fallback_chain, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'healthy', true, NOW())
+           allow_platform_fallback, is_active, priority, health_status, credential_status,
+           in_fallback_chain, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'healthy', 'pending', true, NOW())
          RETURNING id`,
         [
           userId,
@@ -281,6 +329,9 @@ module.exports = {
   getPrimaryByUser,
   getActiveByUser,
   getById,
+  getVerifiedCredentialForUser,
+  updateCredentialVerification,
+  setCredentialPending,
   upsertCredential,
   reorderChain,
   promoteToPrimary,

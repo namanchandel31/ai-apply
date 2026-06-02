@@ -1,17 +1,31 @@
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { EmailStatusCard } from "@/components/EmailStatusCard";
 import { ResumeStatusCard } from "@/components/ResumeStatusCard";
 import { AiProviderStatusCard } from "@/components/AiProviderStatusCard";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useActivationTracking } from "@/hooks/useActivationTracking";
 
 export function Setup() {
   const { data: status, isLoading } = useSetupStatus();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const emailCardRef = useRef<HTMLDivElement>(null);
+
+  useActivationTracking(status, "setup");
 
   const handleUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ["setup-status"] });
   };
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "email") return;
+    const el = emailCardRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [searchParams, isLoading]);
 
   if (isLoading) {
     return (
@@ -31,6 +45,8 @@ export function Setup() {
     );
   }
 
+  const expandEmail = searchParams.get("focus") === "email" && !status?.hasEmailSetup;
+
   return (
     <div className="p-8 lg:p-10 max-w-4xl mx-auto space-y-6">
       <div>
@@ -41,14 +57,6 @@ export function Setup() {
       </div>
 
       <div className="grid gap-6">
-        <ResumeStatusCard 
-          activeResume={status?.activeResume} 
-          onUpdate={handleUpdate} 
-        />
-        <EmailStatusCard 
-          email={status?.email} 
-          onUpdate={handleUpdate} 
-        />
         <AiProviderStatusCard
           activeAiProvider={
             status?.activeAiProvider?.id
@@ -58,6 +66,14 @@ export function Setup() {
           hasAiSetup={status?.hasAiSetup}
           onUpdate={handleUpdate}
         />
+        <ResumeStatusCard activeResume={status?.activeResume} onUpdate={handleUpdate} />
+        <div ref={emailCardRef}>
+          <EmailStatusCard
+            email={status?.email}
+            onUpdate={handleUpdate}
+            defaultExpanded={expandEmail}
+          />
+        </div>
       </div>
     </div>
   );

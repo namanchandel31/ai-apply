@@ -6,6 +6,7 @@ const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
 const { supabase } = require("../config/supabase");
 const { error: sendError, ok, ERROR_CODES } = require("../utils/response");
+const { userHasVerifiedAiCredential } = require("../services/setupStatusService");
 
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
@@ -28,6 +29,18 @@ const uploadResumeController = async (req, res) => {
     const context = req.body.context || 'onboarding';
     if (!['onboarding', 'profile_update'].includes(context)) {
       return sendError(res, 400, 'Invalid context. Must be onboarding or profile_update', ERROR_CODES.BAD_REQUEST);
+    }
+
+    if (context === 'onboarding') {
+      const hasVerified = await userHasVerifiedAiCredential(userId);
+      if (!hasVerified) {
+        return sendError(
+          res,
+          403,
+          'Verify your AI provider key before uploading a resume',
+          'AI_CREDENTIAL_REQUIRED'
+        );
+      }
     }
 
     logInfo("request_start", { reqId, jobId, fileHash, userId, context, source: "resume" });

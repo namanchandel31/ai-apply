@@ -209,6 +209,22 @@ async function requestApplicationStatus(
   };
 }
 
+export type SetupStatusData = {
+  hasResume: boolean;
+  hasValidResume?: boolean;
+  hasEmailSetup: boolean;
+  hasAiSetup?: boolean;
+  hasVerifiedAiCredential?: boolean;
+  hasValidUserAiCredential?: boolean;
+  credentialLastValidatedAt?: string | null;
+  onboardingRequired?: boolean;
+  currentOnboardingStep?: "ai" | "resume" | "ready";
+  activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
+  email?: string | null;
+  activeAiProvider?: AiCredentialSummary | null;
+  aiCredentialChain?: AiCredentialSummary[];
+};
+
 export type UserMe = {
   id: string;
   email: string;
@@ -234,9 +250,10 @@ export const api = {
     });
   },
 
-  uploadResume(file: File) {
+  uploadResume(file: File, context: "onboarding" | "profile_update" = "profile_update") {
     const form = new FormData();
     form.append("resume", file);
+    form.append("context", context);
     return request<{
       success: boolean;
       data: {
@@ -305,26 +322,7 @@ export const api = {
   getSetupStatus() {
     return request<{
       success: boolean;
-      data: {
-        hasResume: boolean;
-        hasValidResume?: boolean;
-        hasEmailSetup: boolean;
-        hasAiSetup?: boolean;
-        activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
-        email?: string | null;
-        activeAiProvider?: {
-          id?: string;
-          provider: string;
-          selectedModel?: string | null;
-          label?: string | null;
-          providerType?: string;
-          allowPlatformFallback?: boolean;
-          healthStatus?: string;
-          inFallbackChain?: boolean;
-          priority?: number;
-        } | null;
-        aiCredentialChain?: AiCredentialSummary[];
-      };
+      data: SetupStatusData;
     }>("/api/user/setup-status", { method: "GET" });
   },
 

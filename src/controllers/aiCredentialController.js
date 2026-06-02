@@ -2,9 +2,34 @@ const { ok, error, ERROR_CODES } = require("../utils/response");
 const { logInfo, logError } = require("../utils/logger");
 const { listAllProviders } = require("../providers");
 const aiCredentialService = require("../services/aiCredentialService");
+const aiCredentialModel = require("../models/aiCredentialModel");
 const { healthCheck } = require("../services/aiGateway");
 const { validateModelForProvider } = require("../services/modelValidation");
 const { getProvider } = require("../providers");
+
+async function applyVerificationResult(userId, credentialId, health) {
+  if (health.ok) {
+    const row = await aiCredentialModel.updateCredentialVerification(credentialId, userId, {
+      credentialStatus: "valid",
+      lastValidatedAt: new Date(),
+    });
+    return { ok: true, row };
+  }
+
+  const isTimeout = health.code === "HEALTH_CHECK_TIMEOUT";
+  await aiCredentialModel.updateCredentialVerification(credentialId, userId, {
+    credentialStatus: "invalid",
+    lastValidatedAt: null,
+  });
+
+  return {
+    ok: false,
+    code: isTimeout ? "AI_VALIDATION_TIMEOUT" : health.code || "CONNECTION_TEST_FAILED",
+    message: isTimeout
+      ? "Provider validation timed out"
+      : health.error || "Connection test failed",
+  };
+}
 
 const listProvidersController = async (_req, res) => {
   return ok(res, { providers: listAllProviders() });
@@ -51,19 +76,6 @@ const saveCredentialController = async (req, res) => {
       return error(res, 400, validation.message, validation.code || ERROR_CODES.BAD_REQUEST);
     }
 
-    const health = await healthCheck({
-      userId: req.user.id,
-      provider,
-      model: validation.model,
-      apiKey: pType === "remote" ? apiKey : undefined,
-      baseUrl,
-      providerType: pType,
-    });
-
-    if (!health.ok) {
-      return error(res, 400, health.error || "Connection test failed", "CONNECTION_TEST_FAILED");
-    }
-
     const saved = await aiCredentialService.saveCredential(req.user.id, {
       provider,
       apiKey,
@@ -75,6 +87,21 @@ const saveCredentialController = async (req, res) => {
       role: role || "primary",
     });
 
+    const health = await healthCheck({
+      userId: req.user.id,
+      provider,
+      credentialId: saved.id,
+      model: validation.model,
+      apiKey: pType === "remote" ? apiKey : undefined,
+      baseUrl,
+      providerType: pType,
+    });
+
+    const verification = await applyVerificationResult(req.user.id, saved.id, health);
+    if (!verification.ok) {
+      return error(res, 400, verification.message, verification.code);
+    }
+
     logInfo("AI_CREDENTIAL_SAVED", {
       reqId,
       userId: req.user.id,
@@ -83,7 +110,7 @@ const saveCredentialController = async (req, res) => {
       model: validation.model,
     });
     return ok(res, {
-      ...saved,
+      ...verification.row,
       ...(validation.normalizedFrom ? { normalizedFrom: validation.normalizedFrom } : {}),
     });
   } catch (err) {
