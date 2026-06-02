@@ -130,6 +130,33 @@ const setUserDefaults = async (userId, { defaultResumeId }) => {
  * Auto-populate the default resume on first upload.
  * Only updates if it's currently NULL (idempotent/non-destructive).
  */
+async function getEmailPreferenceLevels(userId) {
+  const { rows } = await pool.query(
+    `SELECT email_tone_level as "emailToneLevel",
+            email_structure_level as "emailStructureLevel"
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+  if (!rows.length) return null;
+  return rows[0];
+}
+
+async function setEmailPreferenceLevels(userId, { emailToneLevel, emailStructureLevel }) {
+  const { clampLevel } = require("../services/emailPreferenceMapper");
+  const tone = clampLevel(emailToneLevel, 50);
+  const structure = clampLevel(emailStructureLevel, 60);
+  const { rows } = await pool.query(
+    `UPDATE users
+     SET email_tone_level = $2,
+         email_structure_level = $3
+     WHERE id = $1
+     RETURNING email_tone_level as "emailToneLevel",
+               email_structure_level as "emailStructureLevel"`,
+    [userId, tone, structure]
+  );
+  return rows[0] || null;
+}
+
 const autoPopulateDefaultResume = async (userId, resumeId) => {
   const { rows } = await pool.query(
     `UPDATE users 
@@ -150,5 +177,7 @@ module.exports = {
   touchUserLastLogin,
   getUserDefaults,
   setUserDefaults,
+  getEmailPreferenceLevels,
+  setEmailPreferenceLevels,
   autoPopulateDefaultResume,
 };

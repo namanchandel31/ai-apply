@@ -1,6 +1,10 @@
 const express = require('express');
 const { getUserDefaultsController, setUserDefaultsController } = require('../controllers/userDefaultsController');
 const { getSetupStatusController, getMeController } = require('../controllers/userController');
+const {
+  getEmailPreferencesController,
+  patchEmailPreferencesController,
+} = require('../controllers/userEmailPreferencesController');
 const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
@@ -73,5 +77,8 @@ router.put('/user/defaults', supabaseAuthMiddleware, setUserDefaultsController);
  *         description: Setup status returned successfully
  */
 router.get('/user/setup-status', supabaseAuthMiddleware, getSetupStatusController);
+
+router.get('/user/email-preferences', supabaseAuthMiddleware, getEmailPreferencesController);
+router.patch('/user/email-preferences', supabaseAuthMiddleware, patchEmailPreferencesController);
 
 module.exports = router;

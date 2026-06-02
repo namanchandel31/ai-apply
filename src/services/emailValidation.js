@@ -210,12 +210,69 @@ function computeCompositeRisk(signals) {
   return clampScore(total / w);
 }
 
+function hasGreetingLikeOpening(body) {
+  const first = firstParagraph(body).trim().toLowerCase();
+  return /^(hi|hello|dear|good morning|good afternoon)\b/.test(first);
+}
+
+function hasSignoffLikeClosing(body) {
+  const tail = body.trim().slice(-120).toLowerCase();
+  return (
+    /\b(best|regards|sincerely|thanks|thank you|cheers|kind regards)\b/.test(tail) ||
+    /\n[A-Z][a-z]+(\s+[A-Z][a-z]+)?\s*$/.test(body.trim())
+  );
+}
+
+function validateEmailStructure(body, context = {}) {
+  const validationWarnings = [];
+  const hardFailures = [];
+  const structureMode = context.emailPreferences?.structureMode || "balanced";
+  const wc = wordCount(body);
+  const paras = splitParagraphs(body);
+
+  if (structureMode === "structured" || structureMode === "highly_scannable") {
+    if (paras.length < 2) {
+      hardFailures.push("broken_structure:missing_paragraph_separation");
+    }
+    const maxParaWords = structureMode === "highly_scannable" ? 100 : 140;
+    for (const p of paras) {
+      if (wordCount(p) > maxParaWords) {
+        hardFailures.push("broken_structure:wall_of_text");
+        break;
+      }
+    }
+  }
+
+  if (paras.length === 1 && wc > 180) {
+    hardFailures.push("broken_structure:wall_of_text");
+  }
+
+  if (!hasGreetingLikeOpening(body)) {
+    validationWarnings.push("structure:greeting_missing");
+  }
+  if (!hasSignoffLikeClosing(body)) {
+    validationWarnings.push("structure:signoff_missing");
+  }
+
+  const range = context.emailPreferences?.targetWordRange;
+  if (range) {
+    if (wc < range.min * 0.6) {
+      validationWarnings.push(`length:below_target:${wc}`);
+    } else if (wc > range.max * 1.35) {
+      validationWarnings.push(`length:above_target:${wc}`);
+    }
+  }
+
+  return { hardFailures, validationWarnings };
+}
+
 /**
  * Weighted validation — soft signals + hard failures only for severe issues.
  */
 function validateGeneratedEmail({ subject, body }, context = {}) {
   const sanitizedBody = body || "";
   const hardFailures = [];
+  const validationWarnings = [];
 
   if (!sanitizedBody.trim()) {
     hardFailures.push("broken_structure:empty_body");
@@ -230,14 +287,14 @@ function validateGeneratedEmail({ subject, body }, context = {}) {
   }
 
   const wc = wordCount(sanitizedBody);
-  if (wc < 100 || wc > 240) {
-    hardFailures.push(`invalid_length:${wc}_words`);
-  }
-
   const paras = splitParagraphs(sanitizedBody);
   if (paras.length === 1 && wc > 180) {
     hardFailures.push("broken_structure:wall_of_text");
   }
+
+  const structureResult = validateEmailStructure(sanitizedBody, context);
+  hardFailures.push(...structureResult.hardFailures);
+  validationWarnings.push(...structureResult.validationWarnings);
 
   const opening = firstParagraph(sanitizedBody).toLowerCase();
   const genericHits = GENERIC_OPENERS.filter((p) => opening.includes(p)).length;
@@ -279,6 +336,7 @@ function validateGeneratedEmail({ subject, body }, context = {}) {
 
   return {
     hardFailures,
+    validationWarnings,
     validationSignals,
     compositeRisk,
     shouldRetry,
@@ -288,5 +346,6 @@ function validateGeneratedEmail({ subject, body }, context = {}) {
 
 module.exports = {
   validateGeneratedEmail,
+  validateEmailStructure,
   BANNED_PHRASES,
 };

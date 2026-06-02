@@ -5,7 +5,7 @@ const { logInfo, logError } = require("../utils/logger");
 const { generateStructuredJson } = require("./aiGateway");
 const {
   PROMPT_VERSION,
-  SYSTEM_PROMPT,
+  buildSystemPrompt,
   buildEmailUserPrompt,
   buildRetryUserPrompt,
 } = require("../prompts/emailGeneratePrompt");
@@ -66,11 +66,11 @@ function shouldTriggerRetry(validation, scores) {
   return false;
 }
 
-async function callEmailLlm(userId, userPrompt, logMeta) {
+async function callEmailLlm(userId, userPrompt, logMeta, systemPrompt) {
   const parsed = await generateStructuredJson({
     userId,
     task: "email_generate",
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     userPrompt,
     promptVersion: PROMPT_VERSION,
     reqId: logMeta.reqId,
@@ -141,6 +141,14 @@ function buildEmailMetadata({
       generationTimeMs,
       retryCount,
       toneType: context.toneType,
+      emailToneLevel: context.emailPreferences?.emailToneLevel,
+      toneProfile: context.emailPreferences?.toneProfile,
+      emailStructureLevel: context.emailPreferences?.emailStructureLevel,
+      structureMode: context.emailPreferences?.structureMode,
+      selectedPreset: context.emailPreferences?.selectedPreset,
+      targetWordRange: context.emailPreferences?.targetWordRange,
+      generationSnapshot: context.generationSnapshot || null,
+      validationWarnings: run.validation.validationWarnings || [],
       personalizationUsed: context.personalizationUsed || [],
       wordCount: wordCount(run.draft.body),
       validationSignals: run.validation.validationSignals,
@@ -176,7 +184,16 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
   }
 
   const startedAt = Date.now();
-  logInfo("email_generation_start", { ...logMeta, task: "email_generate", promptVersion: PROMPT_VERSION });
+  const systemPrompt = buildSystemPrompt(context.emailPreferences?.targetWordRange);
+  logInfo("email_generation_start", {
+    ...logMeta,
+    task: "email_generate",
+    promptVersion: PROMPT_VERSION,
+    toneProfile: context.emailPreferences?.toneProfile,
+    structureMode: context.emailPreferences?.structureMode,
+    selectedPreset: context.emailPreferences?.selectedPreset,
+    generationSnapshot: context.generationSnapshot,
+  });
 
   const history = [];
   let retryCount = 0;
@@ -190,9 +207,10 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
       match: context.match,
       toneContext: context.toneContext,
       personalizationContext: context.personalizationContext,
+      emailPreferences: context.emailPreferences,
     });
 
-    let rawDraft = await callEmailLlm(userId, userPrompt, logMeta);
+    let rawDraft = await callEmailLlm(userId, userPrompt, logMeta, systemPrompt);
     let evaluated = evaluateDraft(rawDraft, context);
     history.push({
       attempt: "initial",
@@ -233,7 +251,7 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
       });
 
       retryCount = 1;
-      const retryRaw = await callEmailLlm(userId, retryPrompt, logMeta);
+      const retryRaw = await callEmailLlm(userId, retryPrompt, logMeta, systemPrompt);
       const retryEvaluated = evaluateDraft(retryRaw, context);
       history.push({
         attempt: "retry",

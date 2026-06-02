@@ -1,10 +1,22 @@
 const { inferToneContext } = require("./emailToneInference");
 const { buildPersonalizationContext } = require("./emailPersonalizationContext");
+const {
+  resolveEmailPreferences,
+  blendToneContext,
+  buildGenerationSnapshot,
+} = require("./emailPreferenceMapper");
 
 /**
- * Build generation context from parsed JD, resume, and match result.
+ * Build generation context from parsed JD, resume, match result, and user email prefs.
  */
-function buildEmailGenerationContext({ rawJdText, parsedJd, resumeParsedJson, matchResult }) {
+function buildEmailGenerationContext({
+  rawJdText,
+  parsedJd,
+  resumeParsedJson,
+  matchResult,
+  emailToneLevel = 50,
+  emailStructureLevel = 60,
+}) {
   const experience = (resumeParsedJson?.experience || []).slice(0, 3).map((exp) => ({
     company: exp.company,
     role: exp.role,
@@ -43,7 +55,16 @@ function buildEmailGenerationContext({ rawJdText, parsedJd, resumeParsedJson, ma
     missingSkills: matchResult?.missingSkills || [],
   };
 
-  const toneContext = inferToneContext({ rawJdText: rawJdText || "", parsedJd });
+  const jdTone = inferToneContext({ rawJdText: rawJdText || "", parsedJd });
+  const emailPrefs = resolveEmailPreferences({
+    emailToneLevel,
+    emailStructureLevel,
+    job,
+    candidate,
+    resumeParsedJson,
+  });
+  const toneContext = blendToneContext(jdTone, emailPrefs.toneProfile);
+
   const { personalizationContext, personalizationUsed } = buildPersonalizationContext({
     rawJdText: rawJdText || "",
     parsedJd,
@@ -55,12 +76,16 @@ function buildEmailGenerationContext({ rawJdText, parsedJd, resumeParsedJson, ma
     ...job.requiredSkills.map((s) => String(s).toLowerCase()),
   ]);
 
+  const generationSnapshot = buildGenerationSnapshot(emailPrefs);
+
   return {
     candidate,
     job,
     match,
     toneContext,
     toneType: toneContext.toneType,
+    emailPreferences: emailPrefs,
+    generationSnapshot,
     personalizationContext,
     personalizationUsed,
     allowedTools: [...allowedTools],

@@ -26,6 +26,7 @@ const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/ui
 const { computeMatch } = require("../services/matchingService");
 const { generateApplicationEmail } = require("../services/emailService");
 const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
+const { getEmailPreferenceLevels } = require("../models/userModel");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
 const { logInfo, logError } = require("../utils/logger");
@@ -148,11 +149,17 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     const company = (parsedJd.company_name || "").toLowerCase().trim();
     const contactEmail = parsedJd.contact_email;
 
+    const prefLevels = (await getEmailPreferenceLevels(userId)) || {
+      emailToneLevel: 50,
+      emailStructureLevel: 60,
+    };
     const emailContext = buildEmailGenerationContext({
       rawJdText: rawText,
       parsedJd,
       resumeParsedJson: resume.parsedJson,
       matchResult,
+      emailToneLevel: prefLevels.emailToneLevel,
+      emailStructureLevel: prefLevels.emailStructureLevel,
     });
 
     const cachedEmail = await generateApplicationEmail(emailContext, {
@@ -191,6 +198,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
         match_score_snapshot: matchResult.score,
         email_metadata: cachedEmail.emailMetadata,
         email_feedback_signals: cachedEmail.emailFeedbackSignals,
+        email_preferences_snapshot: emailContext.generationSnapshot,
       },
       userId,
       client

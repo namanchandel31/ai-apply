@@ -12,6 +12,8 @@ import { LoadingTimer } from "@/components/loading-timer";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { AlertCircle, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { EmailPreferencesCard } from "@/components/EmailPreferencesCard";
+
 export function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -176,6 +178,10 @@ export function Dashboard() {
             </Card>
           </>
         )}
+      </div>
+
+      <div className="max-w-4xl mx-auto">
+        <EmailPreferencesCard variant="compact" />
       </div>
 
       <Card className="max-w-4xl mx-auto border-2 shadow-sm">

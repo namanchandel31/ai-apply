@@ -5,6 +5,7 @@ const { getJDById } = require("../models/jdModel");
 const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail, RetryableError } = require("./emailService");
 const { buildEmailGenerationContext } = require("./emailContextBuilder");
+const { getEmailPreferenceLevels } = require("../models/userModel");
 const { logInfo, logError } = require("../utils/logger");
 
 /**
@@ -86,6 +87,7 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
     const applicationId = crypto.randomUUID();
     const rawJdText = jd.rawText || jd.raw_text || "";
     let cachedEmail = null;
+    let generationSnapshot = null;
 
     // 4. Resilient Generation Loop
     const savedApp = await withRetry(async (attempt) => {
@@ -94,12 +96,19 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
         if (!cachedEmail) {
           logInfo("email_generation_start", { reqId, resumeId, jobDescriptionId, attempt });
           
+          const prefLevels = (await getEmailPreferenceLevels(userId)) || {
+            emailToneLevel: 50,
+            emailStructureLevel: 60,
+          };
           const emailContext = buildEmailGenerationContext({
             rawJdText,
             parsedJd: jd.parsedJson,
             resumeParsedJson: resume.parsedJson,
             matchResult,
+            emailToneLevel: prefLevels.emailToneLevel,
+            emailStructureLevel: prefLevels.emailStructureLevel,
           });
+          generationSnapshot = emailContext.generationSnapshot;
 
           cachedEmail = await generateApplicationEmail(emailContext, {
             reqId,
@@ -121,6 +130,7 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
           emailBody: cachedEmail.body,
           emailMetadata: cachedEmail.emailMetadata,
           emailFeedbackSignals: cachedEmail.emailFeedbackSignals,
+          emailPreferencesSnapshot: generationSnapshot,
           userId,
           client
         });

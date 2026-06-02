@@ -209,6 +209,14 @@ async function requestApplicationStatus(
   };
 }
 
+export type EmailPreferencesData = {
+  emailToneLevel: number;
+  emailStructureLevel: number;
+  selectedPreset: string;
+  toneProfile: string;
+  structureMode: string;
+};
+
 export type SetupStatusData = {
   hasResume: boolean;
   hasValidResume?: boolean;
@@ -317,6 +325,24 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
     });
+  },
+
+  getEmailPreferences() {
+    return request<{ success: boolean; data: EmailPreferencesData }>(
+      "/api/user/email-preferences",
+      { method: "GET" }
+    );
+  },
+
+  patchEmailPreferences(body: { emailToneLevel?: number; emailStructureLevel?: number }) {
+    return request<{ success: boolean; data: EmailPreferencesData }>(
+      "/api/user/email-preferences",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
   },
 
   getSetupStatus() {

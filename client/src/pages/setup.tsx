@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { EmailStatusCard } from "@/components/EmailStatusCard";
+import { EmailPreferencesCard } from "@/components/EmailPreferencesCard";
 import { ResumeStatusCard } from "@/components/ResumeStatusCard";
 import { AiProviderStatusCard } from "@/components/AiProviderStatusCard";
 import { useQueryClient } from "@tanstack/react-query";
@@ -74,6 +75,7 @@ export function Setup() {
             defaultExpanded={expandEmail}
           />
         </div>
+        <EmailPreferencesCard />
       </div>
     </div>
   );

@@ -1,13 +1,13 @@
-const PROMPT_VERSION = "email_generate_v2";
+const PROMPT_VERSION = "email_generate_v3";
 
-const SYSTEM_PROMPT = `You write real job application emails that sound like a competent professional reaching out directly.
+const SYSTEM_PROMPT_BASE = `You write real job application emails that sound like a competent professional reaching out directly.
 
 Target: credible, easy to skim in a few seconds. NOT perfect writing, NOT a cover letter, NOT LinkedIn-influencer tone.
 
 Output ONLY valid JSON:
 {
   "subject": "string (5-120 chars)",
-  "body": "string (plain text, 120-220 words)"
+  "body": "string (plain text)"
 }
 
 STRICT BANS (never use):
@@ -15,28 +15,26 @@ STRICT BANS (never use):
 - "I can contribute immediately", "I am passionate about", "thrilled to", "delve"
 - "not just X, but Y", "whether it's"
 - Em dash (—) or en dash (–). Use commas and periods only.
-- Markdown, bullet lists, bold, headers
+- Markdown headers or bold
 - Tool/stack dumping unless tools appear in BOTH job requirements AND candidate data provided
 - Invented experience, companies, years, tools, relocation, or visa/work authorization
 
 WRITING STYLE:
-- 120-220 words, lightweight email
 - Role and company referenced naturally in the first 1-2 sentences (Gmail preview survival)
 - Mention 2-4 matching skills/experiences from provided data only
-- Slight natural imperfection OK: uneven paragraph sizes, varied sentence length, not every paragraph symmetrical
-- Do NOT over-polish transitions or make every sentence equally smooth
+- Slight natural imperfection OK: uneven paragraph sizes, varied sentence length
 - Vary sentence openings; avoid three consecutive "I have" / "I am" starts
-- Use tone guidance from user prompt (startup/enterprise/agency/remote) as style hints, NOT fill-in templates
+- Use tone guidance as style hints, NOT fill-in templates
 - Busy-professional tone: direct, grounded, specific, respectful
+- As short as possible, as long as necessary for the target word range`;
 
-STRUCTURE:
-- Greeting
-- Short personalized opening with early relevance
-- Why candidate fits THIS role (specific)
-- 2-4 matching points from provided data
-- Resume attachment mention (natural, brief)
-- Short CTA
-- Professional signoff with candidate name if provided`;
+function buildSystemPrompt(targetWordRange) {
+  const min = targetWordRange?.min ?? 120;
+  const max = targetWordRange?.max ?? 220;
+  return `${SYSTEM_PROMPT_BASE}\n- Target length: approximately ${min}-${max} words (guidance, not a rigid limit)`;
+}
+
+const SYSTEM_PROMPT = buildSystemPrompt({ min: 120, max: 220 });
 
 function formatCandidateBlock(candidate) {
   const lines = [];
@@ -70,13 +68,54 @@ function formatJobBlock(job) {
 
 function formatToneBlock(toneContext) {
   if (!toneContext) return "";
-  return [
+  const lines = [
     "Tone guidance (adapt style, do not copy templates):",
     `- Company style: ${toneContext.companyStyle}`,
     `- Communication: ${toneContext.communicationTone}`,
     `- Hiring signal: ${toneContext.hiringSignal}`,
     `- Environment: ${toneContext.environmentType}`,
-  ].join("\n");
+  ];
+  if (toneContext.userToneProfile) {
+    lines.push(`- User formality preference: ${toneContext.userToneProfile}`);
+  }
+  return lines.join("\n");
+}
+
+function formatUserToneBlock(toneProfile) {
+  const hints = {
+    casual: "Warmer, slightly informal phrasing while staying professional. Short sentences OK.",
+    balanced: "Friendly professional. Direct, approachable, not stiff.",
+    professional: "Concise business tone. Precise, respectful, no slang.",
+    executive: "Formal and measured. Authoritative without filler or hype.",
+  };
+  return `User tone profile (${toneProfile}): ${hints[toneProfile] || hints.balanced}`;
+}
+
+function formatStructureBlock(structureMode) {
+  const blocks = {
+    conversational:
+      "Structure: 2-3 flowing paragraphs. Natural transitions. Minimal line breaks.",
+    balanced:
+      "Structure: Greeting, opening hook, fit paragraph (2-4 specific points), brief resume mention, CTA, sign-off. Use blank lines between sections.",
+    structured:
+      "Structure: Clearly separated sections with blank lines — greeting, hook, why I fit (short lines or tight paragraph), resume mention, CTA, sign-off.",
+    highly_scannable:
+      "Structure: Greeting, one-line hook, fit as 2-5 short lines each starting with - (plain hyphen bullets only, no markdown), brief resume mention, CTA, sign-off. Optimize for mobile skim.",
+  };
+  return blocks[structureMode] || blocks.balanced;
+}
+
+function formatLengthGuidance(targetWordRange, seniorityBand) {
+  if (!targetWordRange) return "";
+  return [
+    `Length guidance: aim for ${targetWordRange.min}-${targetWordRange.max} words.`,
+    seniorityBand
+      ? `Seniority context: ${seniorityBand} — more senior roles may use slightly more evidence; stay within range.`
+      : "",
+    "Do not pad with generic filler to hit word count.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function formatPersonalizationBlock(personalizationContext) {
@@ -98,6 +137,7 @@ function buildEmailUserPrompt({
   match,
   toneContext,
   personalizationContext,
+  emailPreferences,
 }) {
   let matchGuidance;
   if (match.score === 0 || !match.matchedSkills?.length) {
@@ -117,6 +157,19 @@ function buildEmailUserPrompt({
     relocationNote.push("Remote role: mention async/ownership only if natural, not as buzzwords.");
   }
 
+  const prefBlocks = [];
+  if (emailPreferences?.toneProfile) {
+    prefBlocks.push(formatUserToneBlock(emailPreferences.toneProfile));
+  }
+  if (emailPreferences?.structureMode) {
+    prefBlocks.push(formatStructureBlock(emailPreferences.structureMode));
+  }
+  if (emailPreferences?.targetWordRange) {
+    prefBlocks.push(
+      formatLengthGuidance(emailPreferences.targetWordRange, emailPreferences.seniorityBand)
+    );
+  }
+
   return [
     "Analyze the job and candidate data below, then write the email.",
     "",
@@ -131,6 +184,8 @@ function buildEmailUserPrompt({
     match.score > 0 ? `Match score: ${match.score}%` : "",
     "",
     formatToneBlock(toneContext),
+    "",
+    ...prefBlocks,
     "",
     formatPersonalizationBlock(personalizationContext),
     relocationNote.length ? relocationNote.join("\n") : "",
@@ -172,6 +227,9 @@ function buildRetryUserPrompt({
 module.exports = {
   PROMPT_VERSION,
   SYSTEM_PROMPT,
+  buildSystemPrompt,
   buildEmailUserPrompt,
   buildRetryUserPrompt,
+  formatUserToneBlock,
+  formatStructureBlock,
 };
