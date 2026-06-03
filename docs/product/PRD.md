@@ -2,7 +2,7 @@
 
 > **Audience:** Product managers, stakeholders, design, and business partners  
 > **Last updated:** June 2, 2026  
-> **Companion doc:** [Technical PRD](./Technical-PRD.md) · [Engineering hub](../README.md)
+> **Companion docs:** [Technical PRD](./Technical-PRD.md) · [Upcoming features](./upcoming-features.md) · [Engineering hub](../README.md)
 
 ---
 
@@ -26,7 +26,7 @@
 
 **Direction:** Evolve from “AI email tool” to a **career operating system** — apply faster, stay organized, apply smarter (see §4).
 
-**Next focus (P0):** Onboarding, trusted AI models, applicant profile data, JD-aware email generation, tone + structure.
+**Planned work:** See [Upcoming features](./upcoming-features.md) for the prioritized checklist backlog.
 
 ---
 
@@ -157,9 +157,9 @@ Derived status — not raw DB enums.
 
 ---
 
-## 8. Product status & roadmap
+## 8. Product status
 
-Single source of truth for what exists, what’s broken, and what’s next.
+What exists today and known gaps. **Backlog and specs:** [upcoming-features.md](./upcoming-features.md).
 
 ### 8.1 Shipped
 
@@ -173,6 +173,7 @@ Single source of truth for what exists, what’s broken, and what’s next.
 | Email | LLM subject/body; Gmail SMTP |
 | Lifecycle | Retry, continue (needs review), cancel |
 | AI | BYOK, provider chain, health check |
+| Email prefs | Tone + structure sliders; preset derivation; generation snapshot on apply |
 
 ### 8.2 Known gaps (in progress)
 
@@ -181,127 +182,9 @@ Single source of truth for what exists, what’s broken, and what’s next.
 | Resume parsing on some free models | Timeouts, 429s — see engineering failure log |
 | Slow-feeling resume upload | Some paths still HTTP-bound vs worker-owned |
 
-### 8.3 Prioritized backlog
-
-| Pri | Feature | Outcome |
-| --- | --- | --- |
-| **P0** | [Applicant profile](#p0-applicant-profile) | Reusable CTC, notice period, locations, links for all AI flows |
-| **P0** | [Guided onboarding](#p0-guided-onboarding) | API key → resume → profile → Gmail with in-product guidance |
-| **P0** | [Validated AI models](#p0-validated-ai-models) | Provider → one key → curated model dropdown (Gemini 2.5 Lite first) |
-| **P0** | [JD instruction compliance](#p0-jd-instruction-compliance) | Follow JD subject/format/field asks; omit missing data silently |
-| **P0** | [Email tone slider](#p0-email-tone) | Casual ↔ professional, persisted default |
-| **P0** | [Structured emails](#p0-structured-emails) | Scannable sections, not one paragraph |
-| **P1** | [LinkedIn extension](#p1-linkedin-extension) | Apply from job post in ≤2 clicks |
-| **P1** | [Multi-resume profiles](#p1-multi-resume) | Auto-pick resume by JD; attach correct PDF |
-| P2 | Recruiter response tracking | Enable future North Star (response rate) |
-| P2 | Email edit / regenerate in UI | Fix drafts without full re-parse |
-| P2 | Application analytics | Volume, send rate, match distribution |
-| P3 | Team seats, priority tier | Monetization + scale |
-
-### 8.4 Release phases
-
-| Phase | Theme | Deliverables |
-| --- | --- | --- |
-| **Now** | Core loop | Shipped items in §8.1 |
-| **Next** | P0 | Profile, onboarding, models, JD compliance, tone, structure |
-| **Then** | P1 | LinkedIn extension, multi-resume |
-| **After** | P2+ | Response tracking, analytics, engagement signals |
-| **Later** | Platform | Managed AI (Premium), semantic search, integrations |
-
 ---
 
-## 9. Feature specifications (planned)
-
-Detailed requirements for near-term work. Shipped behavior is summarized in §8.1 only.
-
-### P0 — Applicant profile
-
-**Problem:** CTC, notice period, locations, and links are re-entered or missing from emails; JDs often require them.
-
-**Solution:** First-class **Applicant Profile** — reusable domain object for all AI workflows (email, JD compliance, extension, future intelligence).
-
-| Field group | Fields |
-| --- | --- |
-| Compensation | Current CTC (amount + currency), expected CTC (amount + currency) |
-| Availability | Notice period: Immediate · 15 · 30 · 45 · 60 · 90 days · Negotiable |
-| Preferences | `preferred_locations` JSON array — e.g. `["Remote"]`, `["Remote","Bangalore"]` |
-| Links | LinkedIn, portfolio, GitHub (validated URLs) |
-| Meta | `profile_completion_percent` (0–100) |
-
-**Completeness (8 fields):** Resume uploaded · current CTC · expected CTC · notice period · preferred locations · LinkedIn · portfolio · GitHub.
-
-**Resume parse integration:** Extract links/location with confidence — auto-fill if >0.9, confirm if 0.6–0.9, ignore if <0.6. Never hallucinate. Parse failure must not block resume upload.
-
-**AI rules:** Inject profile into every generation request. When JD asks for CTC/notice/location/links: include if present, **omit silently** if absent — never "N/A" or apologies.
-
-**Audit:** Store `application_generation_context` snapshot per application so later profile edits do not rewrite history.
-
-**Setup:** Dedicated Profile card — Incomplete / Partial / Complete with e.g. `6/8 fields completed`.
-
----
-
-### P0 — Guided onboarding
-
-**Problem:** Users don’t know credential order; resume parse fails without AI key.
-
-**Flow:** (1) Add & validate AI API key → (2) Upload resume → (3) Complete applicant profile → (4) Gmail app password → (5) Ready + first apply CTA.
-
-**Rules:** First Google login enters onboarding; resume step gated on valid AI key; resumable if user leaves mid-flow.
-
----
-
-### P0 — Validated AI models
-
-**Problem:** Free-text model names cause misconfiguration and failures.
-
-**Flow:** Select provider → paste **one API key per provider** → choose model from **manually curated** list (start: **Gemini 2.5 Lite**). No auto-discovery of models.
-
-**Rules:** New models only after internal QA. Provider-scoped dropdown. Runtime fallback to trusted default if needed.
-
----
-
-### P0 — JD instruction compliance
-
-**Problem:** JDs specify subject format (`Name - Role`) and required fields (CTC, notice, etc.); generation ignores or invents missing values.
-
-**Solution:** Extract instructions → merge with applicant profile → generate with compliance checklist.
-
-| Rule | Behavior |
-| --- | --- |
-| JD specifies format | Follow when parseable |
-| JD asks for field | Include only if profile has value |
-| Field missing | Omit completely — no placeholder or apology |
-| Conflict with safety | Fall back to standard template |
-
-**Acceptance:** ≥95% subject-format compliance when instructions parseable; preview shows Applied / Partial / Fallback.
-
----
-
-### P0 — Email tone
-
-Slider (casual ↔ professional) in Setup/Dashboard; persisted default; drives `toneType` in generation. Optional per-application override before send.
-
----
-
-### P0 — Structured emails
-
-Required sections: greeting · opening hook · fit (bullets/short lines) · CTA · sign-off. Validator + one auto-rewrite if structure fails. Target ≥95% compliance.
-
----
-
-### P1 — LinkedIn extension
-
-Chrome extension: **Apply with One Tap** on job posts → extract JD → same API pipeline as dashboard. No auto-click Easy Apply. Graceful fallback to web app.
-
----
-
-### P1 — Multi-resume profiles
-
-Multiple labeled resumes; auto-select best match for JD; user can override; attach selected PDF on send. List shows profile label.
-
----
-
-## 10. Use cases
+## 9. Use cases
 
 | ID | Scenario | Actor | Success |
 | --- | --- | --- | --- |
@@ -312,17 +195,12 @@ Multiple labeled resumes; auto-select best match for JD; user can override; atta
 | UC-05 | Volume operations | Volume Alex | Filter/sort applications at scale |
 | UC-06 | BYOK fallback | Builder Blake | Chain uses user keys first |
 | UC-07 | Cancel | Any user | Terminal cancelled; no further send |
-| UC-08 | Tone preference | Careful Casey | Professional tone + structured body |
-| UC-09 | JD-specific subject/fields | Any user | Subject matches JD; only provided fields included |
-| UC-10 | Trusted model setup | New user | Provider → key → Gemini 2.5 Lite from dropdown |
-| UC-11 | Onboarding order | New user | API key before resume parse; guided Gmail setup |
-| UC-12 | Applicant profile in email | Any user | JD asks CTC → included from profile or omitted |
-| UC-13 | LinkedIn apply | Volume Alex | Extension queues app; same statuses as dashboard |
-| UC-14 | Multi-resume routing | Volume Alex | Correct profile selected and attached |
+
+Planned scenarios (UC-08–UC-14): [upcoming-features.md](./upcoming-features.md#product-use-cases-planned--acceptance).
 
 ---
 
-## 11. Business model & pricing
+## 10. Business model & pricing
 
 ### Philosophy
 
@@ -361,7 +239,7 @@ Multiple labeled resumes; auto-select best match for JD; user can override; atta
 
 ---
 
-## 12. Constraints, risks & out of scope
+## 11. Constraints, risks & out of scope
 
 ### Constraints
 
@@ -369,7 +247,7 @@ Multiple labeled resumes; auto-select best match for JD; user can override; atta
 | --- | --- |
 | Gmail app password | 2FA + education required |
 | BYOK (typical) | User brings AI key; lower COGS, more setup |
-| Single resume (today) | Multi-resume is P1 |
+| Single resume (today) | Multi-resume planned — see upcoming features |
 | English-first | Parsing/prompts tuned for English JDs |
 | Async long work | UI must not imply instant completion |
 
@@ -378,11 +256,10 @@ Multiple labeled resumes; auto-select best match for JD; user can override; atta
 | Risk | Mitigation |
 | --- | --- |
 | AI timeouts / 429s | Trusted models, credential chain, worker retries |
-| Wrong model selection | P0 curated dropdown |
+| Wrong model selection | Curated model dropdown (planned) |
 | Missing recruiter email | Needs-review + continue (shipped) |
-| Weak onboarding | P0 guided flow, API key first |
-| Unstructured emails | P0 tone + structure + JD compliance |
-| No reply tracking yet | P2 response tracking → future North Star |
+| Weak onboarding | Guided flow (planned) |
+| No reply tracking yet | Response tracking (planned) → future North Star |
 
 ### Out of scope
 
@@ -390,7 +267,7 @@ Cover letters for non-email portals · auto LinkedIn Easy Apply · legal review 
 
 ---
 
-## 13. Glossary
+## 12. Glossary
 
 | Term | Definition |
 | --- | --- |
@@ -405,11 +282,11 @@ Cover letters for non-email portals · auto LinkedIn Easy Apply · legal review 
 
 ---
 
-## 14. References
+## 13. References
 
 - [Technical PRD](./Technical-PRD.md) — architecture, APIs, implementation
+- [Upcoming features](./upcoming-features.md) — backlog checklist (P0–P3)
 - [Engineering glossary](../glossary.md)
-- [Future architecture](../roadmap/future-architecture.md)
 
 ---
 

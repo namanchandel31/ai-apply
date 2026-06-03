@@ -1,9 +1,9 @@
 # One Tap — Technical Product Requirements Document (Technical PRD)
 
 > **Audience:** Engineers, architects, DevOps, security reviewers  
-> **Last updated:** June 1, 2026  
+> **Last updated:** June 2, 2026  
 > **Status:** Living document — code and `docs/` are source of truth where they conflict  
-> **Companion doc:** [Product PRD](./PRD.md)
+> **Companion docs:** [Product PRD](./PRD.md) · [Upcoming features](./upcoming-features.md)
 
 ---
 
@@ -36,12 +36,9 @@
 12. [Deployment & operations](#deployment--operations)
 13. [Implementation status](#implementation-status)
 14. [Technical debt & known issues](#technical-debt--known-issues)
-15. [Improvement scope (engineering)](#improvement-scope-engineering)
-16. [Feature scope (technical)](#feature-scope-technical)
-17. [Use cases (technical)](#use-cases-technical)
-18. [ADRs & conventions](#adrs--conventions)
-19. [Testing strategy](#testing-strategy)
-20. [Future architecture](#future-architecture)
+15. [Use cases (technical)](#use-cases-technical)
+16. [ADRs & conventions](#adrs--conventions)
+17. [Testing strategy](#testing-strategy)
 
 ---
 
@@ -557,18 +554,9 @@ Scale horizontally: `npm run worker` replicas.
 | Email feedback signals | Schema only; no product UI |
 | Provider capabilities (advanced) | Flags stubbed in `capabilities.js` |
 
-### Not implemented (documented only)
+### Planned (not in codebase)
 
-| Area | Reference |
-| --- | --- |
-| Recruiter response tracking pipeline | Product roadmap + `email_feedback_signals` hooks (schema present, full pipeline pending) |
-| JWT revocation / session store | `future-architecture.md`, security doc |
-| Priority queues / paid tier | `queues/scaling.md` |
-| WebSocket realtime | ADR-006 chose SSE |
-| Event partitioning/archival | ADR-007 future |
-| ATS ranking pipeline | `future-architecture.md` |
-| Semantic JD cache | Roadmap |
-| Postgres RLS | `supabase-auth-cutover.md` |
+See [upcoming-features.md](./upcoming-features.md) for the engineering and product checklist. Schema-only hooks today: `email_feedback_signals`, provider capability stubs in `capabilities.js`.
 
 ---
 
@@ -579,50 +567,15 @@ Scale horizontally: `npm run worker` replicas.
 | TD-1 | Free-tier LLM timeouts on resume parse | High | Remove free models; isolate AbortController per retry |
 | TD-2 | `llm_usage_logs` / `failed_parses` constraint failures under load | Medium | Fix migrations + error handling |
 | TD-3 | Combined API+worker on Render | Medium | Split when CPU saturates |
-| TD-4 | Dual path poll + SSE client CPU on large lists | Low | Adaptive subscribe (roadmap) |
+| TD-4 | Dual path poll + SSE client CPU on large lists | Low | Adaptive subscribe — see upcoming features |
 | TD-5 | Legacy `POST /api/apply/` | Low | Deprecate in docs/clients |
 | TD-6 | No token revocation | Medium | Session store ADR |
 
 **Internal log:** `failure-log.md` at repo root (resume parsing session).
 
----
+**Backlog:** [upcoming-features.md](./upcoming-features.md).
 
-## Improvement scope (engineering)
-
-### P0 — Reliability
-
-- [ ] Worker-isolated resume parsing (align with ADR-005)
-- [ ] Provider timeout separate from HTTP timeout
-- [ ] Production AI model allowlist (no free OpenRouter models)
-- [ ] Harden `failed_parses` and telemetry writes
-
-### P1 — Operability
-
-- [ ] Split Render services (API vs worker)
-- [ ] Redis dedicated instance per queue tier at scale
-- [ ] Materialized view or read replica for heavy list/status polls
-- [ ] Partition `application_events` by month
-
-### P2 — Platform
-
-- [ ] Implement `recordEmailFeedback` + webhook for bounces/replies
-- [ ] Build recruiter response tracking end-to-end (capture, normalize, attribute to application, and expose response-rate analytics)
-- [ ] Outbox pattern for exactly-once side effects
-- [ ] JWT revocation service
-- [ ] Supabase RLS policies matching `users.supabase_user_id`
-
-### P3 — AI platform
-
-- [ ] Embeddings for semantic match (capabilities flag)
-- [ ] Streaming partial generation to UI
-- [ ] Vision path for scanned resumes
-- [ ] ATS scoring microservice or queue
-
----
-
-## Feature scope (technical)
-
-### In scope (current sprint baseline)
+### Shipped technical acceptance (baseline)
 
 | Feature | Technical acceptance |
 | --- | --- |
@@ -634,21 +587,7 @@ Scale horizontally: `npm run worker` replicas.
 | Cancel | Terminal cancelled; send rejected |
 | Encrypt credentials | AES via `ENCRYPTION_KEY` |
 | Publish realtime | Deduped SSE payloads with version/epoch |
-
-### Planned next scope (north-star enabling)
-
-| Feature | Technical acceptance |
-| --- | --- |
-| Recruiter response tracking | Capture reply signals from supported channels, map responses to `application_id`, and persist normalized response events |
-| Response-rate analytics | Compute per-user and aggregate recruiter response rate from sent applications with auditable numerator/denominator definitions |
-| Response status visibility | Expose response state in applications API/UI without breaking four-layer truth model |
-
-### Out of scope (engineering)
-
-- Multi-region active-active
-- CRDT state sync
-- gRPC internal APIs
-- Non-Postgres primary store
+| Email preferences | User levels + snapshot on generate; mapper-driven prompts |
 
 ---
 
@@ -692,9 +631,7 @@ Scale horizontally: `npm run worker` replicas.
 
 ### TUC-07 — Recruiter response attribution
 
-**Given** an outbound email was sent for `application_id = A`  
-**When** a recruiter reply is captured from an integrated channel  
-**Then** system normalizes and attributes the response to `A`, updates response-tracking state, and includes the event in recruiter response-rate metrics
+**Planned** — see [upcoming-features.md](./upcoming-features.md#p2--engineering-platform).
 
 ---
 
@@ -734,32 +671,7 @@ Scale horizontally: `npm run worker` replicas.
 
 Run: `npm test`
 
-**Gap:** E2E Playwright not present in repo — recommend for release gates.
-
----
-
-## Future architecture
-
-Consolidated from [../roadmap/future-architecture.md](../roadmap/future-architecture.md):
-
-| Bottleneck | Evolution |
-| --- | --- |
-| `application_events` size | Partition/archive |
-| uiStatus complexity | Rule split + test matrix |
-| Single Redis | Tiered Redis |
-| Colocated workers | Separate `ai` vs `send` pools |
-| Poll + SSE | SSE-primary with adaptive subscribe |
-| Status bundle DB load | Read replica / materialized view |
-
-### Directional capabilities
-
-- WebSocket (optional, bidirectional)
-- Priority queues (paid tier)
-- CDC to warehouse
-- Semantic JD cache
-- Multi-region (hard — single-writer regions)
-
-**Do not implement from roadmap without new ADR.**
+**Gap:** E2E Playwright not present in repo — track in [upcoming-features.md](./upcoming-features.md).
 
 ---
 
@@ -793,6 +705,7 @@ ai-apply/
 | [../architecture/state-model.md](../architecture/state-model.md) | State |
 | [../glossary.md](../glossary.md) | Terms |
 | [./PRD.md](./PRD.md) | Product PRD |
+| [./upcoming-features.md](./upcoming-features.md) | Backlog checklist |
 
 ---
 
