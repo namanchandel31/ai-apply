@@ -1,12 +1,23 @@
 const { Queue } = require("bullmq");
 const config = require("../config");
-const { connection } = require("./connection");
+const { getBullmqConnectionOptions } = require("./connection");
+const { logBullmqComponentBinding } = require("../observability/redisDebugInstrumentation");
 const { QUEUE_NAMES } = require("../constants/queues");
 
 const QUEUE_NAME = QUEUE_NAMES.PROCESS_APPLICATION;
 
+const bullmqConnection = getBullmqConnectionOptions();
+
+logBullmqComponentBinding({
+  componentType: "queue",
+  componentName: QUEUE_NAME,
+  connection: null,
+  hypothesisId: "B",
+  extra: { blocking: false, dedicatedConnection: true },
+});
+
 const processApplicationQueue = new Queue(QUEUE_NAME, {
-  connection,
+  connection: bullmqConnection,
   defaultJobOptions: {
     attempts: config.queue.PROCESS_JOB_MAX_ATTEMPTS,
     backoff: { type: "exponential", delay: 2000 },

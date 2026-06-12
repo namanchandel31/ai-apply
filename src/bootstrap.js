@@ -26,10 +26,8 @@ registerGracefulShutdown();
 registerShutdownHook("workers", stopWorkers, { priority: 100 });
 registerShutdownHook("api", stopApi, { priority: 80 });
 registerShutdownHook("redis", async () => {
-  const { connection } = require("./queues/connection");
-  if (connection.status !== "end") {
-    await connection.quit();
-  }
+  const { closeBullmqQueues } = require("./queues/connection");
+  await closeBullmqQueues();
 }, { priority: 20 });
 registerShutdownHook("postgres", async () => {
   const { pool } = require("./db");

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Loader2,
   Sparkles,
@@ -25,12 +25,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
 const REMOTE_PROVIDERS = [
-  { id: "openai", label: "OpenAI", defaultModel: "gpt-4.1-mini" },
-  { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini" },
-  { id: "anthropic", label: "Anthropic", defaultModel: "claude-3-5-haiku-20241022" },
-  { id: "gemini", label: "Gemini", defaultModel: "gemini-2.0-flash" },
-  { id: "grok", label: "Grok", defaultModel: "grok-2-latest" },
-  { id: "nvidia", label: "NVIDIA NIM", defaultModel: "meta/llama-3.1-8b-instruct" },
+  { id: "openai", label: "OpenAI" },
+  { id: "openrouter", label: "OpenRouter" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "gemini", label: "Gemini" },
+  { id: "grok", label: "Grok" },
+  { id: "groq", label: "Groq" },
+  { id: "nvidia", label: "NVIDIA NIM" },
 ];
 
 function healthBadge(status?: string) {
@@ -107,6 +108,25 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
   const [allowPlatformFallback, setAllowPlatformFallback] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [curatedModels, setCuratedModels] = useState<
+    Array<{ modelId: string; displayName: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSelectedModel("");
+    api
+      .getCuratedAiModels(provider)
+      .then((res) => {
+        if (!cancelled) setCuratedModels(res.data?.models ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setCuratedModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
 
   const sorted = [...credentials].sort((a, b) => a.priority - b.priority);
   const usesOwnKey = sorted.length > 0;
@@ -119,12 +139,16 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
   };
 
   const handleTest = async () => {
+    if (!selectedModel) {
+      toast.error("Select a certified model from the dropdown");
+      return;
+    }
     setTesting(true);
     try {
       const res = await api.testAiCredential({
         provider,
         apiKey,
-        selectedModel: selectedModel || undefined,
+        selectedModel,
         providerType: "remote",
       });
       if (res.data?.ok) toast.success("Connection successful");
@@ -138,12 +162,16 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedModel) {
+      toast.error("Select a certified model from the dropdown");
+      return;
+    }
     setLoading(true);
     try {
       await api.saveAiCredential({
         provider,
         apiKey,
-        selectedModel: selectedModel || undefined,
+        selectedModel,
         allowPlatformFallback: formRole === "primary" ? allowPlatformFallback : false,
         providerType: "remote",
         role: formRole,
@@ -414,7 +442,10 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
               id="ai-provider"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={provider}
-              onChange={(e) => setProvider(e.target.value)}
+              onChange={(e) => {
+                setProvider(e.target.value);
+                setSelectedModel("");
+              }}
             >
               {REMOTE_PROVIDERS.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -426,27 +457,27 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
 
           <div className="space-y-2">
             <Label htmlFor="ai-model">Model</Label>
-            <Input
-              id="ai-model"
-              placeholder="e.g. gpt-4.1-mini or openai/gpt-4o-mini"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Model IDs are stored in lowercase for consistency (e.g. OpenAI/GPT-4O → openai/gpt-4o).
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => {
-                const hint = REMOTE_PROVIDERS.find((p) => p.id === provider)?.defaultModel;
-                if (hint) setSelectedModel(hint);
-              }}
-            >
-              Use suggested model
-            </Button>
+            {curatedModels.length > 0 ? (
+              <select
+                id="ai-model"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                required
+              >
+                <option value="">Select certified model</option>
+                {curatedModels.map((m) => (
+                  <option key={m.modelId} value={m.modelId}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+                No certified models for this provider yet. Certify and promote a model from{" "}
+                <span className="font-medium text-foreground">/dev/model-certification</span> first.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -481,11 +512,19 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={handleTest} disabled={testing || loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleTest}
+              disabled={testing || loading || !selectedModel || curatedModels.length === 0}
+            >
               {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Test connection
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading || !selectedModel || curatedModels.length === 0}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
             </Button>

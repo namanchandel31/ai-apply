@@ -531,6 +531,52 @@ async function healthCheck({ userId, provider, credentialId, model, apiKey, base
 // Public API
 // =============================================================================
 
+function buildCredentialOverrideCreds(credentialOverride) {
+  return {
+    provider: credentialOverride.provider,
+    apiKey: credentialOverride.apiKey,
+    model: credentialOverride.model,
+    providerType: credentialOverride.providerType || "remote",
+    baseUrl: credentialOverride.baseUrl || null,
+    credentialSource: "certification",
+  };
+}
+
+async function executeWithCredentialOverride({
+  credentialOverride,
+  task,
+  systemPrompt,
+  userPrompt,
+  model,
+  signal,
+  structured,
+  reqId,
+  jobId,
+}) {
+  const creds = buildCredentialOverrideCreds(credentialOverride);
+  const resolvedModel = validateExecutionRequest(creds, task, model || creds.model);
+
+  logInfo("AI_CERTIFICATION_EXECUTION", {
+    reqId,
+    jobId,
+    task,
+    provider: creds.provider,
+    model: resolvedModel,
+  });
+
+  const result = await executeOnProvider({
+    credentials: { ...creds, model: resolvedModel },
+    task,
+    systemPrompt,
+    userPrompt,
+    model: resolvedModel,
+    signal,
+    structured,
+  });
+
+  return { result, credentials: { ...creds, model: resolvedModel } };
+}
+
 async function runGatewayRequest(params, structured = true) {
   const {
     userId,
@@ -545,6 +591,8 @@ async function runGatewayRequest(params, structured = true) {
     jobId,
     endpoint,
     executionContext: providedContext,
+    credentialOverride,
+    returnExecutionDetails,
   } = params;
 
   if (!userId) throw new NonRetryableError("userId is required for AI gateway calls");
@@ -572,30 +620,55 @@ async function runGatewayRequest(params, structured = true) {
   }
 
   try {
-    const credentials = await resolveCredentialContext(userId, executionContext);
-    const { result, credentials: usedCreds, fallbackIndex } = await executeWithFallback({
-      userId,
-      credentials,
-      task,
-      systemPrompt,
-      userPrompt,
-      model,
-      signal,
-      structured,
-      executionContext,
-      reqId,
-      jobId,
-    });
+    let result;
+    let usedCreds;
+    let fallbackIndex = 0;
+
+    if (credentialOverride) {
+      const overrideExec = await executeWithCredentialOverride({
+        credentialOverride,
+        task,
+        systemPrompt,
+        userPrompt,
+        model,
+        signal,
+        structured,
+        reqId,
+        jobId,
+      });
+      result = overrideExec.result;
+      usedCreds = overrideExec.credentials;
+    } else {
+      const credentials = await resolveCredentialContext(userId, executionContext);
+      const fallbackResult = await executeWithFallback({
+        userId,
+        credentials,
+        task,
+        systemPrompt,
+        userPrompt,
+        model,
+        signal,
+        structured,
+        executionContext,
+        reqId,
+        jobId,
+      });
+      result = fallbackResult.result;
+      usedCreds = fallbackResult.credentials;
+      fallbackIndex = fallbackResult.fallbackIndex;
+    }
 
     retries = fallbackIndex;
     const latencyMs = Date.now() - startedAt;
     llmProtection.recordSuccess(latencyMs);
 
+    const telemetryEndpoint = credentialOverride ? "model_certification" : endpoint || task;
+
     recordTelemetry({
       userId,
       provider: result.provider,
       model: result.model,
-      endpoint: endpoint || task,
+      endpoint: telemetryEndpoint,
       credentialSource: usedCreds.credentialSource,
       usage: result.usage,
       estimatedCost: result.estimatedCost,
@@ -617,6 +690,28 @@ async function runGatewayRequest(params, structured = true) {
       credentialId: usedCreds.credentialId,
       latencyMs,
     });
+
+    if (returnExecutionDetails) {
+      const usage = result.usage || {};
+      return {
+        data: structured ? result.parsed : result,
+        execution: {
+          provider: result.provider,
+          model: result.model,
+          usage: {
+            inputTokens: usage.promptTokens ?? usage.input_tokens ?? 0,
+            outputTokens: usage.completionTokens ?? usage.output_tokens ?? 0,
+            totalTokens: usage.totalTokens ?? usage.total_tokens ?? 0,
+          },
+          estimatedCost: result.estimatedCost ?? estimateCost(result.provider, result.model, {
+            promptTokens: usage.promptTokens,
+            completionTokens: usage.completionTokens,
+          }),
+          latencyMs: result.latencyMs ?? latencyMs,
+          finishReason: result.raw?.status || result.raw?.choices?.[0]?.finish_reason || "stop",
+        },
+      };
+    }
 
     return structured ? result.parsed : result;
   } catch (err) {

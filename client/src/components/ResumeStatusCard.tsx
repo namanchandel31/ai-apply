@@ -21,8 +21,15 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
 
     setLoading(true);
     try {
-      await api.uploadResume(file);
-      toast.success("Resume parsed and saved");
+      const res = await api.uploadResume(file);
+      const deduplicated = Boolean(
+        (res as { deduplicated?: boolean }).deduplicated
+      );
+      toast.success(
+        deduplicated
+          ? "This resume is already on file — kept as your active resume"
+          : "Resume parsed and saved"
+      );
       if (fileInputRef.current) fileInputRef.current.value = "";
       onUpdate();
     } catch (err) {

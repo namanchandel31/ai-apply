@@ -25,8 +25,12 @@ async function main() {
     sendWaiting: result.counts?.["send-application"]?.waiting ?? null,
   }));
 
-  const { connection } = require("../src/queues/connection");
-  await connection.quit();
+  const { worker: processWorker } = require("../src/workers/processApplication.worker");
+  const { worker: sendWorker } = require("../src/workers/sendApplication.worker");
+  const { closeBullmqQueues } = require("../src/queues/connection");
+
+  await Promise.all([processWorker.close(), sendWorker.close()]);
+  await closeBullmqQueues();
   process.exit(0);
 }
 

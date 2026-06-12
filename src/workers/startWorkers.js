@@ -1,5 +1,6 @@
 const { logInfo, logError } = require("../utils/logger");
 const { markBootPhaseComplete } = require("../observability/processLifecycle");
+const { logLifecyclePhase } = require("../observability/redisDebugInstrumentation");
 
 let workersStarted = false;
 let processWorker = null;
@@ -20,7 +21,9 @@ async function startWorkers() {
   startPostCommitSweep();
 
   const { validateQueueSystem } = require("../queues/validateQueueSystem");
+  logLifecyclePhase("validate_queue_system_start", "E");
   await validateQueueSystem({ role: "worker" });
+  logLifecyclePhase("validate_queue_system_complete", "E");
 
   const {
     redisRealtimeEnabled,
@@ -30,8 +33,10 @@ async function startWorkers() {
     ensureRealtimePublisher();
   }
 
+  logLifecyclePhase("require_workers_start", "E");
   const processModule = require("./processApplication.worker");
   const sendModule = require("./sendApplication.worker");
+  logLifecyclePhase("require_workers_complete", "E");
   processWorker = processModule.worker;
   sendWorker = sendModule.worker;
 
@@ -52,6 +57,9 @@ async function startWorkers() {
  */
 async function stopWorkers() {
   if (!workersStarted) return;
+
+  const { markBullmqShuttingDown } = require("../queues/connection");
+  markBullmqShuttingDown();
 
   const closes = [];
   if (processWorker) {

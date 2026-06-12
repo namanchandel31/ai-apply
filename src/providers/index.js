@@ -3,6 +3,7 @@ const openrouter = require("./openrouter.provider");
 const anthropic = require("./anthropic.provider");
 const gemini = require("./gemini.provider");
 const grok = require("./grok.provider");
+const groq = require("./groq.provider");
 const nvidia = require("./nvidia.provider");
 const ollama = require("./ollama.provider");
 const lmstudio = require("./lmstudio.provider");
@@ -13,12 +14,13 @@ const REGISTRY = {
   anthropic,
   gemini,
   grok,
+  groq,
   nvidia,
   ollama,
   lmstudio,
 };
 
-const REMOTE_IDS = ["openai", "openrouter", "anthropic", "gemini", "grok", "nvidia"];
+const REMOTE_IDS = ["openai", "openrouter", "anthropic", "gemini", "grok", "groq", "nvidia"];
 const LOCAL_IDS = ["ollama", "lmstudio"];
 
 function getProvider(id) {
@@ -34,7 +36,6 @@ function listRemoteProviders() {
     billingModel: "byok",
     adapterVersion: REGISTRY[id].adapterVersion || "1.0.0",
     capabilities: REGISTRY[id].capabilities,
-    defaultModel: require("./providerUtils").DEFAULT_MODELS[id],
   }));
 }
 

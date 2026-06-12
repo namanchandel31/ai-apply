@@ -1,5 +1,4 @@
-const { getResumeById } = require("../models/resumeModel");
-const { getUserDefaults } = require("../models/userModel");
+const { resolveResumeForAutoApply } = require("./resolveResumeForAutoApply");
 const { createJDWithParsedData } = require("../models/jdModel");
 const { createApplication, findRecentDuplicate } = require("../models/applicationModel");
 const { parseJobDescription } = require("./jdParseService");
@@ -18,22 +17,19 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
 
   // Phase 1 — External Calls (No DB Tx)
   
-  // 1. Fetch user defaults
-  const userDefaults = await getUserDefaults(userId);
-  if (!userDefaults || !userDefaults.defaultResumeId) {
-    const err = new Error("No default resume configured.");
-    err.code = "DEFAULTS_NOT_CONFIGURED";
+  // 1. Resolve latest parsed resume for the user
+  let resume;
+  try {
+    resume = await resolveResumeForAutoApply(userId);
+  } catch (err) {
+    if (err.code === "RESUME_REQUIRED") {
+      const wrapped = new Error("No resume configured.");
+      wrapped.code = "DEFAULTS_NOT_CONFIGURED";
+      throw wrapped;
+    }
     throw err;
   }
-  const resumeId = userDefaults.defaultResumeId;
-
-  // 2. Fetch resume (ownership checked)
-  const resume = await getResumeById(resumeId, userId);
-  if (!resume) {
-    const err = new Error("Default resume not found or not owned by user.");
-    err.code = "RESUME_NOT_FOUND";
-    throw err;
-  }
+  const resumeId = resume.resumeId;
 
   // 3. Verify SMTP credentials exist
   const { rows: credRows } = await pool.query(

@@ -11,6 +11,7 @@ const { isValidEmail, isValidPhone } = require("../utils/validators");
 const { sanitizeTextForLlm, sanitizeTextForStorage, sanitizeErrorMessage } = require("../utils/textSanitize");
 const { callOpenAIJson } = require("./llmClient");
 const { SYSTEM_PROMPT: JD_SYSTEM_PROMPT } = require("../prompts/jdParsePrompt");
+const { RESUME_SYSTEM_PROMPT } = require("../prompts/resumeParsePrompt");
 const {
   LLM_MAX_ATTEMPTS,
   LLM_RETRY_BASE_DELAY_MS,
@@ -23,61 +24,6 @@ const { JDSchema } = require("../schemas/jdSchema");
 const { createResumeWithParsedData } = require("../models/resumeModel");
 const { createJDWithParsedData } = require("../models/jdModel");
 const { saveFailedParse } = require("../models/failedParseModel");
-
-// ---------------------------------------------------------------------
-// Prompts
-// ---------------------------------------------------------------------
-const RESUME_SYSTEM_PROMPT = `You are a highly accurate resume parsing engine.
-
-STRICT RULES:
-* Output ONLY valid JSON matching the exact schema.
-* ALWAYS include all schema fields.
-* Do NOT add extra fields.
-* Do NOT hallucinate.
-* Missing values must be null or empty arrays.
-* Normalize output.
-* Remove duplicate skills.
-
-SCHEMA:
-{
-"name": string | null,
-"email": string | null,
-"phone": string | null,
-"location": string | null,
-"linkedin": string | null,
-"github": string | null,
-"portfolio": string | null,
-"summary": string | null,
-"skills": string[],
-"experience": [
-{
-"company": string | null,
-"role": string | null,
-"location": string | null,
-"start_date": string | null,
-"end_date": string | null,
-"duration": string | null,
-"description": string | null
-}
-],
-"education": [
-{
-"institution": string | null,
-"degree": string | null,
-"field_of_study": string | null,
-"start_date": string | null,
-"end_date": string | null
-}
-],
-"projects": [
-{
-"name": string | null,
-"description": string | null,
-"technologies": string[]
-}
-],
-"certifications": string[]
-}`;
 
 // ---------------------------------------------------------------------
 // Helpers

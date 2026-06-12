@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
@@ -26,10 +26,13 @@ import { Badge } from "@/components/ui/badge";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
 
 const REMOTE_PROVIDERS = [
-  { id: "openai", label: "OpenAI", defaultModel: "gpt-4.1-mini" },
-  { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini" },
-  { id: "anthropic", label: "Anthropic", defaultModel: "claude-3-5-haiku-20241022" },
-  { id: "gemini", label: "Gemini", defaultModel: "gemini-2.0-flash" },
+  { id: "openai", label: "OpenAI" },
+  { id: "openrouter", label: "OpenRouter" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "gemini", label: "Gemini" },
+  { id: "grok", label: "Grok" },
+  { id: "groq", label: "Groq" },
+  { id: "nvidia", label: "NVIDIA NIM" },
 ];
 
 type AiUiState =
@@ -59,6 +62,9 @@ export function Onboarding() {
   const [provider, setProvider] = useState("openai");
   const [selectedModel, setSelectedModel] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [curatedModels, setCuratedModels] = useState<
+    Array<{ modelId: string; displayName: string }>
+  >([]);
   const [aiUi, setAiUi] = useState<AiUiState>("idle");
   const [aiError, setAiError] = useState<string | null>(null);
   const [resumeUi, setResumeUi] = useState<ResumeUiState>("idle");
@@ -73,6 +79,21 @@ export function Onboarding() {
   const parsingResume = !!status?.hasResume && !hasValidResume;
 
   useResumeParsePolling(parsingResume);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getCuratedAiModels(provider)
+      .then((res) => {
+        if (!cancelled) setCuratedModels(res.data?.models ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setCuratedModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
 
   useEffect(() => {
     if (isLoading || !status) return;
@@ -123,11 +144,6 @@ export function Onboarding() {
     return () => clearTimeout(t);
   }, [redirectSeconds, navigate]);
 
-  const defaultModel = useMemo(
-    () => REMOTE_PROVIDERS.find((p) => p.id === provider)?.defaultModel ?? "",
-    [provider]
-  );
-
   const invalidateStatus = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: setupStatusQueryOptions.queryKey });
     refetch();
@@ -140,6 +156,10 @@ export function Onboarding() {
   };
 
   const handleSaveAi = async () => {
+    if (!selectedModel) {
+      toast.error("Select a certified model from the dropdown");
+      return;
+    }
     setAiError(null);
     setAiUi("saving");
     trackOnboardingEvent("ai_key_validation_started");
@@ -148,7 +168,7 @@ export function Onboarding() {
       await api.saveAiCredential({
         provider,
         apiKey,
-        selectedModel: selectedModel || defaultModel,
+        selectedModel,
         role: "primary",
         providerType: "remote",
       });
@@ -337,11 +357,26 @@ export function Onboarding() {
                     </div>
                     <div className="space-y-2">
                       <Label>Model</Label>
-                      <Input
-                        placeholder={defaultModel}
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                      />
+                      {curatedModels.length > 0 ? (
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          required
+                        >
+                          <option value="">Select certified model</option>
+                          {curatedModels.map((m) => (
+                            <option key={m.modelId} value={m.modelId}>
+                              {m.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+                          No certified models for this provider yet. Ask your admin to certify models
+                          via the dev certification tool.
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -381,6 +416,8 @@ export function Onboarding() {
                     onClick={handleSaveAi}
                     disabled={
                       !apiKey ||
+                      !selectedModel ||
+                      curatedModels.length === 0 ||
                       aiUi === "saving" ||
                       aiUi === "pending_validation"
                     }

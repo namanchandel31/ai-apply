@@ -142,6 +142,8 @@ const createApplication = async ({
 
 const updateApplicationFields = async (applicationId, fields, userId = null, client = pool) => {
   const allowed = [
+    "resume_id",
+    "resume_snapshot_path",
     "email_subject",
     "email_body",
     "match_score",

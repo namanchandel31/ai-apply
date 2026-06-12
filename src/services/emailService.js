@@ -66,16 +66,21 @@ function shouldTriggerRetry(validation, scores) {
   return false;
 }
 
-async function callEmailLlm(userId, userPrompt, logMeta, systemPrompt) {
-  const parsed = await generateStructuredJson({
+async function callEmailLlm(userId, userPrompt, logMeta, systemPrompt, options = {}) {
+  const gatewayParams = {
     userId,
     task: "email_generate",
     systemPrompt,
     userPrompt,
     promptVersion: PROMPT_VERSION,
     reqId: logMeta.reqId,
-    endpoint: "email_generate",
-  });
+    endpoint: options.credentialOverride ? "model_certification" : "email_generate",
+    credentialOverride: options.credentialOverride,
+    returnExecutionDetails: !!options.credentialOverride,
+  };
+
+  const gatewayResult = await generateStructuredJson(gatewayParams);
+  const parsed = options.credentialOverride ? gatewayResult.data : gatewayResult;
 
   const validation = emailResponseSchema.safeParse(parsed);
   if (!validation.success) {
@@ -83,7 +88,11 @@ async function callEmailLlm(userId, userPrompt, logMeta, systemPrompt) {
       `Schema validation failed: ${JSON.stringify(validation.error.flatten().fieldErrors)}`
     );
   }
-  return validation.data;
+  const draft = validation.data;
+  if (options.credentialOverride) {
+    return { draft, execution: gatewayResult.execution };
+  }
+  return draft;
 }
 
 function evaluateDraft(draft, context) {
@@ -174,7 +183,7 @@ function buildEmailMetadata({
  * @param {object} logMeta - { userId, reqId, ... }
  * @returns {Promise<{ subject, body, llmRawOutput, emailMetadata, emailFeedbackSignals }>}
  */
-const generateApplicationEmail = async (context, logMeta = {}) => {
+const generateApplicationEmail = async (context, logMeta = {}, options = {}) => {
   const userId = logMeta.userId;
   if (!userId) {
     throw new NonRetryableError("userId is required in logMeta for email generation");
@@ -210,7 +219,12 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
       emailPreferences: context.emailPreferences,
     });
 
-    let rawDraft = await callEmailLlm(userId, userPrompt, logMeta, systemPrompt);
+    const llmOptions = {
+      credentialOverride: options.credentialOverride,
+    };
+    const initialLlm = await callEmailLlm(userId, userPrompt, logMeta, systemPrompt, llmOptions);
+    let rawDraft = options.credentialOverride ? initialLlm.draft : initialLlm;
+    let emailExecution = options.credentialOverride ? initialLlm.execution : null;
     let evaluated = evaluateDraft(rawDraft, context);
     history.push({
       attempt: "initial",
@@ -218,7 +232,7 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
       compositeRisk: evaluated.validation.compositeRisk,
     });
 
-    if (shouldTriggerRetry(evaluated.validation, evaluated.scores)) {
+    if (!options.certificationMode && shouldTriggerRetry(evaluated.validation, evaluated.scores)) {
       logInfo("email_generation_retry_scheduled", {
         ...logMeta,
         compositeRisk: evaluated.validation.compositeRisk,
@@ -296,13 +310,17 @@ const generateApplicationEmail = async (context, logMeta = {}) => {
       recruiterComposite: evaluated.recruiterComposite,
     });
 
-    return {
+    const result = {
       subject: evaluated.draft.subject,
       body: evaluated.draft.body,
       llmRawOutput,
       emailMetadata,
       emailFeedbackSignals: initialEmailFeedbackSignals(),
     };
+    if (options.credentialOverride) {
+      result.execution = emailExecution;
+    }
+    return result;
   } catch (err) {
     logError("email_generation_failed", err, logMeta);
     throw err;

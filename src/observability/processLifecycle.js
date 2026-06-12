@@ -141,9 +141,10 @@ async function collectRuntimeDiagnostics() {
   }
 
   try {
-    const { connection } = require("../queues/connection");
-    diag.redisConnected = connection.status === "ready";
-    diag.redisStatus = connection.status;
+    const { getRedisHealthStatus } = require("../queues/connection");
+    const health = await getRedisHealthStatus();
+    diag.redisConnected = health.connected;
+    diag.redisStatus = health.status;
   } catch (_) {
     /* ignore */
   }

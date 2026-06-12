@@ -12,6 +12,7 @@ import { GuestRoute } from "@/routes/GuestRoute";
 import { OnboardingGuard } from "@/routes/OnboardingGuard";
 import { SessionHandlers } from "@/auth/SessionHandlers";
 import { useAuth } from "@/auth/AuthContext";
+import { ModelCertificationPage } from "@/pages/dev/ModelCertification";
 
 function CatchAllRedirect() {
   const { session, isResolved } = useAuth();
@@ -52,6 +53,9 @@ export function AppRoutes() {
             </Route>
             <Route path="/setup" element={<Setup />} />
           </Route>
+          {import.meta.env.VITE_MODEL_CERTIFICATION_ENABLED === "true" && (
+            <Route path="/dev/model-certification" element={<ModelCertificationPage />} />
+          )}
         </Route>
 
         <Route path="*" element={<CatchAllRedirect />} />

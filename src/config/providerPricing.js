@@ -22,6 +22,11 @@ const PRICING_TABLE = {
   grok: {
     default: { inputPer1M: 0.5, outputPer1M: 1.5, currency: "USD" },
   },
+  groq: {
+    "llama-3.3-70b-versatile": { inputPer1M: 0.59, outputPer1M: 0.79, currency: "USD" },
+    "llama-3.1-8b-instant": { inputPer1M: 0.05, outputPer1M: 0.08, currency: "USD" },
+    default: { inputPer1M: 0.59, outputPer1M: 0.79, currency: "USD" },
+  },
   nvidia: {
     default: { inputPer1M: 0.2, outputPer1M: 0.2, currency: "USD" },
   },

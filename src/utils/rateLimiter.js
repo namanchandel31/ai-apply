@@ -163,6 +163,7 @@ const RATE_LIMITS = {
     windowSeconds: 86400,
   },
   IP_GLOBAL:       { limit: 200, windowSeconds: 60 },
+  USER_MODEL_CERTIFICATION: { limit: 5, windowSeconds: 3600 },
 };
 
 module.exports = { rateLimiter, RATE_LIMITS };

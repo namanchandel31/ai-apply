@@ -6,6 +6,7 @@ const aiCredentialModel = require("../models/aiCredentialModel");
 const { healthCheck } = require("../services/aiGateway");
 const { validateModelForProvider } = require("../services/modelValidation");
 const { getProvider } = require("../providers");
+const curatedAiModelModel = require("../models/curatedAiModelModel");
 
 async function applyVerificationResult(userId, credentialId, health) {
   if (health.ok) {
@@ -74,6 +75,25 @@ const saveCredentialController = async (req, res) => {
     });
     if (!validation.valid) {
       return error(res, 400, validation.message, validation.code || ERROR_CODES.BAD_REQUEST);
+    }
+
+    const hasCurated = await curatedAiModelModel.hasAnyActiveForProvider(provider);
+    if (!hasCurated) {
+      return error(
+        res,
+        400,
+        "No certified models are available for this provider. Certify and promote a model first.",
+        "NO_CURATED_MODELS"
+      );
+    }
+    const allowed = await curatedAiModelModel.isModelAllowed(provider, validation.model);
+    if (!allowed) {
+      return error(
+        res,
+        400,
+        "This model is not on the approved list. Choose a model from the dropdown.",
+        "MODEL_NOT_CURATED"
+      );
     }
 
     const saved = await aiCredentialService.saveCredential(req.user.id, {
@@ -145,6 +165,25 @@ const testCredentialController = async (req, res) => {
     });
     if (!validation.valid) {
       return error(res, 400, validation.message, validation.code || ERROR_CODES.BAD_REQUEST);
+    }
+
+    const hasCurated = await curatedAiModelModel.hasAnyActiveForProvider(provider);
+    if (!hasCurated) {
+      return error(
+        res,
+        400,
+        "No certified models are available for this provider. Certify and promote a model first.",
+        "NO_CURATED_MODELS"
+      );
+    }
+    const allowed = await curatedAiModelModel.isModelAllowed(provider, validation.model);
+    if (!allowed) {
+      return error(
+        res,
+        400,
+        "This model is not on the approved list. Choose a model from the dropdown.",
+        "MODEL_NOT_CURATED"
+      );
     }
 
     const health = await healthCheck({

@@ -111,6 +111,7 @@ const DEFAULT_MODELS = {
   anthropic: "claude-3-5-haiku-20241022",
   gemini: "gemini-2.0-flash",
   grok: "grok-2-latest",
+  groq: "llama-3.3-70b-versatile",
   nvidia: "meta/llama-3.1-8b-instruct",
 };
 

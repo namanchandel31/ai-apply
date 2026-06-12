@@ -15,7 +15,7 @@ const {
 const { estimateCost } = require("../config/providerPricing");
 
 /**
- * Shared OpenAI-compatible adapter (OpenAI, OpenRouter, Grok, NVIDIA NIM).
+ * Shared OpenAI-compatible adapter (OpenAI, OpenRouter, Grok, Groq, NVIDIA NIM).
  */
 const ADAPTER_VERSION = "1.0.0";
 

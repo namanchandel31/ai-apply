@@ -1,5 +1,5 @@
 const config = require("../config");
-const { connection } = require("./connection");
+const { pingRedis: pingBullmqRedis } = require("./connection");
 const { processApplicationQueue } = require("./processApplicationQueue");
 const { sendApplicationQueue } = require("./sendApplicationQueue");
 const {
@@ -13,8 +13,7 @@ const SEND_APPLICATION_QUEUE = QUEUE_NAMES.SEND_APPLICATION;
 const { logInfo, logError } = require("../utils/logger");
 
 async function pingRedis() {
-  const pong = await connection.ping();
-  return pong === "PONG";
+  return pingBullmqRedis();
 }
 
 async function getAllQueueCounts() {

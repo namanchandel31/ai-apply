@@ -1,5 +1,6 @@
 const { Worker } = require("bullmq");
-const { connection } = require("../queues/connection");
+const { getBullmqConnectionOptions } = require("../queues/connection");
+const { logBullmqComponentBinding } = require("../observability/redisDebugInstrumentation");
 const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
 const { pool } = require("../db");
@@ -8,7 +9,7 @@ const { getLatestJobByType } = require("../models/applicationJobModel");
 const { transitionJobState } = require("../services/transitionJobState");
 const { recordEvent } = require("../models/applicationEventModel");
 const { updateJobDescriptionFromParsed } = require("../models/jdModel");
-const { getResumeById } = require("../models/resumeModel");
+const { resolveResumeForAutoApply } = require("../services/resolveResumeForAutoApply");
 const { parseJobDescription } = require("../services/jdParseService");
 const { classifyJdParseFailure } = require("../services/jdParseFailureClassifier");
 const { finalizeBullMqJobFailure, willBullMqRetry } = require("../queues/bullmqJobFailure");
@@ -130,8 +131,14 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     const rawText = jdRows[0]?.raw_text;
     if (!rawText) throw new Error("Missing job description text");
 
-    const resume = await getResumeById(app.resume_id, userId);
-    if (!resume) throw new Error("Resume not found");
+    const resume = await resolveResumeForAutoApply(userId);
+    if (resume.resumeId !== app.resume_id) {
+      logInfo("resume_resolved_to_latest", {
+        applicationId,
+        previousResumeId: app.resume_id,
+        resolvedResumeId: resume.resumeId,
+      });
+    }
 
     logInfo("ai_generation_started", { applicationId });
     const parsedJd = await parseJobDescription(rawText, userId, {
@@ -165,7 +172,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     const cachedEmail = await generateApplicationEmail(emailContext, {
       reqId,
       userId,
-      resumeId: app.resume_id,
+      resumeId: resume.resumeId,
       jobDescriptionId: app.job_description_id,
     });
 
@@ -177,6 +184,8 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     await updateApplicationFields(
       applicationId,
       {
+        resume_id: resume.resumeId,
+        resume_snapshot_path: resume.filePath,
         email_subject: cachedEmail.subject,
         email_body: cachedEmail.body,
         match_score: matchResult.score,
@@ -369,8 +378,18 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
   });
 }
 
+const bullmqConnection = getBullmqConnectionOptions();
+
+logBullmqComponentBinding({
+  componentType: "worker",
+  componentName: QUEUE_NAMES.PROCESS_APPLICATION,
+  connection: null,
+  hypothesisId: "A",
+  extra: { blocking: true, dedicatedConnection: true },
+});
+
 const worker = new Worker(QUEUE_NAMES.PROCESS_APPLICATION, processor, {
-  connection,
+  connection: bullmqConnection,
   concurrency: require("../config").queue.WORKER_CONCURRENCY.process,
 });
 

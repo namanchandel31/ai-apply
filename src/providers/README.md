@@ -60,7 +60,7 @@ Providers evolve independently:
 
 | Type | IDs | API key | Execution (v1) |
 |------|-----|---------|----------------|
-| Remote | openai, openrouter, anthropic, gemini, grok, nvidia | Required | Supported |
+| Remote | openai, openrouter, anthropic, gemini, grok, groq, nvidia | Required | Supported |
 | Local | ollama, lmstudio | Optional (`NULL` in DB) | Stub — `LOCAL_PROVIDER_NOT_IMPLEMENTED` |
 
 Local providers use `base_url` + reachability health checks only until Phase 2 execution.

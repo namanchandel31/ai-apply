@@ -157,15 +157,16 @@ async function setEmailPreferenceLevels(userId, { emailToneLevel, emailStructure
   return rows[0] || null;
 }
 
+/** Set the user's active resume after upload/replace (always points at latest upload). */
 const autoPopulateDefaultResume = async (userId, resumeId) => {
   const { rows } = await pool.query(
-    `UPDATE users 
+    `UPDATE users
      SET default_resume_id = $2
-     WHERE id = $1 AND default_resume_id IS NULL
+     WHERE id = $1
      RETURNING id, default_resume_id`,
     [userId, resumeId]
   );
-  return rows[0] || null; // Returns null if not updated (meaning it wasn't NULL)
+  return rows[0] || null;
 };
 
 module.exports = {

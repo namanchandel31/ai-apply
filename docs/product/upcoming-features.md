@@ -69,8 +69,9 @@ Use `- [ ]` / `- [x]` to track progress. Add acceptance notes under each feature
 **Problem:** Free-text model names cause misconfiguration and failures.
 
 - [ ] UI: select provider → paste one API key per provider
-- [ ] UI: model dropdown from manually curated list only (no auto-discovery)
-- [ ] Backend: store selected model per credential; validate against allowlist
+- [x] UI: model dropdown from manually curated list only (no auto-discovery) — when `curated_ai_models` has entries
+- [x] Backend: store selected model per credential; validate against allowlist
+- [x] Dev certification tool: `/dev/model-certification` (dual-run, promote to curated list)
 - [ ] Runtime fallback to trusted default when configured model unavailable
 - [ ] Internal process: new models added only after QA sign-off
 - [ ] Production allowlist excludes unreliable free-tier models (align with engineering checklist)

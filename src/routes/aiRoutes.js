@@ -11,9 +11,11 @@ const {
   activateCredentialController,
   deleteCredentialController,
 } = require("../controllers/aiCredentialController");
+const { listCuratedModelsPublicController } = require("../controllers/modelCertificationController");
 
 const router = express.Router();
 
+router.get("/ai/curated-models", supabaseAuthMiddleware, listCuratedModelsPublicController);
 router.get("/ai/providers", supabaseAuthMiddleware, listProvidersController);
 router.get("/ai/credentials", supabaseAuthMiddleware, listCredentialsController);
 router.post("/ai/credentials", supabaseAuthMiddleware, saveCredentialController);

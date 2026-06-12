@@ -433,6 +433,67 @@ export const api = {
     return request(`/api/ai/credentials/${id}`, { method: "DELETE" });
   },
 
+  getCuratedAiModels(provider?: string) {
+    const qs = provider ? `?provider=${encodeURIComponent(provider)}` : "";
+    return request<{
+      success: boolean;
+      data: { models: Array<{ provider: string; modelId: string; displayName: string }> };
+    }>(`/api/ai/curated-models${qs}`, { method: "GET" });
+  },
+
+  runModelCertification(body: {
+    provider: string;
+    model: string;
+    apiKey: string;
+    resumeSource: "active" | "upload";
+    resumeFile?: File;
+  }) {
+    const form = new FormData();
+    form.append("provider", body.provider);
+    form.append("model", body.model);
+    form.append("apiKey", body.apiKey);
+    form.append("resumeSource", body.resumeSource);
+    if (body.resumeFile) form.append("resume", body.resumeFile);
+    return request<{ success: boolean; data: ModelCertificationResult }>(
+      "/api/dev/model-certification/run",
+      { method: "POST", body: form }
+    );
+  },
+
+  listModelCertificationRuns() {
+    return request<{ success: boolean; data: { runs: ModelCertificationRunSummary[] } }>(
+      "/api/dev/model-certification/runs",
+      { method: "GET" }
+    );
+  },
+
+  listCuratedModelsAdmin() {
+    return request<{ success: boolean; data: { models: CuratedAiModelRow[] } }>(
+      "/api/dev/model-certification/curated",
+      { method: "GET" }
+    );
+  },
+
+  promoteCuratedModel(certificationRunId: string, displayName?: string) {
+    return request("/api/dev/model-certification/curated/promote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ certificationRunId, displayName }),
+    });
+  },
+
+  patchCuratedModel(id: string, body: { isActive?: boolean; sortOrder?: number }) {
+    return request(`/api/dev/model-certification/curated/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  deactivateCuratedModel(id: string) {
+    return request(`/api/dev/model-certification/curated/${id}`, { method: "DELETE" });
+  },
+
   getApplicationsList(params: ApplicationsListParams, options?: { signal?: AbortSignal }) {
     const qs = buildApplicationsListQueryString(params);
     const path = qs ? `/api/applications?${qs}` : "/api/applications";
@@ -607,6 +668,54 @@ export type AiCredentialSummary = {
   healthStatus?: string;
   inFallbackChain?: boolean;
   hasApiKey?: boolean;
+};
+
+export type ModelCertificationResult = {
+  runId: string;
+  provider: string;
+  model: string;
+  resumeScore: number;
+  emailScore: number;
+  certificationScore: number;
+  reliabilityScore: number;
+  judgeConfidence: number;
+  valueScore: number;
+  overallScore: number;
+  passed: boolean;
+  recommended: boolean;
+  totalCostUsd: number;
+  costPer100Runs: number;
+  costPer1000Runs: number;
+  totalLatencyMs: number;
+  scores: Record<string, unknown>;
+};
+
+export type ModelCertificationRunSummary = {
+  id: string;
+  provider: string;
+  model: string;
+  resume_source?: string;
+  certification_score: number;
+  reliability_score: number;
+  value_score: number;
+  overall_score: number;
+  passed: boolean;
+  recommended: boolean;
+  scores_json?: Record<string, unknown>;
+  error_message?: string | null;
+  created_at: string;
+};
+
+export type CuratedAiModelRow = {
+  id: string;
+  provider: string;
+  model_id: string;
+  display_name: string;
+  certification_score: number;
+  reliability_score: number;
+  overall_score: number;
+  is_active: boolean;
+  sort_order: number;
 };
 
 export type ParsedResume = {

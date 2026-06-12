@@ -169,7 +169,7 @@ const getResumeById = async (resumeId, userId = null, client = null) => {
 const getLatestParsedResumeForUser = async (userId, client = null) => {
   const queryClient = client || pool;
   const { rows } = await queryClient.query(
-    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, r.file_path
+    `SELECT r.id AS resume_id, pr.id AS parsed_resume_id, pr.parsed_json, pr.raw_text, r.file_path
      FROM resumes r
      INNER JOIN parsed_resumes pr ON pr.resume_id = r.id
      WHERE r.user_id = $1
@@ -184,6 +184,7 @@ const getLatestParsedResumeForUser = async (userId, client = null) => {
     resumeId: rows[0].resume_id,
     parsedResumeId: rows[0].parsed_resume_id,
     parsedJson: rows[0].parsed_json,
+    rawText: rows[0].raw_text,
     filePath: rows[0].file_path,
   };
 };

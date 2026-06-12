@@ -1,7 +1,8 @@
 const { Worker, UnrecoverableError } = require("bullmq");
 const { pool } = require("../db");
 const nodemailer = require("nodemailer");
-const { connection } = require("../queues/connection");
+const { getBullmqConnectionOptions } = require("../queues/connection");
+const { logBullmqComponentBinding } = require("../observability/redisDebugInstrumentation");
 const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
 const {
@@ -32,6 +33,7 @@ const {
   logExecutionTimeline,
   assertExecutionInvariants,
 } = require("../services/executionStateResolver");
+const { resolveResumeForAutoApply } = require("../services/resolveResumeForAutoApply");
 
 const processor = async (job) => {
   const { applicationId, userId, recipientEmail, dbJobId } = job.data;
@@ -104,16 +106,33 @@ const processor = async (job) => {
 
     const credentials = await fetchSmtpCredentials(userId);
 
+    const resolvedResume = await resolveResumeForAutoApply(userId);
+    const resumeStoragePath =
+      resolvedResume.filePath || application.resume_snapshot_path || application.file_path;
+
+    if (!resumeStoragePath) {
+      throw new UnrecoverableError("Resume file path missing for send");
+    }
+
+    if (resolvedResume.filePath && resolvedResume.filePath !== application.resume_snapshot_path) {
+      logInfo("send_resume_path_refreshed", {
+        applicationId,
+        previousPath: application.resume_snapshot_path,
+        resolvedPath: resolvedResume.filePath,
+        resolvedResumeId: resolvedResume.resumeId,
+      });
+    }
+
     let fileBuffer;
     const { data, error } = await supabase.storage
       .from("resumes")
-      .download(application.resume_snapshot_path);
+      .download(resumeStoragePath);
 
     if (error) {
       const isPermanent =
         error.status === 404 || error.message?.includes("not found");
       if (isPermanent) {
-        throw new UnrecoverableError(`Resume not found: ${application.resume_snapshot_path}`);
+        throw new UnrecoverableError(`Resume not found: ${resumeStoragePath}`);
       }
       throw new Error(`Storage error: ${error.message}`);
     }
@@ -239,8 +258,18 @@ const processor = async (job) => {
   }
 };
 
+const bullmqConnection = getBullmqConnectionOptions();
+
+logBullmqComponentBinding({
+  componentType: "worker",
+  componentName: QUEUE_NAMES.SEND_APPLICATION,
+  connection: null,
+  hypothesisId: "A",
+  extra: { blocking: true, dedicatedConnection: true },
+});
+
 const worker = new Worker(QUEUE_NAMES.SEND_APPLICATION, processor, {
-  connection,
+  connection: bullmqConnection,
   concurrency: require("../config").queue.WORKER_CONCURRENCY.send,
 });
 

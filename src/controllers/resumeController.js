@@ -8,6 +8,45 @@ const { supabase } = require("../config/supabase");
 const { error: sendError, ok, ERROR_CODES } = require("../utils/response");
 const { userHasVerifiedAiCredential } = require("../services/setupStatusService");
 
+async function respondWithDuplicateResume(res, {
+  reqId,
+  jobId,
+  fileHash,
+  userId,
+  context,
+  existing,
+}) {
+  try {
+    await autoPopulateDefaultResume(userId, existing.resumeId);
+  } catch (dbErr) {
+    logError("auto_populate_default_resume_failed", dbErr, {
+      reqId,
+      userId,
+      resumeId: existing.resumeId,
+      deduplicated: true,
+    });
+  }
+
+  logInfo("RESUME_DUPLICATE_REUSED", {
+    reqId,
+    jobId,
+    fileHash,
+    userId,
+    context,
+    source: "resume",
+    message: "Duplicate resume detected, using existing uploaded resume",
+  });
+
+  return res.status(200).json({
+    success: true,
+    deduplicated: true,
+    resumeId: existing.resumeId,
+    parsedResumeId: existing.parsedResumeId,
+    data: existing.parsedJson,
+    message: "This resume is already on file. It remains your active resume.",
+  });
+}
+
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
   const jobId = crypto.randomUUID();
@@ -48,24 +87,14 @@ const uploadResumeController = async (req, res) => {
     // Deduplication check
     const existing = await findResumeByHash(fileHash, userId);
     if (existing) {
-      if (context === 'onboarding') {
-        logInfo("RESUME_DUPLICATE_REUSED", { reqId, jobId, fileHash, userId, context, source: "resume", message: "Duplicate resume detected, using existing uploaded resume" });
-        return res.status(200).json({
-          success: true,
-          deduplicated: true,
-          resumeId: existing.resumeId,
-          parsedResumeId: existing.parsedResumeId,
-          data: existing.parsedJson,
-          message: 'Duplicate resume detected. Using existing uploaded resume.'
-        });
-      } else {
-        // profile_update
-        logInfo("RESUME_DUPLICATE_REJECTED", { reqId, jobId, fileHash, userId, context, source: "resume", message: "Duplicate resume upload rejected during profile update" });
-        return res.status(409).json({
-          success: false,
-          error: 'Duplicate resume detected. Please upload a new resume.'
-        });
-      }
+      return respondWithDuplicateResume(res, {
+        reqId,
+        jobId,
+        fileHash,
+        userId,
+        context,
+        existing,
+      });
     }
 
     // Wrap the handler with a 90s timeout guard
@@ -102,35 +131,24 @@ const uploadResumeController = async (req, res) => {
       if (storageError) {
         const msg = storageError.message || '';
         if (msg.includes('The resource already exists')) {
-          if (context === 'profile_update') {
-            logInfo("RESUME_DUPLICATE_REJECTED", { reqId, jobId, fileHash, userId, context, source: "resume", message: "Duplicate resume upload rejected during profile update (orphaned storage)" });
-            return res.status(409).json({
-              success: false,
-              error: 'Duplicate resume detected. Please upload a new resume.'
-            });
-          } else {
-            // context === 'onboarding'
-            // Re-query DB (race condition check)
-            const doubleCheck = await findResumeByHash(fileHash, userId);
-            if (doubleCheck) {
-              logInfo("RESUME_DUPLICATE_REUSED", { reqId, jobId, fileHash, userId, context, source: "resume", message: "Duplicate resume detected (race condition), using existing uploaded resume" });
-              return res.status(200).json({
-                success: true,
-                deduplicated: true,
-                resumeId: doubleCheck.resumeId,
-                parsedResumeId: doubleCheck.parsedResumeId,
-                data: doubleCheck.parsedJson,
-                message: 'Duplicate resume detected. Using existing uploaded resume.'
-              });
-            }
-
-            // DB row DOES NOT exist: Storage object existed without DB row
-            // We swallow the error and proceed to processResumeJob to recreate the DB metadata row.
-            logInfo("RESUME_STORAGE_DB_RECONCILED", {
-              reqId, jobId, fileHash, userId, filePath, source: "resume",
-              message: "Storage object existed without DB row, metadata reconciled successfully"
+          const doubleCheck = await findResumeByHash(fileHash, userId);
+          if (doubleCheck) {
+            return respondWithDuplicateResume(res, {
+              reqId,
+              jobId,
+              fileHash,
+              userId,
+              context,
+              existing: doubleCheck,
             });
           }
+
+          // DB row DOES NOT exist: Storage object existed without DB row
+          // We swallow the error and proceed to processResumeJob to recreate the DB metadata row.
+          logInfo("RESUME_STORAGE_DB_RECONCILED", {
+            reqId, jobId, fileHash, userId, filePath, source: "resume",
+            message: "Storage object existed without DB row, metadata reconciled successfully"
+          });
         } else {
           throw new Error(`Supabase upload failed: ${storageError.message}`);
         }

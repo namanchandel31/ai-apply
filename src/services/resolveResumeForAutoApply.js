@@ -3,7 +3,7 @@ const { getResumeById, getLatestParsedResumeForUser } = require("../models/resum
 
 /**
  * Resolve a parsed, user-owned resume for auto-apply.
- * Order: explicit resumeId → default_resume_id → latest parsed resume.
+ * Order: explicit resumeId → latest uploaded/parsed resume → default_resume_id.
  */
 async function resolveResumeForAutoApply(userId, explicitResumeId = null) {
   let resumeId =
@@ -12,13 +12,13 @@ async function resolveResumeForAutoApply(userId, explicitResumeId = null) {
       : null;
 
   if (!resumeId) {
-    const defaults = await getUserDefaults(userId);
-    resumeId = defaults?.defaultResumeId ?? null;
+    const latest = await getLatestParsedResumeForUser(userId);
+    resumeId = latest?.resumeId ?? null;
   }
 
   if (!resumeId) {
-    const latest = await getLatestParsedResumeForUser(userId);
-    resumeId = latest?.resumeId ?? null;
+    const defaults = await getUserDefaults(userId);
+    resumeId = defaults?.defaultResumeId ?? null;
   }
 
   if (!resumeId) {

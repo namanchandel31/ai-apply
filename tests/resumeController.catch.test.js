@@ -6,6 +6,14 @@ jest.mock("../src/models/resumeModel", () => ({
   findResumeByHash: jest.fn(),
 }));
 
+jest.mock("../src/models/userModel", () => ({
+  autoPopulateDefaultResume: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("../src/services/setupStatusService", () => ({
+  userHasVerifiedAiCredential: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock("../src/config/supabase", () => ({
   supabase: {
     storage: {
@@ -17,6 +25,7 @@ jest.mock("../src/config/supabase", () => ({
 }));
 
 const { findResumeByHash } = require("../src/models/resumeModel");
+const { autoPopulateDefaultResume } = require("../src/models/userModel");
 const { uploadResumeController } = require("../src/controllers/resumeController");
 
 describe("uploadResumeController catch handling", () => {
@@ -74,12 +83,38 @@ describe("uploadResumeController catch handling", () => {
     await uploadResumeController(baseReq, res);
 
     expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(autoPopulateDefaultResume).toHaveBeenCalledWith("user-1", "existing-id");
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
         deduplicated: true,
         resumeId: "existing-id",
-        message: expect.stringContaining("Duplicate resume"),
+        message: expect.stringContaining("already on file"),
+      })
+    );
+  });
+
+  it("reuses existing resume on duplicate hash for profile_update", async () => {
+    findResumeByHash.mockResolvedValue({
+      resumeId: "existing-id",
+      parsedResumeId: "parsed-id",
+      parsedJson: { name: "Cached", skills: ["ts"] },
+      filePath: "user-1/abc.pdf",
+    });
+
+    const res = mockRes();
+    await uploadResumeController(
+      { ...baseReq, body: { context: "profile_update" } },
+      res
+    );
+
+    expect(res.status).not.toHaveBeenCalledWith(409);
+    expect(autoPopulateDefaultResume).toHaveBeenCalledWith("user-1", "existing-id");
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        deduplicated: true,
+        resumeId: "existing-id",
       })
     );
   });
