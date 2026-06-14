@@ -1,5 +1,193 @@
 ## Log (newest first)
 
+### 2026-06-14 — First-time auto-apply and setup guided tooltips
+- **Prompt:** Design 3–4 brief, skippable onboarding tooltips for AutoApply, Applications, and Setup.
+- **Outcome:** Updated first-run walkthrough to 4 concise value-focused steps with skip/escape behavior, including Applications and Setup entry points.
+
+### 2026-06-14 — Fix Gemini/Groq showing Coming soon incorrectly
+- **Prompt:** Gemini and Groq are supported but showed Coming soon in provider dropdown
+- **Outcome:** Coming soon now uses explicit `remoteProviders` list (OpenAI, Gemini, Groq live); not derived from curated DB rows.
+
+### 2026-06-14 — Apply tab first-visit Auto Apply walkthrough
+- **Prompt:** Quick guided tour on first Apply visit — 2–3 tooltips for Auto Apply on/off
+- **Outcome:** `ApplyWalkthrough` spotlight tour (3 steps); triggers after onboarding via pending flag + localStorage seen state.
+
+### 2026-06-14 — API key helper below input
+- **Prompt:** Move API key helper text below the input with same gap-1 spacing as label to input
+- **Outcome:** Helper renders under the API key field with `gap-1`.
+
+### 2026-06-14 — Tighter API key helper spacing
+- **Prompt:** Reduce gap between API key helper text and label/input to match label–input spacing
+- **Outcome:** Helper moved inside API key field with `gap-1` between helper and input.
+
+### 2026-06-14 — Coming soon providers keep full opacity in dropdown
+- **Prompt:** Unsupported providers should not fade logo/name; only show Coming soon label
+- **Outcome:** Removed `data-[disabled]:opacity-50` from `SelectItem`; disabled items stay full emphasis, not selectable.
+
+### 2026-06-14 — Provider API key helper links on Choose Model
+- **Prompt:** Show helper text with URL to get API key when a model provider is selected (Gemini → AI Studio, Groq, etc.)
+- **Outcome:** `aiProviderApiKeyLinks` map + contextual helper above API key field, updates with provider.
+
+### 2026-06-14 — Provider logos in onboarding dropdown
+- **Prompt:** Show model provider SVG logos (OpenAI, Anthropic, etc.) alongside names in Choose Model dropdown
+- **Outcome:** Added `AiProviderLogo` / `AiProviderOptionLabel` with brand SVG marks; wired into provider `SelectItem`s.
+
+### 2026-06-14 — Coming soon aligned far right in provider dropdown
+- **Prompt:** Coming soon label should align to far right of dropdown row, not beside provider name
+- **Outcome:** `SelectItem` gained optional `suffix` slot outside `ItemText`; onboarding uses it for right-aligned label.
+
+### 2026-06-14 — Provider dropdown "Coming soon" labels
+- **Prompt:** Mark unsupported model providers in Choose Model dropdown with a Coming soon label
+- **Outcome:** Fetches certified providers; unsupported entries show right-aligned "Coming soon" and are disabled.
+
+### 2026-06-14 — Fix onboarding stuck on "You're all set"
+- **Prompt:** After Gmail submit, celebration screen never redirects to dashboard
+- **Outcome:** Fixed `OnboardingConfetti` completion callback (Strict Mode cleared timer); added 3s fallback redirect to `/dashboard`.
+
+### 2026-06-14 — Gmail step copy merged into one paragraph
+- **Prompt:** Merge the two Gmail intro paragraphs into one while keeping the app password link
+- **Outcome:** Single paragraph with inline link, setup steps, and privacy note.
+
+### 2026-06-14 — Gmail helper text matches intro styling
+- **Prompt:** Helper copy should use same font size, weight, and color as paragraph above
+- **Outcome:** Changed helper text from `text-sm` to `text-base text-muted-foreground` to match.
+
+### 2026-06-14 — Gmail step copy shortened with privacy note
+- **Prompt:** Shorten app password helper text; add privacy angle (send only, can't read inbox)
+- **Outcome:** Tighter step 3 helper copy with send-only / no inbox access messaging.
+
+### 2026-06-14 — Gmail step app password instructions
+- **Prompt:** Subtle copy on step 3 explaining create app, name it, get password; email used for sending
+- **Outcome:** Added brief helper text below the app password link on Connect Gmail step.
+
+### 2026-06-14 — Entire resume dropzone clickable
+- **Prompt:** Whole gray dotted box should open the file picker, same as Browse file
+- **Outcome:** Dropzone is a `<label>` for the hidden input; click anywhere opens picker; drag-and-drop unchanged.
+
+### 2026-06-14 — Resume dropzone browse button standard styling
+- **Prompt:** Browse button should match standard app button size, radius, font size, and weight
+- **Outcome:** Removed `size="sm"` and custom `bg-white`; uses default `Button` sizing (`h-10`, `rounded-lg`, `text-base font-medium`).
+
+### 2026-06-14 — Resume dropzone icon heading and browse button
+- **Prompt:** Drop zone like reference — icon, heading, paragraph, gray dashed box, browse button
+- **Outcome:** `ResumeDropzone` redesigned with cloud icon, drag copy, format hint, outline Browse file button.
+
+### 2026-06-14 — Onboarding resume drag-and-drop zone
+- **Prompt:** Step 2 upload as ~120px dashed drop zone with formats + drag/drop
+- **Outcome:** `ResumeDropzone` replaces Upload button; browse link, PDF hint, drag-and-drop.
+
+### 2026-06-14 — Step indicator top margin
+- **Prompt:** Add margin above step indicator
+- **Outcome:** Increased top spacing (`mt-10`) above step progress bar.
+
+### 2026-06-14 — Center onboarding header content
+- **Prompt:** Center-align logo, welcome, and content above the box
+- **Outcome:** Logo, welcome, steps-left copy, and step indicator centered above the form card.
+
+### 2026-06-14 — Step indicator below welcome, above card
+- **Prompt:** Put step indicator right above the box, below logo and welcome text
+- **Outcome:** Order is logo → welcome → steps-left copy → step indicator → white form card.
+
+### 2026-06-14 — Onboarding welcome outside card
+- **Prompt:** Move logo, welcome, and steps-left text outside box; keep step form inside
+- **Outcome:** Brand + welcome copy above card; white box contains step title and inputs only.
+
+### 2026-06-14 — Onboarding step title matches indicator
+- **Prompt:** In-card step heading should match indicator (Choose Model, etc.)
+- **Outcome:** Single `label` per step used for both indicator and section heading.
+
+### 2026-06-14 — Remove step X of 3 line from onboarding
+- **Prompt:** Remove "Step 1 of 3 · 3 remaining" text
+- **Outcome:** Dropped subheading; step section shows title only.
+
+### 2026-06-14 — Onboarding step indicator labels
+- **Prompt:** Step labels should be Choose Model, Upload Resume, Connect Gmail
+- **Outcome:** Updated `STEPS` short labels; widened indicator layout for longer text.
+
+### 2026-06-14 — Consistent onboarding field spacing
+- **Prompt:** Same label-to-input spacing for all three step-1 fields (provider, model, API key)
+- **Outcome:** Shared `OnboardingField` wrapper with `flex flex-col gap-3` and full-width control slot for Select/Input.
+
+### 2026-06-14 — Onboarding label-to-input spacing
+- **Prompt:** Increase space between label and input/menu button
+- **Outcome:** Form fields use `space-y-3` instead of `space-y-2` on onboarding.
+
+### 2026-06-14 — Onboarding model field consistent height
+- **Prompt:** Model select vs "no certified models" message should be same input height
+- **Outcome:** Single disabled `Select` shows "Select model" or empty-state placeholder at fixed `h-10` trigger height.
+
+### 2026-06-14 — Model provider label and select menu width
+- **Prompt:** Label should say "Model provider"; dropdown menu should match trigger width
+- **Outcome:** Renamed onboarding label; `SelectContent` uses `--radix-select-trigger-width` in popper mode.
+
+### 2026-06-14 — Center onboarding step indicator
+- **Prompt:** Step indicator should be center-aligned to the box, not left
+- **Outcome:** Step progress uses `w-fit mx-auto` with fixed-width connectors instead of full-width flex stretch.
+
+### 2026-06-14 — Onboarding selects use shared Select component
+- **Prompt:** Fix provider/model input padding — use same component as other text inputs
+- **Outcome:** Replaced native `<select>` with Radix `Select`/`SelectTrigger` matching app `Input` styling.
+
+### 2026-06-14 — Shorten onboarding welcome copy
+- **Prompt:** Welcome description too long — shorten, same meaning
+- **Outcome:** Single dynamic line e.g. "3 steps left — finish setup to apply from Gmail."
+
+### 2026-06-14 — Onboarding step indicator above card
+- **Prompt:** Move step indicator out of the box, top center above it
+- **Outcome:** Step progress sits centered above the white card, outside the border.
+
+### 2026-06-14 — Onboarding single-step card UX polish
+- **Prompt:** Match login box width; one step at a time with 1-2-3 progress; fix input alignment; clearer welcome copy
+- **Outcome:** Centered `max-w-lg` card like login; step indicator with done/current states; only active step form shown; fixed select/input field layout.
+
+### 2026-06-14 — Onboarding progressive three-step flow
+- **Prompt:** Welcome + 3-step progressive disclosure (AI, resume, Gmail), confetti on complete, then dashboard; walkthrough deferred
+- **Outcome:** Redesigned `/onboarding` with step boxes, email as step 3, canvas-confetti celebration, walkthrough pending flag; backend onboarding requires email too.
+
+### 2026-06-14 — Fix post-auth dashboard flash before onboarding
+- **Prompt:** After Google sign-in, briefly hits dashboard then redirects to onboarding — skip that
+- **Outcome:** Auth callback and session redirects resolve setup status first; route straight to `/onboarding` or `/dashboard` via `resolvePostAuthPath` / `AuthenticatedHomeRedirect`.
+
+### 2026-06-14 — Login box no shadow
+- **Prompt:** Remove the shadow from the box
+- **Outcome:** Login card uses `shadow-none` instead of card shadow.
+
+### 2026-06-14 — Login page gray background
+- **Prompt:** Make background a little gray, keep the box white
+- **Outcome:** Page uses `bg-background`; login card stays white.
+
+### 2026-06-14 — Login page content in centered box
+- **Prompt:** Make everything into a box on the login page
+- **Outcome:** Wrapped headline, bullets, and Google button in a centered bordered `Card` on white background.
+
+### 2026-06-14 — Login page single-column layout
+- **Prompt:** Switch from two columns to one — marketing content on top, Google button below
+- **Outcome:** Single centered column (`max-w-lg`); headline, description, bullets stacked above full-width Google button.
+
+### 2026-06-14 — Login page simplify and tighten layout
+- **Prompt:** Push columns up; one-line headline; minimal benefit bullets; remove steps/card; plain white
+- **Outcome:** White two-column layout, shorter headline, single-line bullets, right column is Google button only.
+
+### 2026-06-14 — Login page two-column redesign
+- **Prompt:** Redesign login with left heading/benefits and right steps + Google button
+- **Outcome:** Split layout: marketing column (headline, description, 3 benefits) and get-started card (numbered steps, Google OAuth).
+
+### 2026-06-14 — Fix blank Apply page when API slow/down
+- **Prompt:** App loading but no data showing on dashboard
+- **Outcome:** Root cause was `OnboardingGuard` blocking routes on setup-status fetch (skeleton forever when API on :5001 was down). Removed blocking loader so Apply/Applications render immediately; onboarding redirect only after status confirms `onboardingRequired`. API verified healthy via Vite proxy.
+
+### 2026-06-14 — Empty state job description copy
+- **Prompt:** Update copy — product uses job descriptions, not job links
+- **Outcome:** Empty state body now says "paste a job description" to match Apply page wording.
+
+### 2026-06-14 — Applications empty state copy and typography
+- **Prompt:** Empty state should use 14px heading/body; replace "Go to Dashboard" with apply CTA
+- **Outcome:** Both lines use `text-base` (14px); button says "Start applying" and links to Apply page; body copy references pasting a job link.
+
+### 2026-06-14 — Commit and push OneTap UI refresh
+- **Prompt:** git push and commit
+- **Outcome:** Committed 100 files as `832261d` (OneTap UI, tracker statuses, apply dashboard); pushed to `origin/master`. Left `.runtime/api.pid` and debug log unstaged.
+
 ### 2026-06-14 — Deploy linear funnel follow-up
 - **Prompt:** Subagent follow-up after linear tracker funnel implementation
 - **Outcome:** Applied migration 026; restarted API on :5001 with funnel service changes.

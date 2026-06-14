@@ -1,44 +1,69 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  CheckCircle2,
-  FileText,
-  KeyRound,
-  Loader2,
-  Upload,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type ApiError } from "@/lib/api";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { useResumeParsePolling } from "@/hooks/useResumeParsePolling";
 import { useActivationTracking } from "@/hooks/useActivationTracking";
-import {
-  trackOnboardingEvent,
-  WELCOME_SEEN_KEY,
-} from "@/lib/onboardingEvents";
+import { trackOnboardingEvent } from "@/lib/onboardingEvents";
+import { markOnboardingWalkthroughPending } from "@/lib/onboardingWalkthrough";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { OneTapBrand, OneTapLogomark } from "@/components/OneTapLogomark";
-import { PAGE_PADDING_X } from "@/lib/pageLayout";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { OneTapBrand } from "@/components/OneTapLogomark";
+import { OnboardingConfetti } from "@/components/onboarding/OnboardingConfetti";
+import { ResumeDropzone } from "@/components/onboarding/ResumeDropzone";
+import { AiProviderOptionLabel } from "@/components/ai/AiProviderLogo";
 import { cn } from "@/lib/utils";
-import { UserMenu } from "@/components/UserMenu";
 import { useAuth } from "@/auth/AuthContext";
 import { getDisplayFirstName } from "@/lib/userDisplay";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
+import { getAiProviderApiKeyLink } from "@/lib/aiProviderApiKeyLinks";
+import {
+  DEFAULT_REMOTE_PROVIDER_ID,
+  isProviderComingSoon,
+  REMOTE_PROVIDERS,
+  type RemoteProviderId,
+} from "@/lib/remoteProviders";
 
-const REMOTE_PROVIDERS = [
-  { id: "openai", label: "OpenAI" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "gemini", label: "Gemini" },
-  { id: "grok", label: "Grok" },
-  { id: "groq", label: "Groq" },
-  { id: "nvidia", label: "NVIDIA NIM" },
-];
+const GMAIL_APP_PASSWORDS_URL = "https://myaccount.google.com/apppasswords";
+
+const STEPS = [
+  { id: 1, label: "Choose Model" },
+  { id: 2, label: "Upload Resume" },
+  { id: 3, label: "Connect Gmail" },
+] as const;
+
+const FIELD_CLASS = "flex flex-col gap-1";
+const LABEL_CLASS = "block text-base font-medium leading-normal text-foreground";
+const CONTROL_WRAP_CLASS = "w-full";
+
+type OnboardingFieldProps = {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+};
+
+function OnboardingField({ label, htmlFor, children }: OnboardingFieldProps) {
+  return (
+    <div className={FIELD_CLASS}>
+      <Label htmlFor={htmlFor} className={LABEL_CLASS}>
+        {label}
+      </Label>
+      <div className={CONTROL_WRAP_CLASS}>{children}</div>
+    </div>
+  );
+}
 
 type AiUiState =
   | "idle"
@@ -57,6 +82,57 @@ type ResumeUiState =
   | "failed"
   | "stalled";
 
+type StepProgressProps = {
+  activeStep: number;
+  completed: [boolean, boolean, boolean];
+};
+
+function OnboardingStepProgress({ activeStep, completed }: StepProgressProps) {
+  return (
+    <div className="mx-auto flex w-fit items-start justify-center">
+      {STEPS.map((step, index) => {
+        const done = completed[index];
+        const current = activeStep === step.id;
+        const upcoming = !done && !current;
+
+        return (
+          <div key={step.id} className="flex items-start">
+            <div className="flex flex-col items-center gap-1.5 px-0.5">
+              <span
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
+                  done && "bg-success/15 text-success",
+                  current && !done && "bg-foreground text-background",
+                  upcoming && "bg-black/[0.06] text-muted-foreground"
+                )}
+              >
+                {done ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : step.id}
+              </span>
+              <span
+                className={cn(
+                  "whitespace-nowrap text-xs font-medium",
+                  current ? "text-foreground" : done ? "text-success" : "text-muted-foreground"
+                )}
+              >
+                {step.label}
+              </span>
+            </div>
+            {index < STEPS.length - 1 ? (
+              <div
+                className={cn(
+                  "mx-2 mt-4 h-px w-10 shrink-0 sm:mx-3 sm:w-14",
+                  completed[index] ? "bg-success/40" : "bg-border"
+                )}
+                aria-hidden
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Onboarding() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -64,8 +140,7 @@ export function Onboarding() {
   const { data: status, isLoading, refetch } = useSetupStatus();
   useActivationTracking(status, "onboarding");
 
-  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState<RemoteProviderId>(DEFAULT_REMOTE_PROVIDER_ID);
   const [selectedModel, setSelectedModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [curatedModels, setCuratedModels] = useState<
@@ -74,15 +149,26 @@ export function Onboarding() {
   const [aiUi, setAiUi] = useState<AiUiState>("idle");
   const [aiError, setAiError] = useState<string | null>(null);
   const [resumeUi, setResumeUi] = useState<ResumeUiState>("idle");
-  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
-  const redirectCancelled = useRef(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
+  const celebrationStartedRef = useRef(false);
   const uploadStartedAt = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const startedRef = useRef(false);
 
   const hasVerifiedAi = !!status?.hasVerifiedAiCredential;
   const hasValidResume = !!status?.hasValidResume;
-  const isActivated = hasVerifiedAi && hasValidResume;
+  const hasEmailSetup = !!status?.hasEmailSetup;
+  const isComplete = hasVerifiedAi && hasValidResume && hasEmailSetup;
   const parsingResume = !!status?.hasResume && !hasValidResume;
+
+  const completedSteps: [boolean, boolean, boolean] = [
+    hasVerifiedAi,
+    hasValidResume,
+    hasEmailSetup,
+  ];
+  const completedCount = completedSteps.filter(Boolean).length;
+  const activeStep = !hasVerifiedAi ? 1 : !hasValidResume ? 2 : !hasEmailSetup ? 3 : 0;
+  const remainingCount = 3 - completedCount;
 
   useResumeParsePolling(parsingResume);
 
@@ -90,6 +176,13 @@ export function Onboarding() {
     if (!user || user.firstName?.trim() || user.fullName?.trim()) return;
     void api.seedProfileFromEmail().then(() => refreshUser());
   }, [user, refreshUser]);
+
+  useEffect(() => {
+    if (startedRef.current || isLoading) return;
+    startedRef.current = true;
+    trackOnboardingEvent("onboarding_started");
+    void api.seedProfileFromEmail().then(() => refreshUser()).catch(() => {});
+  }, [isLoading, refreshUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,14 +198,6 @@ export function Onboarding() {
       cancelled = true;
     };
   }, [provider]);
-
-  useEffect(() => {
-    if (isLoading || !status) return;
-    const seen = sessionStorage.getItem(WELCOME_SEEN_KEY) === "true";
-    const skip =
-      hasVerifiedAi || hasValidResume || seen;
-    setShowWelcome(!skip);
-  }, [isLoading, status, hasVerifiedAi, hasValidResume]);
 
   useEffect(() => {
     if (hasVerifiedAi) setAiUi("valid");
@@ -139,42 +224,40 @@ export function Onboarding() {
   }, [parsingResume, status?.activeResume?.uploadedAt]);
 
   useEffect(() => {
-    if (!isActivated) return;
-    redirectCancelled.current = false;
-    setRedirectSeconds(5);
-  }, [isActivated]);
+    if (!isComplete || celebrationStartedRef.current) return;
+    celebrationStartedRef.current = true;
+    setCelebrating(true);
+    trackOnboardingEvent("onboarding_completed");
+  }, [isComplete]);
 
   useEffect(() => {
-    if (redirectSeconds === null || redirectCancelled.current) return;
-    if (redirectSeconds <= 0) {
-      trackOnboardingEvent("dashboard_entered");
-      navigate("/dashboard", { replace: true });
-      return;
+    if (hasValidResume && uploadStartedAt.current) {
+      trackOnboardingEvent("resume_parsed");
     }
-    const t = setTimeout(() => setRedirectSeconds((s) => (s !== null ? s - 1 : null)), 1000);
-    return () => clearTimeout(t);
-  }, [redirectSeconds, navigate]);
+  }, [hasValidResume]);
 
   const invalidateStatus = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: setupStatusQueryOptions.queryKey });
     refetch();
   }, [queryClient, refetch]);
 
-  const handleGetStarted = async () => {
-    sessionStorage.setItem(WELCOME_SEEN_KEY, "true");
-    trackOnboardingEvent("onboarding_started");
-    try {
-      await api.seedProfileFromEmail();
-      await refreshUser();
-    } catch {
-      // Non-blocking — user can set name later from the account menu.
-    }
-    setShowWelcome(false);
-  };
+  const finishOnboarding = useCallback(() => {
+    markOnboardingWalkthroughPending();
+    trackOnboardingEvent("dashboard_entered");
+    navigate("/dashboard", { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!celebrating) return;
+    const timer = window.setTimeout(() => {
+      finishOnboarding();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [celebrating, finishOnboarding]);
 
   const handleSaveAi = async () => {
     if (!selectedModel) {
-      toast.error("Select a certified model from the dropdown");
+      toast.error("Select a model from the dropdown");
       return;
     }
     setAiError(null);
@@ -208,7 +291,7 @@ export function Onboarding() {
 
   const handleResumeUpload = async (file: File) => {
     if (!hasVerifiedAi) {
-      toast.error("Verify your AI key before uploading a resume");
+      toast.error("Verify your AI provider before uploading a resume");
       return;
     }
     setResumeUi("uploading");
@@ -225,13 +308,33 @@ export function Onboarding() {
     }
   };
 
-  useEffect(() => {
-    if (hasValidResume && uploadStartedAt.current) {
-      trackOnboardingEvent("resume_parsed");
+  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!hasValidResume) {
+      toast.error("Upload and parse your resume first");
+      return;
     }
-  }, [hasValidResume]);
+    setEmailLoading(true);
+    const fd = new FormData(e.currentTarget);
+    const password = String(fd.get("appPassword")).replace(/\s+/g, "");
+    if (password.length !== 16) {
+      toast.error("App password must be exactly 16 characters");
+      setEmailLoading(false);
+      return;
+    }
+    try {
+      await api.saveCredentials(String(fd.get("email")), password);
+      toast.success("Gmail connected");
+      trackOnboardingEvent("gmail_setup_clicked");
+      invalidateStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save credentials");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
 
-  if (isLoading || showWelcome === null) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -239,292 +342,255 @@ export function Onboarding() {
     );
   }
 
-  if (showWelcome) {
-    const welcomeName = user ? getDisplayFirstName(user) : null;
-    return (
-      <div className={cn("flex min-h-screen flex-col items-center justify-center bg-background", PAGE_PADDING_X)}>
-        <div className="max-w-lg text-center space-y-6">
-          <OneTapLogomark className="mx-auto h-14 w-auto" />
-          <h1 className="text-display font-semibold">
-            {welcomeName ? `Welcome, ${welcomeName}` : "Welcome to OneTap"}
-          </h1>
-          <p className="text-muted-foreground">
-            Connect your AI provider and upload your resume to start sending tailored applications in one tap.
-          </p>
-          <Button size="lg" onClick={() => void handleGetStarted()}>
-            Get Started
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const step = status?.currentOnboardingStep ?? "ai";
+  const welcomeName = user ? getDisplayFirstName(user) : null;
+  const currentStepMeta = STEPS.find((s) => s.id === activeStep);
+  const apiKeyLink = getAiProviderApiKeyLink(provider);
+  const welcomeDescription =
+    remainingCount === 0
+      ? "Almost ready to apply."
+      : remainingCount === 1
+        ? "One step left — then you can apply from Gmail."
+        : `${remainingCount} steps left — finish setup to apply from Gmail.`;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className={cn("border-b border-border py-4", PAGE_PADDING_X)}>
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <OneTapBrand logomarkClassName="h-7" />
-          <UserMenu />
-        </div>
-      </header>
-
-      <main className={cn("mx-auto max-w-2xl space-y-6 py-10", PAGE_PADDING_X)}>
-        {!isActivated && (
-          <div className="flex gap-2 text-xs text-muted-foreground">
-            <Badge variant={step === "ai" ? "default" : "outline"}>1. AI</Badge>
-            <Badge variant={step === "resume" ? "default" : "outline"}>2. Resume</Badge>
+      {celebrating ? (
+        <>
+          <OnboardingConfetti active onComplete={finishOnboarding} />
+          <div className="pointer-events-none fixed inset-0 z-[9998] flex items-center justify-center bg-white/75">
+            <p className="text-xl font-semibold text-foreground">You&apos;re all set!</p>
           </div>
-        )}
+        </>
+      ) : null}
 
-        {isActivated ? (
-          <Card className="ring-1 ring-success/30">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span aria-hidden>🎉</span> You&apos;re ready to apply
-              </CardTitle>
-              <CardDescription>
-                Your AI key and resume are set. Gmail is optional — connect it anytime from Setup to send from your own inbox.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {redirectSeconds !== null && !redirectCancelled.current && (
-                <p className="text-sm text-muted-foreground">
-                  Redirecting to dashboard in {redirectSeconds}s…{" "}
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => {
-                      redirectCancelled.current = true;
-                      setRedirectSeconds(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => {
-                    trackOnboardingEvent("dashboard_entered");
-                    navigate("/dashboard");
-                  }}
-                >
-                  Go To Dashboard
-                </Button>
-                <Button variant="outline" asChild>
-                  <a
-                    href="/setup?focus=email"
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => trackOnboardingEvent("gmail_setup_clicked")}
-                  >
-                    Setup Gmail
-                  </a>
-                </Button>
-                <Button variant="ghost" onClick={() => redirectCancelled.current = true}>
-                  Stay Here
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <Card className={step === "ai" ? "ring-2 ring-ring/20" : ""}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <KeyRound className="h-5 w-5" />
-                  AI provider
-                  {hasVerifiedAi && (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  Your API key is validated before resume upload. Billing goes to your provider account.
-                </CardDescription>
-              </CardHeader>
-              {hasVerifiedAi ? (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {status?.activeAiProvider?.provider ?? "Provider"} connected
-                    {status?.activeAiProvider?.selectedModel
-                      ? ` · ${status.activeAiProvider.selectedModel}`
-                      : ""}
-                  </p>
-                </CardContent>
-              ) : (
-                <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Provider</Label>
-                      <select
-                        className="flex h-10 w-full rounded-[10px] border border-input-border bg-input px-[14px] py-2.5 text-base"
+      <div className="flex min-h-screen items-center justify-center px-6 py-12">
+        <div className="w-full max-w-lg">
+          <div className="flex flex-col items-center text-center">
+            <OneTapBrand className="mb-6 justify-center" />
+
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {welcomeName ? `Welcome, ${welcomeName}` : "Welcome to OneTap"}
+            </h1>
+            <p className="mt-3 text-base text-muted-foreground">{welcomeDescription}</p>
+          </div>
+
+          <div className="mb-6 mt-10 flex justify-center">
+            <OnboardingStepProgress activeStep={activeStep} completed={completedSteps} />
+          </div>
+
+          <Card className="w-full border border-border bg-white shadow-none">
+            <CardContent className="p-8">
+              {activeStep > 0 && currentStepMeta ? (
+                <>
+                  <h2 className="text-base font-medium text-foreground">{currentStepMeta.label}</h2>
+
+                {activeStep === 1 ? (
+                  <div className="mt-5 space-y-4">
+                    <OnboardingField label="Model provider">
+                      <Select
                         value={provider}
-                        onChange={(e) => {
-                          setProvider(e.target.value);
+                        onValueChange={(value) => {
+                          setProvider(value as RemoteProviderId);
                           setSelectedModel("");
                         }}
                       >
-                        {REMOTE_PROVIDERS.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {curatedModels.length > 0 ? (
-                        <select
-                          className="flex h-10 w-full rounded-[10px] border border-input-border bg-input px-[14px] py-2.5 text-base"
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          required
-                        >
-                          <option value="">Select certified model</option>
-                          {curatedModels.map((m) => (
-                            <option key={m.modelId} value={m.modelId}>
-                              {m.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                          No certified models for this provider yet. Ask your admin to certify models
-                          via the dev certification tool.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API key</Label>
-                    <Input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      autoComplete="off"
-                    />
-                  </div>
-                  {aiUi === "validation_timeout" && (
-                    <div className="rounded-xl bg-warning/10 p-3 text-sm">
-                      <p className="font-medium">Unable to verify provider.</p>
-                      <p className="text-muted-foreground">{aiError}</p>
-                      <div className="mt-3 flex gap-2">
-                        <Button size="sm" variant="outline" onClick={handleSaveAi}>
-                          Retry Validation
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setAiUi("idle");
-                            setApiKey("");
-                          }}
-                        >
-                          Change Key
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {aiUi === "invalid" && aiError && (
-                    <p className="text-sm text-destructive">{aiError}</p>
-                  )}
-                  <Button
-                    onClick={handleSaveAi}
-                    disabled={
-                      !apiKey ||
-                      !selectedModel ||
-                      curatedModels.length === 0 ||
-                      aiUi === "saving" ||
-                      aiUi === "pending_validation"
-                    }
-                  >
-                    {(aiUi === "saving" || aiUi === "pending_validation") && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {aiUi === "pending_validation" ? "Verifying…" : "Save & Verify"}
-                  </Button>
-                </CardContent>
-              )}
-            </Card>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REMOTE_PROVIDERS.map((p) => {
+                            const comingSoon = isProviderComingSoon(p.id);
+                            return (
+                              <SelectItem
+                                key={p.id}
+                                value={p.id}
+                                disabled={comingSoon}
+                                suffix={
+                                  comingSoon ? (
+                                    <span className="text-xs text-muted-foreground">Coming soon</span>
+                                  ) : undefined
+                                }
+                              >
+                                <AiProviderOptionLabel provider={p.id} label={p.label} />
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </OnboardingField>
 
-            <Card className={step === "resume" ? "ring-2 ring-ring/20" : ""}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <FileText className="h-5 w-5" />
-                  Resume
-                  {hasValidResume && (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  )}
-                </CardTitle>
-                <CardDescription>PDF only. Parsed with your verified AI key.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!hasVerifiedAi && (
-                  <p className="text-sm text-muted-foreground">
-                    Complete AI verification above to unlock resume upload.
-                  </p>
-                )}
-                {hasValidResume && status?.activeResume && (
-                  <p className="text-sm">
-                    <CheckCircle2 className="mr-1 inline h-4 w-4 text-success" />
-                    {status.activeResume.filename}
-                  </p>
-                )}
-                {!hasValidResume && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      disabled={!hasVerifiedAi}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void handleResumeUpload(f);
-                      }}
-                    />
+                    <OnboardingField label="Model">
+                      <Select
+                        value={selectedModel || undefined}
+                        onValueChange={setSelectedModel}
+                        disabled={curatedModels.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              curatedModels.length > 0
+                                ? "Select model"
+                                : "No certified models for this provider yet."
+                            }
+                          />
+                        </SelectTrigger>
+                        {curatedModels.length > 0 ? (
+                          <SelectContent>
+                            {curatedModels.map((m) => (
+                              <SelectItem key={m.modelId} value={m.modelId}>
+                                {m.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        ) : null}
+                      </Select>
+                    </OnboardingField>
+
+                    <OnboardingField label="API key" htmlFor="onboarding-api-key">
+                      <div className="flex flex-col gap-1">
+                        <Input
+                          id="onboarding-api-key"
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          autoComplete="off"
+                          placeholder="Paste your API key"
+                        />
+                        {apiKeyLink ? (
+                          <p className="text-base text-muted-foreground">
+                            You can get your {apiKeyLink.providerName} API key from{" "}
+                            <a
+                              href={apiKeyLink.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 font-medium text-foreground underline-offset-4 hover:underline"
+                            >
+                              {apiKeyLink.linkLabel}
+                              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                            </a>
+                            .
+                          </p>
+                        ) : null}
+                      </div>
+                    </OnboardingField>
+
+                    {aiUi === "validation_timeout" && (
+                      <div className="rounded-[10px] bg-warning/10 p-3 text-base">
+                        <p className="font-medium">Unable to verify provider.</p>
+                        <p className="text-muted-foreground">{aiError}</p>
+                        <div className="mt-3 flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void handleSaveAi()}>
+                            Retry
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setAiUi("idle");
+                              setApiKey("");
+                            }}
+                          >
+                            Change key
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {aiUi === "invalid" && aiError ? (
+                      <p className="text-base text-destructive">{aiError}</p>
+                    ) : null}
+
                     <Button
-                      variant="outline"
-                      disabled={!hasVerifiedAi || resumeUi === "uploading"}
-                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full"
+                      onClick={() => void handleSaveAi()}
+                      disabled={
+                        !apiKey ||
+                        !selectedModel ||
+                        curatedModels.length === 0 ||
+                        aiUi === "saving" ||
+                        aiUi === "pending_validation"
+                      }
                     >
-                      {resumeUi === "uploading" ? (
+                      {(aiUi === "saving" || aiUi === "pending_validation") && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="mr-2 h-4 w-4" />
                       )}
-                      Upload PDF
+                      {aiUi === "pending_validation" ? "Verifying…" : "Save & verify"}
                     </Button>
+                  </div>
+                ) : null}
+
+                {activeStep === 2 ? (
+                  <div className="mt-5 space-y-4">
+                    <ResumeDropzone
+                      busy={resumeUi === "uploading"}
+                      onFile={(file) => void handleResumeUpload(file)}
+                    />
                     {resumeUi === "processing" && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <p className="flex items-center gap-2 text-base text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Parsing your resume…
                       </p>
                     )}
                     {resumeUi === "stalled" && (
-                      <div className="text-sm space-y-2">
-                        <p className="text-warning">
-                          Parsing is taking longer than expected. You can retry upload or continue from Setup later.
-                        </p>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link to="/setup">Open Setup</Link>
-                        </Button>
-                      </div>
+                      <p className="text-base text-warning">
+                        Parsing is taking longer than expected. Try uploading again.
+                      </p>
                     )}
                     {resumeUi === "failed" && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-base text-destructive">
                         Upload failed. Check your file and try again.
                       </p>
                     )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </main>
+                  </div>
+                ) : null}
+
+                {activeStep === 3 ? (
+                  <form onSubmit={(e) => void handleEmailSubmit(e)} className="mt-5 space-y-4">
+                    <p className="text-base text-muted-foreground">
+                      Connect Gmail with an app password so applications send from your inbox. Create a
+                      new app on Google (e.g. OneTap),{" "}
+                      <a
+                        href={GMAIL_APP_PASSWORDS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 font-medium text-foreground underline-offset-4 hover:underline"
+                      >
+                        get an app password
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                      </a>
+                      , and paste it below — we only send from this address and can&apos;t read your
+                      inbox.
+                    </p>
+                    <OnboardingField label="Gmail address" htmlFor="onboarding-email">
+                      <Input
+                        id="onboarding-email"
+                        name="email"
+                        type="email"
+                        defaultValue={status?.email ?? user?.email ?? ""}
+                        required
+                      />
+                    </OnboardingField>
+                    <OnboardingField label="App password" htmlFor="onboarding-app-password">
+                      <Input
+                        id="onboarding-app-password"
+                        name="appPassword"
+                        type="password"
+                        placeholder="xxxx xxxx xxxx xxxx"
+                        required
+                        autoComplete="off"
+                      />
+                    </OnboardingField>
+                    <Button type="submit" className="w-full" disabled={emailLoading}>
+                      {emailLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Connect Gmail
+                    </Button>
+                  </form>
+                ) : null}
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

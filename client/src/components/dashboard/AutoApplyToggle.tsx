@@ -9,7 +9,7 @@ type Props = {
 
 export function AutoApplyToggle({ enabled, onEnabledChange, disabled }: Props) {
   return (
-    <div className="flex items-center gap-3">
+    <div data-tour="auto-apply-toggle" className="flex items-center gap-3">
       <label
         htmlFor="auto-apply-toggle"
         className={cn("text-base font-medium text-foreground", disabled && "opacity-50")}

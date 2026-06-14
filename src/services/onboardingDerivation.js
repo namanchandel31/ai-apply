@@ -2,22 +2,26 @@
  * Derived onboarding state — no persistence; computed from setup facts only.
  */
 
-const ONBOARDING_STEPS = Object.freeze(["ai", "resume", "ready"]);
+const ONBOARDING_STEPS = Object.freeze(["ai", "resume", "email", "ready"]);
 
 /**
- * @param {{ hasVerifiedAiCredential: boolean, hasValidResume: boolean }} facts
+ * @param {{ hasVerifiedAiCredential: boolean, hasValidResume: boolean, hasEmailSetup: boolean }} facts
  */
 function deriveOnboardingState(facts) {
   const hasVerifiedAiCredential = !!facts.hasVerifiedAiCredential;
   const hasValidResume = !!facts.hasValidResume;
+  const hasEmailSetup = !!facts.hasEmailSetup;
 
-  const onboardingRequired = !hasVerifiedAiCredential || !hasValidResume;
+  const onboardingRequired =
+    !hasVerifiedAiCredential || !hasValidResume || !hasEmailSetup;
 
   let currentOnboardingStep = "ready";
   if (!hasVerifiedAiCredential) {
     currentOnboardingStep = "ai";
   } else if (!hasValidResume) {
     currentOnboardingStep = "resume";
+  } else if (!hasEmailSetup) {
+    currentOnboardingStep = "email";
   }
 
   return {
@@ -25,6 +29,7 @@ function deriveOnboardingState(facts) {
     currentOnboardingStep,
     hasVerifiedAiCredential,
     hasValidResume,
+    hasEmailSetup,
   };
 }
 

@@ -25,6 +25,7 @@ export function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                data-tour={item.to === "/applications" ? "applications-tab" : undefined}
                 className={({ isActive }) =>
                   cn(
                     "inline-flex h-full items-center border-b-2 px-1 text-base whitespace-nowrap transition-[color,border-color] duration-[120ms]",

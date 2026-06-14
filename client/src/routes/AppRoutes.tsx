@@ -10,6 +10,7 @@ import { Onboarding } from "@/pages/onboarding";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { GuestRoute } from "@/routes/GuestRoute";
 import { OnboardingGuard } from "@/routes/OnboardingGuard";
+import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 import { SessionHandlers } from "@/auth/SessionHandlers";
 import { useAuth } from "@/auth/AuthContext";
 import { ModelCertificationPage } from "@/pages/dev/ModelCertification";
@@ -23,7 +24,7 @@ function CatchAllRedirect() {
       </div>
     );
   }
-  return <Navigate to={session ? "/dashboard" : "/login"} replace />;
+  return session ? <AuthenticatedHomeRedirect /> : <Navigate to="/login" replace />;
 }
 
 export function AppRoutes() {

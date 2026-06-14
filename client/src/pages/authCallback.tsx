@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePostAuthPath, type PostAuthPath } from "@/lib/postAuthDestination";
 
 const CALLBACK_TIMEOUT_MS = 15_000;
 
@@ -22,16 +23,18 @@ export function AuthCallbackPage() {
   useEffect(() => {
     let mounted = true;
 
-    const redirect = (path: "/dashboard" | "/login") => {
+    const redirect = (path: PostAuthPath | "/login") => {
       if (!mounted || redirectedRef.current) return;
       redirectedRef.current = true;
       navigate(path, { replace: true });
     };
 
-    const completeWithSession = (session: Session) => {
+    const completeWithSession = async (session: Session) => {
       if (!session) return;
       stripOAuthHashFromUrl();
-      redirect("/dashboard");
+      const path = await resolvePostAuthPath();
+      if (!mounted || redirectedRef.current) return;
+      redirect(path);
     };
 
     const {
@@ -39,7 +42,7 @@ export function AuthCallbackPage() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted || redirectedRef.current) return;
       if (session && isSessionReadyEvent(event)) {
-        completeWithSession(session);
+        void completeWithSession(session);
       }
     });
 
@@ -51,7 +54,7 @@ export function AuthCallbackPage() {
         return;
       }
       if (data.session) {
-        completeWithSession(data.session);
+        await completeWithSession(data.session);
       }
     })();
 
@@ -61,7 +64,7 @@ export function AuthCallbackPage() {
         const { data } = await supabase.auth.getSession();
         if (!mounted || redirectedRef.current) return;
         if (data.session) {
-          completeWithSession(data.session);
+          await completeWithSession(data.session);
         } else {
           redirect("/login");
         }
