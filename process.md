@@ -1,5 +1,244 @@
 ## Log (newest first)
 
+### 2026-06-14 — Remove footer
+- **Prompt:** Remove footer.
+- **Outcome:** Dropped `MindooFooter` from landing page.
+
+### 2026-06-14 — Steps section full white bg
+- **Prompt:** Use white bg for whole section.
+- **Outcome:** White background on `.m-steps` and layout columns; bottom spacing moved into section `padding-bottom`.
+
+### 2026-06-14 — Steps section top spacing
+- **Prompt:** Remove gap between steps and section above; use that value as steps padding-top.
+- **Outcome:** Removed top `m-spacing-xxl` spacer and solution bottom padding; added `padding-top: var(--m-spacing-xxl)` to `.m-steps`.
+
+### 2026-06-14 — Fix steps sticky scroll mask
+- **Prompt:** Step content shows through sticky white headline after certain scroll.
+- **Outcome:** Overlay grid layout — headline and steps share one cell; steps scroll under sticky mask with higher z-index and full-width white backdrop.
+
+### 2026-06-14 — Steps headline white background
+- **Prompt:** "From start to finish…" text should have white bg.
+- **Outcome:** Added `background: var(--m-bg)` and padding to `.m-steps-sticky`.
+
+### 2026-06-14 — Remove benefits section
+- **Prompt:** Remove section "Designed to fit the way you already search."
+- **Outcome:** Dropped `MindooBenefitsSection` from landing page.
+
+### 2026-06-14 — Remove section 4 (features)
+- **Prompt:** Remove section 4.
+- **Outcome:** Dropped `MindooFeaturesSection` from landing page; removed Features nav/footer links.
+
+### 2026-06-14 — Solution headline one line
+- **Prompt:** Headline should be in one line only.
+- **Outcome:** Replaced `m-ch-22` with `.m-solution-headline` (`white-space: nowrap`, fluid size on mobile).
+
+### 2026-06-14 — Left-align solution headline
+- **Prompt:** "Start where the pressure is highest." align left.
+- **Outcome:** Removed `m-text-center` and `m-ch-18` auto-margin; uses left-aligned `m-ch-22`.
+
+### 2026-06-14 — Solution bento grid (4 features)
+- **Prompt:** Section 3 bento grid with 4 best features (LinkedIn extension, tracking, etc.).
+- **Outcome:** Rebuilt `MindooSolutionSection` as 3-column bento: LinkedIn extension, application tracking, AI personalized emails, Gmail send; added extension/gmail mini mockups.
+
+### 2026-06-14 — Tighten gap between sections 2 and 3
+- **Prompt:** Too much space between section 2 and 3.
+- **Outcome:** Problem section auto-height (removed `55rem` fixed height); reduced solution section and wrapper top padding.
+
+### 2026-06-14 — Solution section bg box
+- **Prompt:** Duplicate footer bg box and use on 3rd section as background.
+- **Outcome:** Extracted shared `.m-bg-box`; wrapped solution section in it; footer uses same base class.
+
+### 2026-06-14 — Left-align problem section
+- **Prompt:** Align the 2nd section left.
+- **Outcome:** `.m-problem-outer` uses `justify-content: flex-start` instead of `center`.
+
+### 2026-06-14 — Remove problem section floating boxes
+- **Prompt:** Remove them.
+- **Outcome:** Deleted floating box markup/data from `MindooProblemSection` and all related CSS.
+
+### 2026-06-14 — Viewport-scattered problem boxes
+- **Prompt:** Boxes can go outside content container but should stay visible in viewport, placed randomly.
+- **Outcome:** Percentage-based scatter positions in component data; images layer fills section (`inset: 0`); separate mobile edge positions.
+
+### 2026-06-14 — More floating problem boxes
+- **Prompt:** Make boxes more floating; okay if they go outside container.
+- **Outcome:** Moved images to `.m-problem-outer`, spread positions with rotation/shadow/float animation, `overflow: visible`.
+
+### 2026-06-14 — Move problem boxes down
+- **Prompt:** Move floating boxes downwards.
+- **Outcome:** Shifted all 7 `.m-problem-img` positions down on desktop and mobile.
+
+### 2026-06-14 — Problem section floating boxes
+- **Prompt:** Duplicate floating boxes to 7, make them smaller.
+- **Outcome:** Added Emails, Job boards, Calendars cards; reduced box size to `10rem` (mobile `5.5rem`) with positions for all 7.
+
+### 2026-06-14 — Match hero subhead font size
+- **Prompt:** Use same font size for hero subhead copy as problem section body.
+- **Outcome:** `.mh-subhead` bumped from `1.0625rem` to `1.125rem` to match `.m-problem-p`.
+
+### 2026-06-14 — Problem section body font size
+- **Prompt:** Bump up the font size.
+- **Outcome:** Increased `.m-problem-p` from `1rem` to `1.125rem`.
+
+### 2026-06-14 — Problem section 2nd paragraph
+- **Prompt:** Update the 2nd paragraph in problem section with expanded after-application copy.
+- **Outcome:** Replaced second `.m-problem-p` in `MindooProblemSection`.
+
+### 2026-06-14 — Revert problem section copy v2
+- **Prompt:** Undo the copy update.
+- **Outcome:** Restored previous problem section body paragraphs (shorter before/after/close copy).
+
+### 2026-06-14 — Problem section copy v2
+- **Prompt:** Update problem section body copy with expanded before/after paragraphs and new closing line.
+- **Outcome:** Replaced three body paragraphs in `MindooProblemSection`; headline unchanged.
+
+### 2026-06-14 — Fix problem section heading visibility
+- **Prompt:** Heading not visible in section 2.
+- **Outcome:** Problem heading now always visible (bypasses reveal opacity), sits above decorative images via z-index, section content top-aligned with padding, wider `m-ch-22` headline; reveal hook uses `threshold: 0`.
+
+### 2026-06-14 — Problem section copy refresh
+- **Prompt:** Update copy in second section with new headline and three body paragraphs.
+- **Outcome:** Replaced `MindooProblemSection` headline and body text; widened headline to `m-ch-18` for the longer line.
+
+### 2026-06-14 — Increase m-h3 line height
+- **Prompt:** Increase line height of problem section headline and wherever `.m-h3` is used.
+- **Outcome:** Bumped `.m-h3` line-height from `90%` to `115%` (affects all `SplitHeading` sections).
+
+### 2026-06-14 — Match empty-state text to JD
+- **Prompt:** Make "We'll apply the moment you add a role" text same as JD.
+- **Outcome:** `.mh-apply-anim .mh-anim-email-empty` now mirrors `.mh-anim-placeholder` (0.8125rem, 150% line-height, tertiary color, 0.7 opacity, left-aligned) instead of the smaller centered caption.
+
+### 2026-06-14 — Body-only email preview, faster typing
+- **Prompt:** Remove subject from email preview (toggle on) — body copy only; faster typewriter; body copy color same as JD.
+- **Outcome:** Dropped `subjectText`/`EMAIL_SUBJECT` from hook + component; typing now types `EMAIL_BODY` only at `TYPING_MS` 28→12. `.mh-anim-body` color switched to `--mh-ui-title` to match `.mh-anim-jd-text`.
+
+### 2026-06-14 — Simplify hero animation + tie to toggle
+- **Prompt:** Remove OneTap logo/Apply/Applications tabs/AutoApply pill from animation; remove all-caps labels; consistent font in JD + email boxes; tie flow to toggle (ON = email preview, OFF/hand-off = no preview, just "Applied successfully").
+- **Outcome:** Dropped the whole `m-product-bar` from `HeroApplyAnimation`; `.mh-apply-anim .m-mini-label` now `text-transform: none`; JD text, email body, and subject normalized to 0.8125rem/150%. Hook branches on `autoApply`: ON keeps generate→type→send; OFF goes paste→applying→`applied` success card ("Applied successfully") via new `mh-anim-applied`/`mh-anim-applying` styles.
+
+### 2026-06-14 — Push hero animation right
+- **Prompt:** HTML animation overlaps hero text; push it right instead of resizing.
+- **Outcome:** Right column uses `justify-content: flex-end`; product mockup gets `margin-left: clamp(2rem, 5vw, 4rem)` on desktop (reset on mobile stack).
+
+### 2026-06-14 — Join waitlist button font weight
+- **Prompt:** Font size/weight on join waitlist button changes on tap; use medium weight for both states.
+- **Outcome:** Set `.mh-hero-waitlist-trigger` to `font-weight: 500` to match the expanded submit button.
+
+## Log (newest first)
+
+## Log (newest first)
+
+### 2026-06-14 — Taller hero section
+- **Prompt:** Increase the height of hero section.
+- **Outcome:** Hero split wrap now uses `min-height: min(88vh, 48rem)` with larger vertical padding and flex centering.
+
+### 2026-06-14 — Blue background through nav + hero
+- **Prompt:** Blue background should cover navigation too, from top of site through hero (not white behind nav).
+- **Outcome:** Wrapped nav + hero in `mh-top-shell`; hero nav uses transparent bar on blue with white links/logo; nav reverts to white pill after scrolling past hero (`data-hero-past`).
+
+### 2026-06-14 — Weav-style blue split hero
+- **Prompt:** Use full OneTap logo blue for hero like weav.com; left-align headline, paragraph, input; product animation on the right.
+- **Outcome:** Rebuilt hero as two-column split on `#2563eb` background with white left-aligned copy + waitlist CTA; `HeroApplyAnimation` on the right with scoped white mockup UI; removed floating side cards.
+
+### 2026-06-14 — Nudge hero toggle line right (visible)
+- **Prompt:** I don't see any change.
+- **Outcome:** Replaced ineffective `margin-left` with `position: relative; left: 1.5rem` (1rem mobile) on line two so toggle + tail shift right regardless of flex centering.
+
+### 2026-06-14 — Nudge hero toggle line right
+- **Prompt:** Move them a little to the right.
+- **Outcome:** Added `margin-left: 0.75rem` on `.mh-h1-line-second` to shift toggle + tail text slightly right.
+
+### 2026-06-14 — Fixed hero toggle position on state change
+- **Prompt:** Toggle shifts position when toggling on/off; keep position and gap to following text fixed.
+- **Outcome:** Line two uses fixed `inline-grid` columns (toggle slot + tail text slot) with constant `column-gap`; tail reserves width for longest label so centering does not jump between hands-free/hands-on.
+
+### 2026-06-14 — Larger hero toggle (again)
+- **Prompt:** Can you increase the height and width of the toggle button?
+- **Outcome:** Scaled toggle track to 5.75rem×3rem (desktop) and 4.5rem×2.5rem (mobile); thumb and on-state travel updated to match.
+
+### 2026-06-14 — Center hero toggle with headline text
+- **Prompt:** Align it horizontally center with the text.
+- **Outcome:** Toggle button uses 1em height + flex centering so it vertically aligns with the headline words on line two; line and word spans use consistent `align-items: center`.
+
+### 2026-06-14 — Wider hero waitlist input
+- **Prompt:** Make it more wider.
+- **Outcome:** Waitlist wrapper widened to min(32rem, 92vw); hero copy max-width raised to 38rem so the field isn’t clipped.
+
+### 2026-06-14 — Hero waitlist: stable outer container on expand
+- **Prompt:** Clicking join waitlist to expand inline input — issue with the overall div (message cut off).
+- **Outcome:** Fixed wrapper to full expanded width always; pill button centered when collapsed; only inner field fades in on expand — no outer div width shift.
+
+### 2026-06-14 — Hero waitlist button: snappy pill expand
+- **Prompt:** Join waitlist button jitters on click; should be snappy, fully rounded, slightly larger type.
+- **Outcome:** Removed scale expand animation; unified wrapper with max-width transition; pill radius + 1rem font on trigger; no transform on hover/active.
+
+### 2026-06-14 — Larger hero toggle
+- **Prompt:** Increase the height of the toggle button as well as the width. Make it bigger.
+- **Outcome:** Scaled hero AutoApply toggle track and thumb (~27% larger on desktop, ~25% on mobile); adjusted thumb travel for on state.
+
+### 2026-06-14 — Hero copy: outcome lead + AutoApply mode toggle
+- **Prompt:** Copy still weak; rethink from broader vision; toggle on/off framing must be smart and coherent.
+- **Outcome:** Headline now "Land more interviews, [toggle] hands-free." / "hands-on." — fixed outcome lead, toggle = AutoApply mode (automatic vs you-approve). Subheads lead with "Apply from LinkedIn or any job post in one click" then diverge on auto-send vs review.
+
+### 2026-06-14 — Hero copy: vision + multi-channel apply
+- **Prompt:** Headline shouldn't focus on pasting JDs; communicate Chrome extension, apply from anywhere, faster job search with AI.
+- **Outcome:** Headline "Wherever you find a role, [toggle] apply from anywhere." / "AI drafts, you send."; subheads mention LinkedIn extension + AutoApply; demo placeholder updated.
+
+### 2026-06-14 — Smaller hero H1
+- **Prompt:** Make the H1 font size a little smaller.
+- **Outcome:** Reduced hero `--mh-h1` from 5rem/4rem/3rem to 4.25rem/3.5rem/2.75rem (desktop/tablet/mobile).
+
+### 2026-06-14 — Hero headline USP copy
+- **Prompt:** Replace "Tailored job applications to review/in one tap" with copy that communicates product USP; toggle changes only the after phrase.
+- **Outcome:** Headline now "Paste a job description — [toggle] review before you send." vs "…sent from your Gmail."; aligned subheads to JD→email→Gmail flow.
+
+### 2026-06-14 — Hero toggle syncs copy + product demo
+- **Prompt:** Narrow hero text; toggle drives AutoApply demo; headline/subhead change with toggle on vs off.
+- **Outcome:** Lifted `autoApply` state to hero; toggle ON shows "in one tap" + auto-send animation; OFF shows "to review" + Review & Send flow; subhead and side cards update; hero copy max-width 26rem.
+
+### 2026-06-14 — Hero headline two-line layout
+- **Prompt:** Headline still runs together; should be exactly two lines.
+- **Outcome:** Split H1 into two explicit flex rows with gap between words; line 1 "Tailored job applications in", line 2 toggle + "one tap."; removed max-width ch constraint.
+
+### 2026-06-14 — Hero headline toggle + spacing fix
+- **Prompt:** Fix collapsed H1 spacing; add big black toggle before "one tap".
+- **Outcome:** Replaced per-word animation with plain spaced headline + inline black toggle switch before "one tap"; widened H1 line-height/letter-spacing.
+
+### 2026-06-14 — Hero typography and inline waitlist
+- **Prompt:** Remove eyebrow tag; fix H1 word spacing; larger grey subhead; replace dual CTAs with expandable email waitlist input.
+- **Outcome:** Removed "Job search automation" tag; fixed word spacing via margin on animated spans; subhead 1.125rem + tertiary grey; added `HeroWaitlistInput` (button → inline email field with Supabase insert).
+
+### 2026-06-14 — Remove top waitlist banner
+- **Prompt:** Remove "OneTap early access is open - join the waitlist for priority access when we launch. →" from top of the site.
+- **Outcome:** Removed `MindooBanner` from landing page and deleted the component plus unused `.m-banner` styles.
+
+### 2026-06-14 — Hero paste-to-reply animation
+- **Prompt:** Design an HTML animation for the hero section showing a user paste a JD and the product generates a reply.
+- **Outcome:** Added `HeroApplyAnimation` and `useHeroApplyAnimation` — looping demo with blinking cursor, paste flash, shimmer “Preparing…” state, typewriter email reply, match score count-up, and Review & Send highlight; wired into `MindooHeroSection` replacing static mockup.
+
+### 2026-06-14 — Full Mindoo site clone
+- **Prompt:** Copy the entire mindoo.ai site (not just hero) with OneTap copy.
+- **Outcome:** Rebuilt landing as full Mindoo layout: banner, pill nav, hero, problem, solution (phone mockups), features carousel, steps, benefits wheel, trust cards, waitlist CTA, footer. Shared `mindoo.css` with Martina Plantijn + Intertight tokens; scroll reveal + nav hide-on-scroll preserved.
+
+### 2026-06-14 — Mindoo hero clone
+- **Prompt:** Copy mindoo.ai hero section literally (fonts, spacing, scroll behavior) with OneTap copy.
+- **Outcome:** Added `MindooHeroSection`, `mindoo-hero.css`, and `useMindooScroll`; replaced Wone hero on landing page with Mindoo layout (tag, animated headline, dual CTAs, product mockup, expanding side cards, nav hide-on-scroll-down).
+
+- **Prompt:** Copy thewone.co hero layout (font sizes, spacing, structure) with OneTap copy; single product mockup instead of 5 images; left/right text sections.
+- **Outcome:** Rebuilt `HeroSection` to match Wone: warm `#f5f3ed` bg, 72/56/40px headline, 20px subhead, white pill CTA with arrow icon, centered product mockup, two-column flanking text with divider.
+
+### 2026-06-14 — Build waitlist landing page
+- **Prompt:** Build all 9 landing page sections, waitlist form with Supabase insert, duplicate email handling; make / the public landing route.
+- **Outcome:** Created `client/src/pages/landing.tsx` with all 9 sections (nav, hero, social proof, feature tabs, problem→solution, feature grid, how-it-works, waitlist form, footer). Form validates client-side, inserts to Supabase `waitlist` table, shows success or "already on list" state. Routed `/` as public `GuestRoute`; authenticated users redirect to their app as before. Zero TS errors and zero lints.
+
+### 2026-06-14 — Supabase waitlist setup guide
+- **Prompt:** Step-by-step Supabase setup for waitlist only; no code implementation yet.
+- **Outcome:** Provided ordered Supabase checklist (table SQL, RLS, grants, env vars, manual verification) using existing project credentials.
+
+### 2026-06-14 — Waitlist landing page discovery and planning
+- **Prompt:** Read the codebase and produce a no-code plan for a waitlist landing page (layout, Supabase setup, email flow, copy).
+- **Outcome:** Started full repository scan and drafted implementation-ready plan covering product summary, feature themes, landing copy, Supabase checklist, and email architecture.
+
 ### 2026-06-14 — First-time auto-apply and setup guided tooltips
 - **Prompt:** Design 3–4 brief, skippable onboarding tooltips for AutoApply, Applications, and Setup.
 - **Outcome:** Updated first-run walkthrough to 4 concise value-focused steps with skip/escape behavior, including Applications and Setup entry points.

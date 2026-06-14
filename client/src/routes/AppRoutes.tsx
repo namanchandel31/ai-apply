@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RealtimeProvider } from "@/contexts/RealtimeProvider";
 import { Layout } from "@/components/layout";
+import { LandingPage } from "@/pages/landing";
 import { LoginPage } from "@/pages/login";
 import { AuthCallbackPage } from "@/pages/authCallback";
 import { Dashboard } from "@/pages/dashboard";
@@ -35,6 +36,7 @@ export function AppRoutes() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         <Route element={<GuestRoute />}>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
         </Route>
 
@@ -48,7 +50,6 @@ export function AppRoutes() {
             }
           >
             <Route element={<OnboardingGuard />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/applications" element={<Applications />} />
             </Route>
