@@ -20,10 +20,7 @@ registerGracefulShutdown();
 registerShutdownHook("workers", stopWorkers, { priority: 100 });
 registerShutdownHook("redis", async () => {
   const { closeBullmqQueues } = require("../queues/connection");
-  const { logLifecyclePhase } = require("../observability/redisDebugInstrumentation");
-  logLifecyclePhase("redis_shutdown_hook_start", "D");
   await closeBullmqQueues();
-  logLifecyclePhase("redis_shutdown_hook_complete", "D");
 }, { priority: 20 });
 registerShutdownHook("postgres", async () => {
   const { pool } = require("../db");
