@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
+import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 
 export function GuestRoute() {
   const { session, isResolved } = useAuth();
@@ -14,7 +15,7 @@ export function GuestRoute() {
   }
 
   if (session) {
-    return <Navigate to="/dashboard" replace />;
+    return <AuthenticatedHomeRedirect />;
   }
 
   return <Outlet />;

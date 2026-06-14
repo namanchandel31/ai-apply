@@ -36,7 +36,8 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popup)]",
-        position === "popper" && "data-[side=bottom]:translate-y-1",
+        position === "popper" &&
+          "w-[var(--radix-select-trigger-width)] data-[side=bottom]:translate-y-1",
         className
       )}
       position={position}
@@ -50,12 +51,14 @@ SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    suffix?: React.ReactNode;
+  }
+>(({ className, children, suffix, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-lg py-2 pl-8 pr-2 text-base font-normal outline-none transition-colors hover:bg-black/[0.06] focus:bg-black/[0.06] data-[highlighted]:bg-black/[0.06] data-[state=checked]:bg-black/[0.06] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-default select-none items-center rounded-lg py-2 pl-8 pr-2 text-base font-normal outline-none transition-colors hover:bg-black/[0.06] focus:bg-black/[0.06] data-[highlighted]:bg-black/[0.06] data-[state=checked]:bg-black/[0.06] data-[disabled]:pointer-events-none",
       className
     )}
     {...props}
@@ -65,7 +68,10 @@ const SelectItem = React.forwardRef<
         <Check className="h-4 w-4 text-ring" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    <SelectPrimitive.ItemText className={suffix ? "flex-1 truncate" : undefined}>
+      {children}
+    </SelectPrimitive.ItemText>
+    {suffix ? <span className="ml-auto shrink-0 pl-3">{suffix}</span> : null}
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;

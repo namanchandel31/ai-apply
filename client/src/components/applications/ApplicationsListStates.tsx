@@ -50,12 +50,12 @@ export function EmptyApplicationsState({ filtered }: { filtered: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
       <Inbox className="h-10 w-10 text-muted-foreground mb-3" />
-      <p className="font-medium">No applications yet</p>
-      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-        Start from the dashboard to queue your first AI-tailored application.
+      <p className="text-base font-medium">No applications yet</p>
+      <p className="text-base font-normal text-muted-foreground mt-1 max-w-sm">
+        Go to Apply and paste a job description to queue your first AI-tailored application.
       </p>
       <Button asChild className="mt-4" variant="secondary">
-        <Link to="/dashboard">Go to Dashboard</Link>
+        <Link to="/dashboard">Start applying</Link>
       </Button>
     </div>
   );

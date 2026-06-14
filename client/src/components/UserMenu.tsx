@@ -155,6 +155,7 @@ export function UserMenu() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-tour="setup-entry"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-normal text-muted-foreground transition-[background-color,color] duration-[120ms] hover:bg-black/[0.05] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Account menu"
           >

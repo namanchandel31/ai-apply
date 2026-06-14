@@ -278,7 +278,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
   };
 
   return (
-    <form onSubmit={handleSend} className="space-y-6">
+    <form data-tour="apply-composer" onSubmit={handleSend} className="space-y-6">
       <div className="grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
         <div className="flex min-w-0 flex-col gap-3">
           <div className={LABEL_ROW}>

@@ -57,6 +57,7 @@ async function buildSetupStatus(userId) {
   const onboarding = deriveOnboardingState({
     hasVerifiedAiCredential,
     hasValidResume,
+    hasEmailSetup,
   });
 
   return {
