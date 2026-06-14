@@ -1,6 +1,5 @@
 const { Worker } = require("bullmq");
 const { getBullmqConnectionOptions } = require("../queues/connection");
-const { logBullmqComponentBinding } = require("../observability/redisDebugInstrumentation");
 const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
 const { pool } = require("../db");
@@ -391,14 +390,6 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
 }
 
 const bullmqConnection = getBullmqConnectionOptions();
-
-logBullmqComponentBinding({
-  componentType: "worker",
-  componentName: QUEUE_NAMES.PROCESS_APPLICATION,
-  connection: null,
-  hypothesisId: "A",
-  extra: { blocking: true, dedicatedConnection: true },
-});
 
 const worker = new Worker(QUEUE_NAMES.PROCESS_APPLICATION, processor, {
   connection: bullmqConnection,

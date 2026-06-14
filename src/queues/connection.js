@@ -1,11 +1,6 @@
 const IORedis = require("ioredis");
 const config = require("../config");
 const { attachRedisErrorHandler } = require("../observability/networkError");
-const {
-  attachRedisDebugInstrumentation,
-  logLifecyclePhase,
-} = require("../observability/redisDebugInstrumentation");
-
 if (!config.redis.redisUrl) {
   throw new Error("REDIS_URL environment variable is required");
 }
@@ -45,17 +40,12 @@ function createEphemeralRedisClient(role) {
     },
   });
 
-  attachRedisDebugInstrumentation(client, { role, hypothesisId: "C" });
-  attachRedisErrorHandler(client, "bullmq_redis", {
-    hypothesisId: "C",
-    role,
-  });
+  attachRedisErrorHandler(client, "bullmq_redis", { role });
 
   return client;
 }
 
 async function pingRedis() {
-  logLifecyclePhase("bullmq_health_ping_start", "E");
   const client = createEphemeralRedisClient("bullmq_health_ping");
   try {
     await client.connect();
@@ -65,7 +55,6 @@ async function pingRedis() {
     if (client.status !== "end") {
       await client.quit();
     }
-    logLifecyclePhase("bullmq_health_ping_complete", "E");
   }
 }
 
@@ -99,7 +88,6 @@ async function closeBullmqQueues() {
     /* queue module may not be loaded */
   }
   await Promise.allSettled(closes);
-  logLifecyclePhase("bullmq_queues_closed", "D");
 }
 
 module.exports = {
