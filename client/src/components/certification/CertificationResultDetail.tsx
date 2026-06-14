@@ -23,10 +23,10 @@ function formatRunError(error: CertificationRunError | string | undefined) {
 
 function statusBadge(result: { overallScore: number; recommended: boolean; passed: boolean }) {
   if (result.recommended) {
-    return <Badge className="bg-emerald-600">Recommended</Badge>;
+    return <Badge variant="success">Recommended</Badge>;
   }
   if (result.passed) {
-    return <Badge variant="secondary" className="bg-amber-500/15 text-amber-700">Passed</Badge>;
+    return <Badge variant="warning">Passed</Badge>;
   }
   return <Badge variant="destructive">Failed</Badge>;
 }
@@ -94,7 +94,7 @@ export function CertificationResultDetail({
         </div>
         {statusBadge(result)}
       </div>
-      <div className="text-4xl font-bold tabular-nums">{result.overallScore}</div>
+      <div className="text-4xl font-semibold tabular-nums">{result.overallScore}</div>
       <p className="text-sm text-muted-foreground">Overall score (primary ranking)</p>
       <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div>

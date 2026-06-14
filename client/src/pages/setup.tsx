@@ -1,19 +1,40 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { EmailStatusCard } from "@/components/EmailStatusCard";
 import { EmailPreferencesCard } from "@/components/EmailPreferencesCard";
 import { ResumeStatusCard } from "@/components/ResumeStatusCard";
 import { AiProviderStatusCard } from "@/components/AiProviderStatusCard";
+import { SetupPageShell } from "@/components/layout/SetupPageShell";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivationTracking } from "@/hooks/useActivationTracking";
 
+const SETUP_DESCRIPTION =
+  "Manage your resume, email, and AI provider credentials. Use the tabs below to configure each area.";
+
+const SETUP_TABS = [
+  { value: "ai", label: "AI Providers" },
+  { value: "resume", label: "Resume Management" },
+  { value: "email", label: "Email Configuration" },
+  { value: "style", label: "Email style" },
+] as const;
+
+type SetupTab = (typeof SETUP_TABS)[number]["value"];
+
+function resolveInitialTab(searchParams: URLSearchParams): SetupTab {
+  if (searchParams.get("focus") === "email") return "email";
+  const tab = searchParams.get("tab");
+  if (tab === "resume" || tab === "email" || tab === "style" || tab === "ai") return tab;
+  return "ai";
+}
+
 export function Setup() {
   const { data: status, isLoading } = useSetupStatus();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
-  const emailCardRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<SetupTab>(() => resolveInitialTab(searchParams));
 
   useActivationTracking(status, "setup");
 
@@ -22,61 +43,68 @@ export function Setup() {
   };
 
   useEffect(() => {
-    if (searchParams.get("focus") !== "email") return;
-    const el = emailCardRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [searchParams, isLoading]);
+    if (searchParams.get("focus") === "email") {
+      setActiveTab("email");
+    }
+  }, [searchParams]);
 
-  if (isLoading) {
-    return (
-      <div className="p-8 lg:p-10 max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="font-serif text-3xl">Setup</h1>
-          <p className="mt-1 text-muted-foreground">
-            Manage your resume, email, and AI provider credentials.
-          </p>
-        </div>
-        <div className="grid gap-6">
-          <Skeleton className="h-[200px] w-full rounded-xl" />
-          <Skeleton className="h-[200px] w-full rounded-xl" />
-          <Skeleton className="h-[200px] w-full rounded-xl" />
-        </div>
-      </div>
-    );
-  }
+  const handleTabChange = (tab: SetupTab) => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", tab);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  };
 
   const expandEmail = searchParams.get("focus") === "email" && !status?.hasEmailSetup;
 
-  return (
-    <div className="p-8 lg:p-10 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="font-serif text-3xl">Setup</h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage your resume, email, and AI provider credentials. AI billing rules are explained on the AI card below.
-        </p>
-      </div>
+  if (isLoading) {
+    return (
+      <SetupPageShell title="Setup" description={SETUP_DESCRIPTION}>
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-[520px] max-w-full rounded-sm" />
+          <Skeleton className="h-[320px] w-full rounded-sm" />
+        </div>
+      </SetupPageShell>
+    );
+  }
 
-      <div className="grid gap-6">
-        <AiProviderStatusCard
-          activeAiProvider={
-            status?.activeAiProvider?.id
-              ? (status.activeAiProvider as import("@/lib/api").AiCredentialSummary)
-              : null
-          }
-          hasAiSetup={status?.hasAiSetup}
-          onUpdate={handleUpdate}
+  return (
+    <SetupPageShell title="Setup" description={SETUP_DESCRIPTION}>
+      <div className="space-y-6">
+        <SegmentedControl
+          value={activeTab}
+          options={[...SETUP_TABS]}
+          onValueChange={handleTabChange}
+          fullWidth={false}
         />
-        <ResumeStatusCard activeResume={status?.activeResume} onUpdate={handleUpdate} />
-        <div ref={emailCardRef}>
+
+        {activeTab === "ai" && (
+          <AiProviderStatusCard
+            activeAiProvider={
+              status?.activeAiProvider?.id
+                ? (status.activeAiProvider as import("@/lib/api").AiCredentialSummary)
+                : null
+            }
+            hasAiSetup={status?.hasAiSetup}
+            onUpdate={handleUpdate}
+          />
+        )}
+
+        {activeTab === "resume" && (
+          <ResumeStatusCard activeResume={status?.activeResume} onUpdate={handleUpdate} />
+        )}
+
+        {activeTab === "email" && (
           <EmailStatusCard
             email={status?.email}
             onUpdate={handleUpdate}
             defaultExpanded={expandEmail}
           />
-        </div>
-        <EmailPreferencesCard />
+        )}
+
+        {activeTab === "style" && <EmailPreferencesCard />}
       </div>
-    </div>
+    </SetupPageShell>
   );
 }

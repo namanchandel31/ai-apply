@@ -3,26 +3,30 @@ import { Loader2, SearchX, Inbox, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { tableCellPaddingX } from "@/components/applications/applicationsTableTypography";
+import { cn } from "@/lib/utils";
 
 export function TableSkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
+          <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-24 mt-1" />
           </TableCell>
-          <TableCell className="hidden sm:table-cell">
+          <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
+            <Skeleton className="h-4 w-28" />
+          </TableCell>
+          <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
+            <Skeleton className="h-4 w-16" />
+          </TableCell>
+          <TableCell className={cn("hidden sm:table-cell", tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-4 w-12" />
           </TableCell>
-          <TableCell>
-            <Skeleton className="h-6 w-20 rounded-full" />
-          </TableCell>
-          <TableCell className="hidden md:table-cell">
+          <TableCell className={cn("hidden md:table-cell", tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell className="w-10">
+          <TableCell className={cn("w-10", tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-8 w-8" />
           </TableCell>
         </TableRow>
@@ -59,7 +63,7 @@ export function EmptyApplicationsState({ filtered }: { filtered: boolean }) {
 
 export function SseReconnectBanner() {
   return (
-    <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800">
+    <div className="flex items-center gap-2 rounded-xl bg-warning/10 px-3 py-2 text-sm text-warning">
       <WifiOff className="h-4 w-4 shrink-0" />
       <span>Reconnecting live updates…</span>
       <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto" />

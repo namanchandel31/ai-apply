@@ -1,5 +1,6 @@
 const { UnrecoverableError } = require("bullmq");
 const {
+  isSmtpAuthFailure,
   isNonRetryableApplicationError,
   willBullMqRetry,
   finalizeBullMqJobFailure,
@@ -16,6 +17,21 @@ describe("bullmqJobFailure", () => {
     const job = { opts: { attempts: 3 }, attemptsMade: 1 };
     const err = new NonRetryableError("invalid_parsed_content");
     expect(willBullMqRetry(job, err)).toBe(false);
+  });
+
+  it("detects Gmail SMTP auth failures as non-retryable", () => {
+    const err = new Error(
+      "Invalid login: 535-5.7.8 Username and Password not accepted. BadCredentials"
+    );
+    expect(isSmtpAuthFailure(err)).toBe(true);
+    expect(isNonRetryableApplicationError(err)).toBe(true);
+    expect(willBullMqRetry({ opts: { attempts: 5 }, attemptsMade: 0 }, err)).toBe(false);
+  });
+
+  it("finalizeBullMqJobFailure rethrows retryable generic errors for BullMQ", async () => {
+    const job = { id: "j2", queueName: "send-application" };
+    const err = new Error("temporary network blip");
+    await expect(finalizeBullMqJobFailure(job, err)).rejects.toThrow("temporary network blip");
   });
 
   it("finalizeBullMqJobFailure discards and throws UnrecoverableError", async () => {

@@ -9,7 +9,7 @@ const autoApplyController = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const { jobDescription, resumeId: bodyResumeId } = req.body;
+    const { jobDescription, resumeId: bodyResumeId, emailSubject, emailBody } = req.body;
 
     if (!jobDescription || typeof jobDescription !== "string" || !jobDescription.trim()) {
       return sendError(res, {
@@ -29,8 +29,41 @@ const autoApplyController = async (req, res) => {
       });
     }
 
+    const trimmedSubject = typeof emailSubject === "string" ? emailSubject.trim() : "";
+    const trimmedBody = typeof emailBody === "string" ? emailBody.trim() : "";
+    const hasCustomEmail = Boolean(trimmedSubject || trimmedBody);
+
+    if (hasCustomEmail) {
+      if (!trimmedSubject || !trimmedBody) {
+        return sendError(res, {
+          status: 400,
+          code: ERROR_CODES.BAD_REQUEST,
+          message: "emailSubject and emailBody must both be non-empty strings when provided",
+          retryable: false,
+        });
+      }
+      if (trimmedSubject.length > 500) {
+        return sendError(res, {
+          status: 400,
+          code: ERROR_CODES.BAD_REQUEST,
+          message: "emailSubject exceeds 500 characters",
+          retryable: false,
+        });
+      }
+      if (trimmedBody.length > 20000) {
+        return sendError(res, {
+          status: 400,
+          code: ERROR_CODES.BAD_REQUEST,
+          message: "emailBody exceeds 20000 characters",
+          retryable: false,
+        });
+      }
+    }
+
     const result = await startAutoApply(userId, jobDescription, reqId, {
       resumeId: bodyResumeId,
+      emailSubject: hasCustomEmail ? trimmedSubject : undefined,
+      emailBody: hasCustomEmail ? trimmedBody : undefined,
     });
 
     return res.status(202).json({

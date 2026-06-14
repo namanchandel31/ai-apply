@@ -8,9 +8,9 @@ import {
   getApplicationsListItems,
   normalizeApplicationsListData,
 } from "@/lib/applicationsListResponse";
-import { ApplicationsToolbar } from "@/components/applications/ApplicationsToolbar";
+import { ApplicationsPageFilters } from "@/components/applications/ApplicationsPageFilters";
 import { ApplicationsDataGrid } from "@/components/applications/ApplicationsDataGrid";
-import { ApplicationsPagination } from "@/components/applications/ApplicationsPagination";
+import { ApplicationsTableFooter } from "@/components/applications/ApplicationsTableFooter";
 import { ApplicationDetailsSheet } from "@/components/applications/ApplicationDetailsSheet";
 import { useRealtime } from "@/contexts/useRealtime";
 import { globalOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
@@ -81,26 +81,23 @@ function ApplicationsDashboardInner() {
 
   return (
     <>
-      <div className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden">
-        <ApplicationsToolbar
-          totalItems={page.totalItems}
-          currentPage={page.currentPage}
-          pageSize={page.pageSize}
-          isFetching={isFetching}
-        />
+      <ApplicationsPageFilters isFetching={isFetching} />
+      <div className="rounded-[10px] bg-card shadow-[var(--shadow-card)] overflow-hidden">
         <ApplicationsDataGrid
           items={items}
           isLoading={isLoading}
           isFetching={isFetching}
           hasActiveFilters={hasActiveFilters}
-          selectedId={selectedId}
+          selectedId={sheetOpen ? selectedId : null}
           onSelectRow={(id) => openDetails(id)}
           onRetry={handleRetry}
           onContinue={handleContinue}
           actionId={actionId}
         />
-        <ApplicationsPagination
+        <ApplicationsTableFooter
+          totalItems={page.totalItems}
           currentPage={page.currentPage}
+          pageSize={page.pageSize}
           totalPages={page.totalPages}
           onPageChange={(p) => patchParams({ page: p }, { resetPage: false })}
         />
@@ -109,7 +106,10 @@ function ApplicationsDashboardInner() {
       <ApplicationDetailsSheet
         applicationId={selectedId}
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={(open) => {
+          setSheetOpen(open);
+          if (!open) setSelectedId(null);
+        }}
         initialTab={sheetTab}
       />
     </>
@@ -125,7 +125,7 @@ const RealtimeConnectionBadge = memo(function RealtimeConnectionBadge() {
       className={cn(
         "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium w-fit",
         live
-          ? "border-emerald-600/30 bg-emerald-600/10 text-emerald-700"
+          ? "border-success/30 bg-success/10 text-success"
           : "border-muted bg-muted/50 text-muted-foreground"
       )}
     >
@@ -138,16 +138,9 @@ const RealtimeConnectionBadge = memo(function RealtimeConnectionBadge() {
 export function ApplicationsDashboard() {
   return (
     <ApplicationsListParamsProvider>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="font-serif text-3xl tracking-tight">Applications</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track and debug AI-tailored job applications in real time.
-          </p>
-        </div>
-        <RealtimeConnectionBadge />
-      </div>
       <ApplicationsDashboardInner />
     </ApplicationsListParamsProvider>
   );
 }
+
+export { RealtimeConnectionBadge };

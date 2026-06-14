@@ -25,14 +25,14 @@ export function EmailPreferenceSlider({
   const [dragging, setDragging] = useState(false);
 
   return (
-    <div className={cn(compact ? "space-y-0.5" : "space-y-1.5")}>
-      <Label className={cn("font-medium", compact ? "text-xs" : "text-sm")}>{label}</Label>
+    <div className={cn(compact ? "space-y-1" : "space-y-2")}>
+      <Label className={cn("font-medium", compact ? "text-xs" : "text-base")}>{label}</Label>
 
-      <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
+      <div className={cn("flex items-center gap-2")}>
         <span
           className={cn(
             "shrink-0 leading-tight text-muted-foreground",
-            compact ? "max-w-[4.5rem] text-[10px]" : "text-xs"
+            compact ? "text-xs max-w-[72px]" : "text-base"
           )}
         >
           {minEndpoint}
@@ -41,14 +41,11 @@ export function EmailPreferenceSlider({
         <div className="relative min-w-0 flex-1">
           {dragging && (
             <div
-              className="pointer-events-none absolute bottom-full z-10 mb-0.5 flex -translate-x-1/2 flex-col items-center"
+              className="pointer-events-none absolute bottom-full z-10 mb-1 flex -translate-x-1/2 flex-col items-center"
               style={{ left: `${value}%` }}
             >
-              <span className="whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-sm">
+              <span className="whitespace-nowrap rounded-lg bg-foreground px-2 py-0.5 text-xs font-medium text-background">
                 {bucketLabel}
-              </span>
-              <span className="text-[8px] leading-none text-foreground" aria-hidden>
-                ▼
               </span>
             </div>
           )}
@@ -65,7 +62,7 @@ export function EmailPreferenceSlider({
         <span
           className={cn(
             "shrink-0 text-right leading-tight text-muted-foreground",
-            compact ? "max-w-[4.5rem] text-[10px]" : "text-xs"
+            compact ? "text-xs max-w-[72px]" : "text-base"
           )}
         >
           {maxEndpoint}

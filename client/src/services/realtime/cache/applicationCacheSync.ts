@@ -14,6 +14,7 @@ import { logDebug } from "@/services/logging/orchestrationLogger";
 import { metrics } from "@/services/logging/metricsHooks";
 import { isDebugEnabled } from "@/services/logging/debugFlags";
 import { applicationsListQueryKey } from "@/queries/applicationsListQuery";
+import { EMAIL_SENT_TRACKER_STATUS_ID } from "@/lib/trackerStatusColors";
 import { getActiveListParams } from "./activeListParamsRegistry";
 import {
   normalizeApplicationsListData,
@@ -164,6 +165,10 @@ function buildEventRowPatch(
     updatedAt: event.updatedAt,
   });
   const merged = { ...orch, ...display };
+  const incomingUi = event.uiStatus || event.status;
+  if (incomingUi === "sent") {
+    merged.trackerStatusId = EMAIL_SENT_TRACKER_STATUS_ID;
+  }
   if (
     isDebugEnabled("reconciliation") &&
     typeof event.matchScore === "number" &&

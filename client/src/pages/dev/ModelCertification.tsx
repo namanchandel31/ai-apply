@@ -15,6 +15,8 @@ import {
   CertificationResultDetail,
   historyRowToResult,
 } from "@/components/certification/CertificationResultDetail";
+import { PAGE_PADDING_X } from "@/lib/pageLayout";
+import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
   { id: "gemini", label: "Gemini" },
@@ -171,11 +173,11 @@ export function ModelCertificationPage() {
       : undefined;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className={cn("mx-auto max-w-4xl space-y-6 py-6", PAGE_PADDING_X)}>
       <div className="space-y-1">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
           <ShieldCheck className="h-6 w-6" />
-          AI Apply model certification
+          OneTap model certification
         </h1>
         <p className="text-sm text-muted-foreground">
           Dual-run dev certification: resume parse → email → judge. Results rank models for the
@@ -193,7 +195,7 @@ export function ModelCertificationPage() {
             <div className="space-y-2">
               <Label>Provider</Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="flex h-10 w-full rounded-[10px] border border-input-border bg-input px-[14px] py-2.5 text-base"
                 value={provider}
                 onChange={(e) => {
                   setProvider(e.target.value);

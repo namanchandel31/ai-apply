@@ -16,6 +16,8 @@ import { logAuthLifecycle } from "@/auth/authLifecycleLog";
 export type AuthUser = {
   id: string;
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
   fullName?: string | null;
   avatarUrl?: string | null;
   subscriptionTier?: string;

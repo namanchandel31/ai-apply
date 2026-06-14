@@ -260,7 +260,7 @@ export function ApplicationDetailsSheet({
                 </TabsContent>
                 <TabsContent value="raw" className="mt-0">
                   {app.llmRawOutputTruncated && (
-                    <p className="text-xs text-amber-700 mb-2 rounded-md bg-amber-500/10 px-2 py-1">
+                    <p className="text-xs text-warning mb-2 rounded-lg bg-warning/10 px-2 py-1">
                       Output truncated on server for size — full load may be added later.
                     </p>
                   )}

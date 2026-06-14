@@ -50,6 +50,8 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
       client,
       applicationStatus: APPLICATION_STATUS.DRAFT,
       resumeSnapshotPath: resolved.filePath,
+      emailSubject: options.emailSubject ?? null,
+      emailBody: options.emailBody ?? null,
     });
 
     dbJob = await createJob(

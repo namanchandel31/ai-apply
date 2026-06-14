@@ -14,6 +14,8 @@ async function buildUserMeResponse(userId) {
   return {
     id: row.id,
     email: row.email,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
     fullName: row.full_name ?? null,
     avatarUrl: row.avatar_url ?? null,
     subscriptionTier: "free",

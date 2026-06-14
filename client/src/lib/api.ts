@@ -236,6 +236,8 @@ export type SetupStatusData = {
 export type UserMe = {
   id: string;
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
   fullName?: string | null;
   avatarUrl?: string | null;
   subscriptionTier: string;
@@ -248,6 +250,20 @@ export const api = {
 
   getMe() {
     return request<{ success: boolean; data: UserMe }>("/api/user/me");
+  },
+
+  patchProfile(body: { firstName?: string; lastName?: string }) {
+    return request<{ success: boolean; data: UserMe }>("/api/user/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  seedProfileFromEmail() {
+    return request<{ success: boolean; data: UserMe }>("/api/user/profile/seed-from-email", {
+      method: "POST",
+    });
   },
 
   saveCredentials(email: string, appPassword: string) {
@@ -287,7 +303,28 @@ export const api = {
     });
   },
 
-  autoApply(jobDescription: string) {
+  previewEmail(jobDescription: string) {
+    return request<{
+      success: boolean;
+      data: {
+        subject: string;
+        body: string;
+        match: { score: number; matchedSkills: string[]; missingSkills: string[] };
+        jobTitle?: string | null;
+        company?: string | null;
+        contactEmail?: string | null;
+      };
+    }>("/api/preview-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobDescription }),
+    });
+  },
+
+  autoApply(
+    jobDescription: string,
+    options?: { emailSubject?: string; emailBody?: string; resumeId?: string }
+  ) {
     return request<{
       success: boolean;
       applicationId: string;
@@ -296,7 +333,12 @@ export const api = {
     }>("/api/auto-apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobDescription }),
+      body: JSON.stringify({
+        jobDescription,
+        ...(options?.emailSubject ? { emailSubject: options.emailSubject } : {}),
+        ...(options?.emailBody ? { emailBody: options.emailBody } : {}),
+        ...(options?.resumeId ? { resumeId: options.resumeId } : {}),
+      }),
     });
   },
 
@@ -552,6 +594,67 @@ export const api = {
       }
     );
   },
+
+  getTrackerStatuses() {
+    return request<{
+      success: boolean;
+      data: {
+        options: Array<{
+          id: string;
+          name: string;
+          color: string;
+          stage?: number | null;
+          system?: boolean;
+        }>;
+      };
+    }>("/api/user/tracker-statuses", { method: "GET" });
+  },
+
+  createTrackerStatus(name: string, color?: string) {
+    return request<{
+      success: boolean;
+      data: {
+        option: {
+          id: string;
+          name: string;
+          color: string;
+          stage?: number | null;
+          system?: boolean;
+        };
+      };
+    }>("/api/user/tracker-statuses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, ...(color ? { color } : {}) }),
+    });
+  },
+
+  deleteTrackerStatus(statusId: string) {
+    return request<{
+      success: boolean;
+      data: { id: string; name: string };
+    }>(`/api/user/tracker-statuses/${encodeURIComponent(statusId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  patchApplicationTrackerStatus(applicationId: string, trackerStatusId: string | null) {
+    return request<{
+      success: boolean;
+      data: { trackerStatusId: string | null };
+    }>(`/api/applications/${applicationId}/tracker-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackerStatusId }),
+    });
+  },
+
+  getTrackerStatusSummary() {
+    return request<{
+      success: boolean;
+      data: TrackerStatusSummary;
+    }>("/api/applications/tracker-status-summary", { method: "GET" });
+  },
 };
 
 export type JdEnrichmentState = "pending" | "complete";
@@ -602,6 +705,31 @@ export type ApplicationsListResponse = {
   pageSize: number;
 };
 
+export type TrackerStatusSummaryBucket = {
+  statusId: string | null;
+  name: string;
+  color: string;
+  count: number;
+  system?: boolean;
+  stage?: number | null;
+};
+
+export type TrackerStatusFunnelStage = {
+  statusId: string;
+  name: string;
+  color: string;
+  stage: number;
+  cumulativeCount: number;
+  currentCount: number;
+};
+
+export type TrackerStatusSummary = {
+  total: number;
+  buckets: TrackerStatusSummaryBucket[];
+  funnel: TrackerStatusFunnelStage[];
+  sideBuckets: TrackerStatusSummaryBucket[];
+};
+
 export type ApplicationRecord = {
   id: string;
   status: string;
@@ -624,6 +752,7 @@ export type ApplicationRecord = {
   normalizedCompanyName?: string | null;
   normalizedJobTitle?: string | null;
   jdEnrichment?: JdEnrichmentState;
+  trackerStatusId?: string | null;
 };
 
 export type ApplicationEventRecord = {

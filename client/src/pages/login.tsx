@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OneTapLogomark } from "@/components/OneTapLogomark";
+import { PAGE_PADDING_X } from "@/lib/pageLayout";
+import { cn } from "@/lib/utils";
 
 export function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -27,10 +30,11 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className={cn("flex min-h-screen items-center justify-center bg-background py-4", PAGE_PADDING_X)}>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="font-serif text-3xl">AI Apply</h1>
+          <OneTapLogomark className="mx-auto mb-4 h-12 w-auto" />
+          <h1 className="text-display font-semibold">OneTap</h1>
           <p className="mt-2 text-muted-foreground">Sign in with your Google account</p>
         </div>
         <Card>

@@ -76,6 +76,49 @@ export function getPresetDisplayName(presetId: PresetId): string {
   return preset?.label ?? "Custom";
 }
 
+export type LengthOptionId = "short" | "medium" | "long";
+export type ToneOptionId = "casual" | "balanced" | "executive";
+
+/** Three-option length control → emailStructureLevel (conversational / balanced / scannable). */
+export const EMAIL_LENGTH_OPTIONS: { id: LengthOptionId; label: string; structure: number }[] = [
+  { id: "short", label: "Short", structure: 25 },
+  { id: "medium", label: "Medium", structure: 60 },
+  { id: "long", label: "Long", structure: 85 },
+];
+
+/** Three-option tone control → emailToneLevel (casual / balanced / executive). */
+export const EMAIL_TONE_OPTIONS: { id: ToneOptionId; label: string; tone: number }[] = [
+  { id: "casual", label: "Casual", tone: 20 },
+  { id: "balanced", label: "Balanced", tone: 50 },
+  { id: "executive", label: "Executive", tone: 85 },
+];
+
+function nearestOption<T extends { structure?: number; tone?: number }>(
+  level: number,
+  options: T[],
+  key: "structure" | "tone"
+): T {
+  return options.reduce((closest, opt) =>
+    Math.abs((opt[key] ?? 0) - level) < Math.abs((closest[key] ?? 0) - level) ? opt : closest
+  );
+}
+
+export function resolveLengthOption(structureLevel: number): LengthOptionId {
+  return nearestOption(structureLevel, EMAIL_LENGTH_OPTIONS, "structure").id;
+}
+
+export function resolveToneOption(toneLevel: number): ToneOptionId {
+  return nearestOption(toneLevel, EMAIL_TONE_OPTIONS, "tone").id;
+}
+
+export function structureForLengthOption(id: LengthOptionId): number {
+  return EMAIL_LENGTH_OPTIONS.find((o) => o.id === id)?.structure ?? 60;
+}
+
+export function toneForToneOption(id: ToneOptionId): number {
+  return EMAIL_TONE_OPTIONS.find((o) => o.id === id)?.tone ?? 50;
+}
+
 export function deriveLengthLabel(min: number, max: number): "short" | "medium" | "long" {
   const mid = (min + max) / 2;
   if (mid < 130) return "short";

@@ -160,6 +160,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       emailToneLevel: 50,
       emailStructureLevel: 60,
     };
+
     const emailContext = buildEmailGenerationContext({
       rawJdText: rawText,
       parsedJd,
@@ -169,12 +170,23 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       emailStructureLevel: prefLevels.emailStructureLevel,
     });
 
-    const cachedEmail = await generateApplicationEmail(emailContext, {
-      reqId,
-      userId,
-      resumeId: resume.resumeId,
-      jobDescriptionId: app.job_description_id,
-    });
+    let cachedEmail;
+    if (app.email_subject && app.email_body) {
+      cachedEmail = {
+        subject: app.email_subject,
+        body: app.email_body,
+        emailMetadata: app.email_metadata ?? null,
+        emailFeedbackSignals: app.email_feedback_signals ?? null,
+      };
+      logInfo("email_generation_skipped_user_draft", { applicationId });
+    } else {
+      cachedEmail = await generateApplicationEmail(emailContext, {
+        reqId,
+        userId,
+        resumeId: resume.resumeId,
+        jobDescriptionId: app.job_description_id,
+      });
+    }
 
     await client.query("BEGIN");
     markClientInTransaction(client);

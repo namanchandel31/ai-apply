@@ -18,17 +18,17 @@ const upload = multer({
 
 const router = express.Router();
 
-router.use(supabaseAuthMiddleware, modelCertificationGuard);
+// Scope auth/guard to dev certification paths only — a router-level use() would
+// intercept every unmatched /api request and return a misleading 404 "Not found".
+const devRouter = express.Router();
+devRouter.use(supabaseAuthMiddleware, modelCertificationGuard);
+devRouter.post("/run", upload.single("resume"), runCertificationController);
+devRouter.get("/runs", listRunsController);
+devRouter.get("/curated", listCuratedAdminController);
+devRouter.post("/curated/promote", promoteCuratedController);
+devRouter.patch("/curated/:id", patchCuratedController);
+devRouter.delete("/curated/:id", deleteCuratedController);
 
-router.post(
-  "/dev/model-certification/run",
-  upload.single("resume"),
-  runCertificationController
-);
-router.get("/dev/model-certification/runs", listRunsController);
-router.get("/dev/model-certification/curated", listCuratedAdminController);
-router.post("/dev/model-certification/curated/promote", promoteCuratedController);
-router.patch("/dev/model-certification/curated/:id", patchCuratedController);
-router.delete("/dev/model-certification/curated/:id", deleteCuratedController);
+router.use("/dev/model-certification", devRouter);
 
 module.exports = router;

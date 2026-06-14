@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 /** Google Account → Security → App passwords (requires 2-Step Verification). */
 const GMAIL_APP_PASSWORDS_URL = "https://myaccount.google.com/apppasswords";
+const SECTION_LABEL = "text-base font-medium";
+const SETUP_BOX_RADIUS = "rounded-sm";
 
 interface Props {
   email: string | null | undefined;
@@ -45,22 +48,22 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded }: Props) {
 
   if (!isEditing && email) {
     return (
-      <Card>
+      <Card className={SETUP_BOX_RADIUS}>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-medium">
               <Mail className="h-5 w-5" />
               Email Configuration
             </CardTitle>
             <CardDescription>Your Gmail account is connected for sending applications.</CardDescription>
           </div>
-          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+          <Badge variant="success">
             <CheckCircle2 className="mr-1 h-3 w-3" /> Connected
           </Badge>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
-            <p className="font-medium text-sm">{email}</p>
+          <div className={cn("flex items-center justify-between border border-input-border bg-input p-3", SETUP_BOX_RADIUS)}>
+            <p className="text-base font-medium">{email}</p>
             <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
               Reconnect
             </Button>
@@ -71,17 +74,17 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded }: Props) {
   }
 
   return (
-    <Card className={!email ? "border-amber-500/50" : ""}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className={cn(SETUP_BOX_RADIUS, !email ? "ring-1 ring-warning/40" : "")}>
+      <CardHeader className="gap-1">
+        <CardTitle className="flex items-center gap-2 text-base font-medium">
           <Mail className="h-5 w-5" />
           Email Configuration
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+      <CardContent className="space-y-3">
+        <div className="space-y-3 text-base text-muted-foreground leading-relaxed">
           <p>
-            We ask for this so One Tap can send job application emails{" "}
+            We ask for this so OneTap can send job application emails{" "}
             <strong className="text-foreground">from your Gmail address</strong>. Recruiters see mail from you,
             in your name—not from a generic platform address.
           </p>
@@ -104,22 +107,23 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded }: Props) {
             <span> (opens Google; 2-Step Verification must be on)</span>
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="cred-email">Gmail address</Label>
-            <Input id="cred-email" name="email" type="email" defaultValue={email || ""} required />
+            <Label htmlFor="cred-email" className={SECTION_LABEL}>Gmail address</Label>
+            <Input id="cred-email" name="email" type="email" defaultValue={email || ""} className={SETUP_BOX_RADIUS} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="cred-password">App password</Label>
+            <Label htmlFor="cred-password" className={SECTION_LABEL}>App password</Label>
             <Input
               id="cred-password"
               name="appPassword"
               type="password"
               placeholder="xxxx xxxx xxxx xxxx"
+              className={SETUP_BOX_RADIUS}
               required
               autoComplete="off"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Paste the 16-character code Google shows you. Spaces are optional.
             </p>
           </div>

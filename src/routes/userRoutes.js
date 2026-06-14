@@ -1,10 +1,15 @@
 const express = require('express');
 const { getUserDefaultsController, setUserDefaultsController } = require('../controllers/userDefaultsController');
-const { getSetupStatusController, getMeController } = require('../controllers/userController');
+const { getSetupStatusController, getMeController, patchProfileController, seedProfileFromEmailController } = require('../controllers/userController');
 const {
   getEmailPreferencesController,
   patchEmailPreferencesController,
 } = require('../controllers/userEmailPreferencesController');
+const {
+  listTrackerStatusesController,
+  createTrackerStatusController,
+  deleteTrackerStatusController,
+} = require('../controllers/trackerStatusController');
 const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
@@ -23,6 +28,8 @@ const router = express.Router();
  *         description: Current user profile
  */
 router.get('/user/me', supabaseAuthMiddleware, getMeController);
+router.patch('/user/profile', supabaseAuthMiddleware, patchProfileController);
+router.post('/user/profile/seed-from-email', supabaseAuthMiddleware, seedProfileFromEmailController);
 
 /**
  * @openapi
@@ -80,5 +87,9 @@ router.get('/user/setup-status', supabaseAuthMiddleware, getSetupStatusControlle
 
 router.get('/user/email-preferences', supabaseAuthMiddleware, getEmailPreferencesController);
 router.patch('/user/email-preferences', supabaseAuthMiddleware, patchEmailPreferencesController);
+
+router.get('/user/tracker-statuses', supabaseAuthMiddleware, listTrackerStatusesController);
+router.post('/user/tracker-statuses', supabaseAuthMiddleware, createTrackerStatusController);
+router.delete('/user/tracker-statuses/:id', supabaseAuthMiddleware, deleteTrackerStatusController);
 
 module.exports = router;

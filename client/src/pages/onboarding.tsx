@@ -5,7 +5,6 @@ import {
   FileText,
   KeyRound,
   Loader2,
-  Sparkles,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +22,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { OneTapBrand, OneTapLogomark } from "@/components/OneTapLogomark";
+import { PAGE_PADDING_X } from "@/lib/pageLayout";
+import { cn } from "@/lib/utils";
+import { UserMenu } from "@/components/UserMenu";
+import { useAuth } from "@/auth/AuthContext";
+import { getDisplayFirstName } from "@/lib/userDisplay";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
 
 const REMOTE_PROVIDERS = [
@@ -55,6 +60,7 @@ type ResumeUiState =
 export function Onboarding() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, refreshUser } = useAuth();
   const { data: status, isLoading, refetch } = useSetupStatus();
   useActivationTracking(status, "onboarding");
 
@@ -79,6 +85,11 @@ export function Onboarding() {
   const parsingResume = !!status?.hasResume && !hasValidResume;
 
   useResumeParsePolling(parsingResume);
+
+  useEffect(() => {
+    if (!user || user.firstName?.trim() || user.fullName?.trim()) return;
+    void api.seedProfileFromEmail().then(() => refreshUser());
+  }, [user, refreshUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,9 +160,15 @@ export function Onboarding() {
     refetch();
   }, [queryClient, refetch]);
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async () => {
     sessionStorage.setItem(WELCOME_SEEN_KEY, "true");
     trackOnboardingEvent("onboarding_started");
+    try {
+      await api.seedProfileFromEmail();
+      await refreshUser();
+    } catch {
+      // Non-blocking — user can set name later from the account menu.
+    }
     setShowWelcome(false);
   };
 
@@ -223,17 +240,18 @@ export function Onboarding() {
   }
 
   if (showWelcome) {
+    const welcomeName = user ? getDisplayFirstName(user) : null;
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
+      <div className={cn("flex min-h-screen flex-col items-center justify-center bg-background", PAGE_PADDING_X)}>
         <div className="max-w-lg text-center space-y-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <Sparkles className="h-7 w-7" />
-          </div>
-          <h1 className="font-serif text-4xl">Welcome to OneTap</h1>
+          <OneTapLogomark className="mx-auto h-14 w-auto" />
+          <h1 className="text-display font-semibold">
+            {welcomeName ? `Welcome, ${welcomeName}` : "Welcome to OneTap"}
+          </h1>
           <p className="text-muted-foreground">
             Connect your AI provider and upload your resume to start sending tailored applications in one tap.
           </p>
-          <Button size="lg" onClick={handleGetStarted}>
+          <Button size="lg" onClick={() => void handleGetStarted()}>
             Get Started
           </Button>
         </div>
@@ -245,14 +263,14 @@ export function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-6 py-4">
+      <header className={cn("border-b border-border py-4", PAGE_PADDING_X)}>
         <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <span className="font-serif text-xl">OneTap</span>
-          <span className="text-sm text-muted-foreground">Setup</span>
+          <OneTapBrand logomarkClassName="h-7" />
+          <UserMenu />
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-6 py-10">
+      <main className={cn("mx-auto max-w-2xl space-y-6 py-10", PAGE_PADDING_X)}>
         {!isActivated && (
           <div className="flex gap-2 text-xs text-muted-foreground">
             <Badge variant={step === "ai" ? "default" : "outline"}>1. AI</Badge>
@@ -261,7 +279,7 @@ export function Onboarding() {
         )}
 
         {isActivated ? (
-          <Card className="border-emerald-500/30">
+          <Card className="ring-1 ring-success/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <span aria-hidden>🎉</span> You&apos;re ready to apply
@@ -313,13 +331,13 @@ export function Onboarding() {
           </Card>
         ) : (
           <>
-            <Card className={step === "ai" ? "ring-2 ring-primary/20" : ""}>
+            <Card className={step === "ai" ? "ring-2 ring-ring/20" : ""}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <KeyRound className="h-5 w-5" />
                   AI provider
                   {hasVerifiedAi && (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <CheckCircle2 className="h-5 w-5 text-success" />
                   )}
                 </CardTitle>
                 <CardDescription>
@@ -341,7 +359,7 @@ export function Onboarding() {
                     <div className="space-y-2">
                       <Label>Provider</Label>
                       <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        className="flex h-10 w-full rounded-[10px] border border-input-border bg-input px-[14px] py-2.5 text-base"
                         value={provider}
                         onChange={(e) => {
                           setProvider(e.target.value);
@@ -359,7 +377,7 @@ export function Onboarding() {
                       <Label>Model</Label>
                       {curatedModels.length > 0 ? (
                         <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          className="flex h-10 w-full rounded-[10px] border border-input-border bg-input px-[14px] py-2.5 text-base"
                           value={selectedModel}
                           onChange={(e) => setSelectedModel(e.target.value)}
                           required
@@ -389,7 +407,7 @@ export function Onboarding() {
                     />
                   </div>
                   {aiUi === "validation_timeout" && (
-                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                    <div className="rounded-xl bg-warning/10 p-3 text-sm">
                       <p className="font-medium">Unable to verify provider.</p>
                       <p className="text-muted-foreground">{aiError}</p>
                       <div className="mt-3 flex gap-2">
@@ -431,13 +449,13 @@ export function Onboarding() {
               )}
             </Card>
 
-            <Card className={step === "resume" ? "ring-2 ring-primary/20" : ""}>
+            <Card className={step === "resume" ? "ring-2 ring-ring/20" : ""}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FileText className="h-5 w-5" />
                   Resume
                   {hasValidResume && (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <CheckCircle2 className="h-5 w-5 text-success" />
                   )}
                 </CardTitle>
                 <CardDescription>PDF only. Parsed with your verified AI key.</CardDescription>
@@ -450,7 +468,7 @@ export function Onboarding() {
                 )}
                 {hasValidResume && status?.activeResume && (
                   <p className="text-sm">
-                    <CheckCircle2 className="mr-1 inline h-4 w-4 text-emerald-600" />
+                    <CheckCircle2 className="mr-1 inline h-4 w-4 text-success" />
                     {status.activeResume.filename}
                   </p>
                 )}
@@ -487,7 +505,7 @@ export function Onboarding() {
                     )}
                     {resumeUi === "stalled" && (
                       <div className="text-sm space-y-2">
-                        <p className="text-amber-600">
+                        <p className="text-warning">
                           Parsing is taking longer than expected. You can retry upload or continue from Setup later.
                         </p>
                         <Button size="sm" variant="outline" asChild>

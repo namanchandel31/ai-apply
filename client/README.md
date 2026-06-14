@@ -1,4 +1,4 @@
-# AI Apply — frontend
+# OneTap — frontend
 
 React + Vite client. Deployed independently on Vercel.
 

@@ -22,7 +22,12 @@ const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/ui
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
 const { safePersistApplicationFailure } = require("../services/safePersistApplicationFailure");
-const { finalizeBullMqJobFailure, willBullMqRetry } = require("../queues/bullmqJobFailure");
+const {
+  finalizeBullMqJobFailure,
+  willBullMqRetry,
+  isSmtpAuthFailure,
+} = require("../queues/bullmqJobFailure");
+const { NonRetryableError } = require("../utils/errors");
 const { inspectBullmqJob } = require("../services/bullmqJobInspector");
 const {
   shouldPersistTerminalFailure,
@@ -38,6 +43,10 @@ const { resolveResumeForAutoApply } = require("../services/resolveResumeForAutoA
 const processor = async (job) => {
   const { applicationId, userId, recipientEmail, dbJobId } = job.data;
   const reqId = job.id;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7450/ingest/4705d152-a121-4937-9af9-91260b409138',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89dbee'},body:JSON.stringify({sessionId:'89dbee',location:'sendApplication.worker.js:processor_entry',message:'send job received',data:{applicationId,userId,attempt:job.attemptsMade,recipientDomain:recipientEmail?.split('@')[1]||null},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
 
   const application = await getApplicationById(applicationId, userId);
   if (!application) {
@@ -74,6 +83,9 @@ const processor = async (job) => {
     nextStatus: "processing",
   });
   if (!claim.ok) {
+    // #region agent log
+    fetch('http://127.0.0.1:7450/ingest/4705d152-a121-4937-9af9-91260b409138',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89dbee'},body:JSON.stringify({sessionId:'89dbee',location:'sendApplication.worker.js:claim_skipped',message:'job claim skipped',data:{applicationId,jobRowId},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     logInfo("send_worker_claim_skipped", { applicationId });
     return;
   }
@@ -105,6 +117,10 @@ const processor = async (job) => {
     }
 
     const credentials = await fetchSmtpCredentials(userId);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7450/ingest/4705d152-a121-4937-9af9-91260b409138',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89dbee'},body:JSON.stringify({sessionId:'89dbee',location:'sendApplication.worker.js:credentials_loaded',message:'smtp credentials fetched',data:{applicationId,credentialEmailDomain:credentials.email?.split('@')[1]||null,passwordLen:credentials.password?.length||0,appStatus:application.application_status},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+    // #endregion
 
     const resolvedResume = await resolveResumeForAutoApply(userId);
     const resumeStoragePath =
@@ -138,6 +154,10 @@ const processor = async (job) => {
     }
     const arrayBuffer = await data.arrayBuffer();
     fileBuffer = Buffer.from(arrayBuffer);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7450/ingest/4705d152-a121-4937-9af9-91260b409138',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89dbee'},body:JSON.stringify({sessionId:'89dbee',location:'sendApplication.worker.js:resume_ready',message:'resume downloaded, attempting smtp send',data:{applicationId,resumeBytes:fileBuffer?.length||0,hasSubject:!!application.email_subject,hasBody:!!application.email_body},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
 
     const { createTransportOptions } = require("../config/mail.config");
     const transporter = nodemailer.createTransport(
@@ -176,7 +196,20 @@ const processor = async (job) => {
       actorId: "send-application",
       metadata: { messageId: smtpResult.messageId },
     });
-  } catch (err) {
+  } catch (rawErr) {
+    let err = rawErr;
+    if (isSmtpAuthFailure(rawErr)) {
+      err = Object.assign(
+        new NonRetryableError(
+          "Gmail rejected your app password — reconnect in Email Configuration with a new 16-character app password"
+        ),
+        { stage: "smtp", cause: rawErr }
+      );
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7450/ingest/4705d152-a121-4937-9af9-91260b409138',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89dbee'},body:JSON.stringify({sessionId:'89dbee',location:'sendApplication.worker.js:send_failed',message:'send worker catch',data:{applicationId,errorMessage:err?.message?.slice(0,120),attempt:job.attemptsMade,isBadCredentials:isSmtpAuthFailure(rawErr),isUnrecoverable:err instanceof UnrecoverableError},timestamp:Date.now(),hypothesisId:'A,D',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
     logError(
       "SEND_APPLICATION_FAILED",
       err,
@@ -242,13 +275,28 @@ const processor = async (job) => {
         actorId: "send-application",
         metadata: { message: err.message, terminal: true, retryable: false },
       });
+    } else if (willRetry) {
+      await transitionJobState(pool, {
+        jobId: jobRowId,
+        expectedStatus: "processing",
+        nextStatus: "queued",
+        lastError: err.message,
+        patch: { retryCountIncrement: true },
+      });
+      await recordEvent({
+        applicationId,
+        eventType: "send_retry_scheduled",
+        actorType: "worker",
+        actorId: "send-application",
+        metadata: { message: err.message, terminal: false, retryable: true },
+      });
     } else {
       await recordEvent({
         applicationId,
-        eventType: willRetry ? "send_retry_scheduled" : "send_failed",
+        eventType: "send_failed",
         actorType: "worker",
         actorId: "send-application",
-        metadata: { message: err.message, terminal: false, retryable: willRetry },
+        metadata: { message: err.message, terminal: false, retryable: false },
       });
     }
 

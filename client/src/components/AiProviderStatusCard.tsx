@@ -23,6 +23,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const SECTION_LABEL = "text-base font-medium";
+const SETUP_BOX_RADIUS = "rounded-sm";
 
 const REMOTE_PROVIDERS = [
   { id: "openai", label: "OpenAI" },
@@ -56,7 +60,7 @@ function healthBadge(status?: string) {
       );
     default:
       return (
-        <Badge variant="outline" className="font-normal text-xs text-emerald-600">
+        <Badge variant="success" className="font-normal text-xs">
           Healthy
         </Badge>
       );
@@ -65,7 +69,7 @@ function healthBadge(status?: string) {
 
 function BillingHelpSection() {
   return (
-    <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+    <details className={cn("border border-border bg-muted/30 px-3 py-2 text-base", SETUP_BOX_RADIUS)}>
       <summary className="cursor-pointer font-medium text-foreground list-none flex items-center gap-1 [&::-webkit-details-marker]:hidden">
         <ChevronDown className="h-4 w-4 shrink-0" />
         How billing works
@@ -243,7 +247,7 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
 
   if (listLoading && !sorted.length) {
     return (
-      <Card>
+      <Card className={SETUP_BOX_RADIUS}>
         <CardContent className="py-8 flex justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
@@ -253,10 +257,10 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
 
   if (!showForm && (usesOwnKey || usesPlatformOnly)) {
     return (
-      <Card>
+      <Card className={SETUP_BOX_RADIUS}>
         <CardHeader className="flex flex-row items-start justify-between gap-4 pb-4">
           <div className="space-y-1 min-w-0 flex-1">
-            <CardTitle className="flex items-center gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2 flex-wrap text-base font-medium">
               <Sparkles className="h-5 w-5 shrink-0" />
               AI Providers
               {usesOwnKey ? (
@@ -277,21 +281,23 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
                 : "No personal AI key — using server configuration when available."}
             </CardDescription>
           </div>
-          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 shrink-0">
+          <Badge variant="success" className="shrink-0">
             <CheckCircle2 className="mr-1 h-3 w-3" /> Ready
           </Badge>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           <BillingHelpSection />
 
           {usesOwnKey && (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {sorted.map((cred, index) => (
                 <li
                   key={cred.id}
-                  className={`flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm ${
-                    cred.inFallbackChain === false ? "opacity-60 bg-muted/20" : ""
-                  }`}
+                  className={cn(
+                    "flex flex-wrap items-center gap-2 border p-3 text-base",
+                    SETUP_BOX_RADIUS,
+                    cred.inFallbackChain === false && "opacity-60 bg-muted/10"
+                  )}
                 >
                   <div className="flex-1 min-w-[140px]">
                     <div className="font-medium flex items-center gap-2 flex-wrap">
@@ -372,7 +378,7 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
           )}
 
           {activeAiProvider?.allowPlatformFallback !== undefined && sorted[0] && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Platform fallback on primary:{" "}
               <strong>{sorted[0].allowPlatformFallback ? "Enabled" : "Disabled"}</strong>
             </p>
@@ -396,9 +402,9 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
   }
 
   return (
-    <Card className={!hasAiSetup && !usesOwnKey ? "border-amber-500/50" : ""}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className={cn(SETUP_BOX_RADIUS, !hasAiSetup && !usesOwnKey ? "ring-1 ring-warning/40" : "")}>
+      <CardHeader className="gap-1">
+        <CardTitle className="flex items-center gap-2 text-base font-medium">
           <Sparkles className="h-5 w-5" />
           {formRole === "primary" ? "Set primary AI provider" : "Add AI provider"}
         </CardTitle>
@@ -408,15 +414,15 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
             : "Added to the end of your backup chain if primary fails."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <BillingHelpSection />
         {sorted.length > 0 && (
           <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
             Back to list
           </Button>
         )}
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="flex gap-4 text-sm">
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="flex gap-4 text-base">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -437,10 +443,13 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ai-provider">Provider</Label>
+            <Label htmlFor="ai-provider" className={SECTION_LABEL}>Provider</Label>
             <select
               id="ai-provider"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className={cn(
+                "flex h-10 w-full border border-input-border bg-input px-[14px] py-2.5 text-base",
+                SETUP_BOX_RADIUS
+              )}
               value={provider}
               onChange={(e) => {
                 setProvider(e.target.value);
@@ -456,11 +465,14 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ai-model">Model</Label>
+            <Label htmlFor="ai-model" className={SECTION_LABEL}>Model</Label>
             {curatedModels.length > 0 ? (
               <select
                 id="ai-model"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className={cn(
+                  "flex h-10 w-full border border-input-border bg-input px-[14px] py-2.5 text-base",
+                  SETUP_BOX_RADIUS
+                )}
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 required
@@ -473,7 +485,7 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
                 ))}
               </select>
             ) : (
-              <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              <p className={cn("border border-dashed border-border px-3 py-2 text-base text-muted-foreground", SETUP_BOX_RADIUS)}>
                 No certified models for this provider yet. Certify and promote a model from{" "}
                 <span className="font-medium text-foreground">/dev/model-certification</span> first.
               </p>
@@ -481,20 +493,21 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ai-api-key">API key</Label>
+            <Label htmlFor="ai-api-key" className={SECTION_LABEL}>API key</Label>
             <Input
               id="ai-api-key"
               type="password"
               placeholder="sk-..."
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              className={SETUP_BOX_RADIUS}
               required
             />
           </div>
 
           {formRole === "primary" && (
-            <div className="rounded-md border border-border p-3">
-              <label className="flex items-start gap-2 text-sm">
+            <div className={cn("border border-border p-3", SETUP_BOX_RADIUS)}>
+              <label className="flex items-start gap-2 text-base">
                 <input
                   type="checkbox"
                   checked={allowPlatformFallback}

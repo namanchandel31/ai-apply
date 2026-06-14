@@ -1,6 +1,7 @@
 const { pool, instrumentedQuery } = require("../db");
 const { transitionApplicationState } = require("../services/transitionApplicationState");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
+const { autoAssignEmailSentTrackerStatus } = require("../services/trackerStatusService");
 
 const getApplicationByResumeAndJD = async (resumeId, jobDescriptionId, userId = null, client = null) => {
   const queryClient = client || pool;
@@ -156,6 +157,7 @@ const updateApplicationFields = async (applicationId, fields, userId = null, cli
     "email_metadata",
     "email_feedback_signals",
     "email_preferences_snapshot",
+    "tracker_status_id",
   ];
   const sets = [];
   const values = [applicationId];
@@ -195,6 +197,9 @@ const markSentFromGenerated = async (applicationId, userId, providerMessageId = 
         `UPDATE applications SET provider_message_id = $2 WHERE id = $1`,
         [applicationId, providerMessageId]
       );
+    }
+    if (userId) {
+      await autoAssignEmailSentTrackerStatus(userId, applicationId, client);
     }
     return r.row;
   });

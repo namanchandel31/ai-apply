@@ -5,6 +5,9 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const SETUP_BOX_RADIUS = "rounded-sm";
 
 interface Props {
   activeResume: { filename: string; uploadedAt: string; fileHash: string } | null | undefined;
@@ -40,10 +43,10 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
   };
 
   return (
-    <Card className={!activeResume ? "border-amber-500/50" : ""}>
+    <Card className={cn(SETUP_BOX_RADIUS, !activeResume ? "ring-1 ring-warning/40" : "")}>
       <CardHeader className="flex flex-row items-center justify-between pb-4">
         <div className="space-y-1">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base font-medium">
             <FileText className="h-5 w-5" />
             Resume Management
           </CardTitle>
@@ -52,19 +55,19 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
           </CardDescription>
         </div>
         {activeResume && (
-          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+          <Badge variant="success">
             <CheckCircle2 className="mr-1 h-3 w-3" /> Ready
           </Badge>
         )}
       </CardHeader>
       <CardContent>
         {activeResume ? (
-          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+          <div className={cn("flex items-center justify-between border border-input-border bg-input p-3", SETUP_BOX_RADIUS)}>
             <div className="flex items-center gap-3">
               <FileText className="h-8 w-8 text-muted-foreground" />
               <div>
-                <p className="font-medium text-sm">{activeResume.filename}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-base font-medium">{activeResume.filename}</p>
+                <p className="text-base text-muted-foreground">
                   Uploaded {new Date(activeResume.uploadedAt).toLocaleDateString()}
                 </p>
               </div>
@@ -84,10 +87,10 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-lg bg-muted/20 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground mb-3 opacity-50" />
-            <p className="font-medium text-sm mb-1">Resume Required</p>
-            <p className="text-xs text-muted-foreground mb-4">Upload a PDF resume before applying to jobs.</p>
+          <div className={cn("flex flex-col items-center justify-center border border-dashed border-border bg-muted/10 p-6 text-center", SETUP_BOX_RADIUS)}>
+            <FileText className="mb-3 h-10 w-10 text-muted-foreground opacity-50" />
+            <p className="mb-1 text-base font-medium">Resume Required</p>
+            <p className="mb-4 text-base text-muted-foreground">Upload a PDF resume before applying to jobs.</p>
             <input
               type="file"
               ref={fileInputRef}

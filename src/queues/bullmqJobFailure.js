@@ -3,12 +3,25 @@ const { NonRetryableError, RetryableError } = require("../utils/errors");
 const { logInfo } = require("../utils/logger");
 
 /**
+ * Gmail SMTP auth failures — retrying will not fix invalid/revoked app passwords.
+ */
+function isSmtpAuthFailure(err) {
+  const msg = String(err?.message || "");
+  return (
+    msg.includes("BadCredentials") ||
+    msg.includes("535-5.7.8") ||
+    msg.includes("Username and Password not accepted")
+  );
+}
+
+/**
  * True when the error must not consume BullMQ retry attempts.
  */
 function isNonRetryableApplicationError(err) {
   if (!err) return false;
   if (err instanceof UnrecoverableError || err instanceof NonRetryableError) return true;
   if (err.name === "UnrecoverableError" || err.name === "NonRetryableError") return true;
+  if (isSmtpAuthFailure(err)) return true;
   return false;
 }
 
@@ -33,10 +46,7 @@ async function finalizeBullMqJobFailure(job, err, opts = {}) {
     opts.forceUnrecoverable || isNonRetryableApplicationError(err);
 
   if (!nonRetryable) {
-    if (err instanceof RetryableError || err?.name === "RetryableError") {
-      throw err;
-    }
-    return err;
+    throw err;
   }
 
   if (job && typeof job.discard === "function") {
@@ -67,6 +77,7 @@ async function finalizeBullMqJobFailure(job, err, opts = {}) {
 }
 
 module.exports = {
+  isSmtpAuthFailure,
   isNonRetryableApplicationError,
   willBullMqRetry,
   finalizeBullMqJobFailure,

@@ -15,7 +15,7 @@ const SheetOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-sheet-fade-in data-[state=closed]:animate-sheet-fade-out",
       className
     )}
     {...props}
@@ -34,17 +34,17 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 flex flex-col gap-4 bg-card shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-300",
+        "fixed z-50 flex flex-col gap-4 bg-card shadow-[var(--shadow-modal)]",
         side === "right" &&
-          "inset-y-0 right-0 h-full w-full border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-lg md:max-w-xl lg:max-w-2xl",
+          "inset-y-0 right-0 h-full w-full data-[state=open]:animate-sheet-in-right data-[state=closed]:animate-sheet-out-right sm:max-w-lg md:max-w-xl lg:max-w-2xl",
         side === "left" &&
-          "inset-y-0 left-0 h-full w-full border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-lg",
+          "inset-y-0 left-0 h-full w-full data-[state=open]:animate-sheet-in-left data-[state=closed]:animate-sheet-out-left sm:max-w-lg",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg opacity-70 transition-opacity hover:bg-black/[0.06] hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -54,7 +54,7 @@ const SheetContent = React.forwardRef<
 SheetContent.displayName = DialogPrimitive.Content.displayName;
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 border-b px-6 py-4", className)} {...props} />
+  <div className={cn("flex flex-col gap-2 px-6 py-4", className)} {...props} />
 );
 
 const SheetTitle = React.forwardRef<

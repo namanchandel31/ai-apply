@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const QUERY_KEY = ["email-preferences"] as const;
+const SETUP_BOX_RADIUS = "rounded-sm";
 
 type Props = {
   /** default = full Setup onboarding; compact = Dashboard quick controls */
@@ -42,11 +43,9 @@ function CurrentStyleBlock({
     );
   }
   return (
-    <div className="space-y-0.5">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Current style
-      </p>
-      <p className="text-sm font-semibold">{getPresetDisplayName(presetId)}</p>
+    <div className="space-y-1">
+      <p className="text-base font-normal text-muted-foreground">Current style</p>
+      <p className="text-base font-medium text-foreground">{getPresetDisplayName(presetId)}</p>
     </div>
   );
 }
@@ -136,7 +135,7 @@ export function EmailPreferencesCard({ variant = "default" }: Props) {
   };
 
   const sliders = (
-    <div className={cn("space-y-4", isCompact && "space-y-2.5")}>
+    <div className={cn("space-y-3", isCompact && "space-y-2.5")}>
       <EmailPreferenceSlider
         label="Tone"
         value={tone}
@@ -166,7 +165,7 @@ export function EmailPreferencesCard({ variant = "default" }: Props) {
 
   if (isLoading && !data) {
     return (
-      <Card>
+      <Card className={isCompact ? undefined : SETUP_BOX_RADIUS}>
         <CardContent className={cn("flex items-center justify-center", isCompact ? "py-8" : "py-12")}>
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
@@ -195,9 +194,9 @@ export function EmailPreferencesCard({ variant = "default" }: Props) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+    <Card className={SETUP_BOX_RADIUS}>
+      <CardHeader className="gap-1">
+        <CardTitle className="flex items-center gap-2 text-base font-medium">
           <Mail className="h-5 w-5" />
           Email style
         </CardTitle>
@@ -218,15 +217,14 @@ export function EmailPreferencesCard({ variant = "default" }: Props) {
               <Button
                 key={preset.id}
                 type="button"
-                size="sm"
                 variant={active ? "default" : "outline"}
-                className={cn(recommended && !active && "border-primary/40")}
+                className={cn(SETUP_BOX_RADIUS, recommended && !active && "ring-1 ring-ring/30")}
                 onClick={() => applyPreset(preset)}
               >
                 {recommended && <Star className="mr-1 h-3 w-3 fill-current" aria-hidden />}
                 {preset.label}
                 {recommended && (
-                  <span className="ml-1 text-[10px] uppercase tracking-wide opacity-80">
+                  <span className="ml-1 text-base uppercase tracking-wide opacity-80">
                     Recommended
                   </span>
                 )}
@@ -239,23 +237,23 @@ export function EmailPreferencesCard({ variant = "default" }: Props) {
 
         {preview && (
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-base">
               <span className="font-medium">Preview</span>
               <span className="text-muted-foreground capitalize">
                 Estimated length: {preview.lengthLabel}
               </span>
             </div>
-            <pre className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 text-xs leading-relaxed font-sans">
+            <pre className={cn("whitespace-pre-wrap border bg-muted/30 p-4 text-base leading-relaxed font-sans", SETUP_BOX_RADIUS)}>
               {preview.body}
             </pre>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Preview is educational, not predictive. Actual emails are tailored to each job by AI.
             </p>
           </div>
         )}
 
         {patchMutation.isPending && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <p className="text-base text-muted-foreground flex items-center gap-1">
             <Loader2 className="h-3 w-3 animate-spin" />
             Saving…
           </p>

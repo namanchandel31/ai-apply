@@ -34,7 +34,7 @@ export function SessionHandlers() {
 
       if (ctx.code === "EMAIL_NOT_VERIFIED") {
         toast.error("Email not verified", {
-          description: "Your Google account must have a verified email to use AI Apply.",
+          description: "Your Google account must have a verified email to use OneTap.",
           id: "email-not-verified",
         });
         return;

@@ -44,6 +44,7 @@ function serializeApplication(row, jobs = {}) {
     matchScore: row.match_score ?? null,
     emailSubject: row.email_subject,
     emailBody: row.email_body,
+    trackerStatusId: row.tracker_status_id ?? null,
   };
   const jdEnrichment = deriveJdEnrichment(base);
   if (jdEnrichment) {

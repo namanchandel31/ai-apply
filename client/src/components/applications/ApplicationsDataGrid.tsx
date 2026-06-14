@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { displayCompany, displayRole } from "@/queries/applicationsCache";
 import { useApplicationsListParams } from "@/contexts/ApplicationsListParamsContext";
-import { ApplicationStatusBadge } from "@/components/applications/ApplicationStatusBadge";
+import { ApplicationTrackerStatusCell } from "@/components/applications/ApplicationTrackerStatusCell";
 import { MatchScoreCell } from "@/components/applications/MatchScoreCell";
 import { DateTimeCell } from "@/components/applications/DateTimeCell";
 import { ApplicationRowActions } from "@/components/applications/ApplicationRowActions";
@@ -27,6 +27,7 @@ import {
   TableSkeletonRows,
 } from "@/components/applications/ApplicationsListStates";
 import { cn } from "@/lib/utils";
+import { tableTextPrimary, tableTextSecondary, tableCellPaddingX } from "@/components/applications/applicationsTableTypography";
 
 type Props = {
   items: ApplicationRecord[];
@@ -67,6 +68,7 @@ const ApplicationTableRow = memo(function ApplicationTableRow({
         <TableCell
           key={cell.id}
           className={cn(
+            tableCellPaddingX,
             "py-2.5",
             cell.column.id === "match" && "hidden sm:table-cell",
             cell.column.id === "updated" && "hidden md:table-cell"
@@ -93,6 +95,7 @@ const ApplicationTableRow = memo(function ApplicationTableRow({
     a.role === b.role &&
     a.company === b.company &&
     a.matchScore === b.matchScore &&
+    a.trackerStatusId === b.trackerStatusId &&
     (a as { _partial?: boolean })._partial === (b as { _partial?: boolean })._partial
   );
 });
@@ -115,7 +118,7 @@ function SortHeader({
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+      className={cn("inline-flex items-center gap-1", tableTextSecondary)}
       onClick={() => onSort(field)}
     >
       {label}
@@ -152,9 +155,16 @@ export function ApplicationsDataGrid({
     () => [
       {
         id: "role",
+        header: () => <span className={tableTextSecondary}>Role</span>,
+        cell: ({ row }) => (
+          <span className={tableTextPrimary}>{displayRole(row.original)}</span>
+        ),
+      },
+      {
+        id: "company",
         header: () => (
           <SortHeader
-            label="Role"
+            label="Company"
             field="normalized_company_name"
             currentSort={params.sort}
             currentOrder={params.order}
@@ -162,11 +172,13 @@ export function ApplicationsDataGrid({
           />
         ),
         cell: ({ row }) => (
-          <div>
-            <div className="font-medium text-sm text-foreground">{displayRole(row.original)}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{displayCompany(row.original)}</div>
-          </div>
+          <span className={tableTextSecondary}>{displayCompany(row.original)}</span>
         ),
+      },
+      {
+        id: "status",
+        header: () => <span className={tableTextSecondary}>Status</span>,
+        cell: ({ row }) => <ApplicationTrackerStatusCell app={row.original} />,
       },
       {
         id: "match",
@@ -179,20 +191,7 @@ export function ApplicationsDataGrid({
             onSort={toggleSort}
           />
         ),
-        cell: ({ row }) => <MatchScoreCell score={row.original.matchScore} />,
-      },
-      {
-        id: "status",
-        header: () => (
-          <SortHeader
-            label="Status"
-            field="application_status"
-            currentSort={params.sort}
-            currentOrder={params.order}
-            onSort={toggleSort}
-          />
-        ),
-        cell: ({ row }) => <ApplicationStatusBadge app={row.original} />,
+        cell: ({ row }) => <MatchScoreCell score={row.original.matchScore} variant="table" />,
       },
       {
         id: "updated",
@@ -206,7 +205,10 @@ export function ApplicationsDataGrid({
           />
         ),
         cell: ({ row }) => (
-          <DateTimeCell iso={row.original.updatedAt ?? row.original.createdAt} />
+          <DateTimeCell
+            iso={row.original.updatedAt ?? row.original.createdAt}
+            variant="inline"
+          />
         ),
       },
       {
@@ -235,14 +237,19 @@ export function ApplicationsDataGrid({
 
   if (isLoading && items.length === 0) {
     return (
-      <Table>
+      <Table className="text-base">
         <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
           <TableRow>
-            <TableHead>Role</TableHead>
-            <TableHead className="hidden sm:table-cell">Match</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden md:table-cell">Updated</TableHead>
-            <TableHead className="w-10" />
+            <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Role</TableHead>
+            <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Company</TableHead>
+            <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Status</TableHead>
+            <TableHead className={cn("hidden sm:table-cell", tableTextSecondary, tableCellPaddingX)}>
+              Match
+            </TableHead>
+            <TableHead className={cn("hidden md:table-cell", tableTextSecondary, tableCellPaddingX)}>
+              Updated
+            </TableHead>
+            <TableHead className={cn("w-10", tableCellPaddingX)} />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -263,7 +270,7 @@ export function ApplicationsDataGrid({
         isFetching && !isLoading && "opacity-70"
       )}
     >
-      <Table>
+      <Table className="text-base">
         <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
           {table.getHeaderGroups().map((hg) => (
             <TableRow key={hg.id}>
@@ -271,6 +278,8 @@ export function ApplicationsDataGrid({
                 <TableHead
                   key={h.id}
                   className={cn(
+                    tableTextSecondary,
+                    tableCellPaddingX,
                     h.id === "match" && "hidden sm:table-cell",
                     h.id === "updated" && "hidden md:table-cell"
                   )}
