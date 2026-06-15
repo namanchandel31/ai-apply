@@ -27,7 +27,7 @@ async function main() {
 
   const { worker: processWorker } = require("../src/workers/processApplication.worker");
   const { worker: sendWorker } = require("../src/workers/sendApplication.worker");
-  const { closeBullmqQueues } = require("../src/queues/connection");
+  const { closeBullmqQueues } = require("../src/queues/bullmqShutdown");
 
   await Promise.all([processWorker.close(), sendWorker.close()]);
   await closeBullmqQueues();

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/auth/AuthContext";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import {
   Sheet,
@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ApplicationStatusBadge } from "@/components/applications/ApplicationStatusBadge";
 import { MatchScoreCell } from "@/components/applications/MatchScoreCell";
 import { DateTimeCell } from "@/components/applications/DateTimeCell";
@@ -54,6 +55,8 @@ export function ApplicationDetailsSheet({
   const { broadcastRevive } = useRealtime();
   const { isResolved, isAuthenticated } = useAuthReady();
   const [continueEmail, setContinueEmail] = useState("");
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
 
   const {
@@ -72,6 +75,58 @@ export function ApplicationDetailsSheet({
   });
 
   const app = detailRes;
+  const isReadyEditable = Boolean(app?.canSend || app?.uiStatus === "generated");
+
+  useEffect(() => {
+    if (!app) return;
+    setEditSubject(app.emailSubject ?? "");
+    setEditBody(app.emailBody ?? "");
+  }, [app?.id, app?.emailSubject, app?.emailBody, app]);
+
+  const handleSaveEmail = async () => {
+    if (!applicationId || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await api.patchApplicationEmail(applicationId, {
+        emailSubject: editSubject,
+        emailBody: editBody,
+      });
+      toast.success("Email updated");
+      void refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update email");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!applicationId || actionBusy) return;
+    setActionBusy(true);
+    const reg = globalOrchestrationRegistry.get(applicationId);
+    broadcastRevive(applicationId, (reg?.orchestrationEpoch ?? 0) + 1);
+    try {
+      if (isReadyEditable) {
+        await api.patchApplicationEmail(applicationId, {
+          emailSubject: editSubject,
+          emailBody: editBody,
+        });
+      }
+      await api.send(applicationId);
+      patchApplicationAfterMutation(queryClient, applicationId, {
+        uiStatus: "sending",
+        pollable: true,
+        terminal: false,
+        canSend: false,
+      });
+      toast.success("Send queued");
+      void refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   const handleRetry = async () => {
     if (!applicationId || actionBusy) return;
@@ -164,11 +219,17 @@ export function ApplicationDetailsSheet({
 
         {app && !isLoading && (
           <div className="flex flex-1 flex-col min-h-0 overflow-hidden px-6 pb-6">
-            {(app.canRetry || app.canContinue) && (
+            {(app.canRetry || app.canContinue || app.canSend) && (
               <div className="flex flex-wrap gap-2 mb-4 shrink-0">
                 {app.canRetry && (
                   <Button size="sm" variant="outline" disabled={actionBusy} onClick={() => void handleRetry()}>
                     Retry
+                  </Button>
+                )}
+                {app.canSend && (
+                  <Button size="sm" disabled={actionBusy} onClick={() => void handleSend()}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
                   </Button>
                 )}
                 {app.canContinue && (
@@ -228,14 +289,55 @@ export function ApplicationDetailsSheet({
                   </div>
                 </TabsContent>
                 <TabsContent value="email" className="mt-0 space-y-3">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
-                    <SafeContent text={app.emailSubject} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
-                    <SafeContent text={app.emailBody} className="max-h-96 overflow-auto" />
-                  </div>
+                  {isReadyEditable ? (
+                    <>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+                        <Input
+                          value={editSubject}
+                          onChange={(e) => setEditSubject(e.target.value)}
+                          className="text-sm"
+                          disabled={actionBusy}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
+                        <Textarea
+                          value={editBody}
+                          onChange={(e) => setEditBody(e.target.value)}
+                          className="min-h-[200px] text-sm"
+                          disabled={actionBusy}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={actionBusy}
+                          onClick={() => void handleSaveEmail()}
+                        >
+                          Save changes
+                        </Button>
+                        {app.canSend && (
+                          <Button size="sm" disabled={actionBusy} onClick={() => void handleSend()}>
+                            <Send className="h-4 w-4 mr-2" />
+                            Send
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+                        <SafeContent text={app.emailSubject} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
+                        <SafeContent text={app.emailBody} className="max-h-96 overflow-auto" />
+                      </div>
+                    </>
+                  )}
                 </TabsContent>
                 <TabsContent value="errors" className="mt-0 space-y-3">
                   {app.lastError && (

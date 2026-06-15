@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { NavigateFunction } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { disconnectExtension } from "@/lib/extensionBridge";
 import { shutdownRealtimeSession } from "@/contexts/RealtimeProvider";
 import { resetOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
 import { logAuthLifecycle } from "@/auth/authLifecycleLog";
@@ -43,6 +44,7 @@ export async function logout({ queryClient, navigate, clearAuthState }: LogoutOp
   logoutInFlight = (async () => {
     clearAuthState();
     shutdownRealtimeSession();
+    await disconnectExtension();
     await queryClient.cancelQueries();
     queryClient.clear();
     resetOrchestrationRegistry();

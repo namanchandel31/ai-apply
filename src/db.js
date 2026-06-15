@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 const config = require("./config");
 const { logger, logInfo, logError } = require("./utils/logger");
+const { detectPoolOwner } = require("./db/poolOwner");
 const {
   instrumentedQuery,
   connectWithTiming,
@@ -50,16 +51,6 @@ function attachPoolErrorHandler(pool, poolInstanceId) {
       );
     }
   });
-}
-
-function detectPoolOwner() {
-  const argv1 = process.argv[1] || "";
-  if (argv1.includes("workers/") || argv1.includes("workers\\")) return "worker";
-  if (argv1.includes("runMigration")) return "migration";
-  if (argv1.includes("processApplication.worker") || argv1.includes("sendApplication.worker")) {
-    return "worker";
-  }
-  return "api";
 }
 
 const POOL_OWNER = detectPoolOwner();

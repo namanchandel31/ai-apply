@@ -1,7 +1,7 @@
 const { pool } = require("../db");
 const { buildFullName, splitFullName } = require("../utils/deriveNameFromEmail");
 
-const USER_COLUMNS = `id, supabase_user_id, email, first_name, last_name, full_name, avatar_url, created_at, last_login_at, profile_customized_at`;
+const USER_COLUMNS = `id, supabase_user_id, email, first_name, last_name, full_name, avatar_url, created_at, last_login_at, profile_customized_at, apply_mode, is_admin`;
 
 async function findBySupabaseUserId(supabaseUserId) {
   const { rows } = await pool.query(
@@ -96,6 +96,20 @@ async function insertNewUserFromSupabase({ supabaseUserId, email, fullName, avat
     [supabaseUserId, email, fullName, firstName, lastName, avatarUrl]
   );
   return rows[0];
+}
+
+async function getUserApplyMode(userId, client = pool) {
+  const { rows } = await client.query(`SELECT apply_mode FROM users WHERE id = $1`, [userId]);
+  return rows[0]?.apply_mode ?? "review_apply";
+}
+
+async function setUserApplyMode(userId, applyMode) {
+  const { rows } = await pool.query(
+    `UPDATE users SET apply_mode = $2 WHERE id = $1
+     RETURNING apply_mode`,
+    [userId, applyMode]
+  );
+  return rows[0]?.apply_mode ?? null;
 }
 
 async function getUserById(userId) {
@@ -245,6 +259,8 @@ module.exports = {
   updateUserProfileFromSupabase,
   insertNewUserFromSupabase,
   getUserById,
+  getUserApplyMode,
+  setUserApplyMode,
   updateUserProfile,
   seedProfileFromEmail,
   touchUserLastLogin,

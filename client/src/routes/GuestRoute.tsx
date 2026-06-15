@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";

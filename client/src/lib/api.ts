@@ -240,16 +240,75 @@ export type UserMe = {
   lastName?: string | null;
   fullName?: string | null;
   avatarUrl?: string | null;
+  applyMode?: "auto_apply" | "review_apply";
   subscriptionTier: string;
+  isAdmin?: boolean;
   flags: Record<string, unknown>;
   createdAt: string;
 };
+
+export type ExtensionDetectionConfig = {
+  hiringKeywords: string[];
+  applyKeywords: string[];
+  blockedEmailPrefixes: string[];
+  scoreEmail: number;
+  scoreHiringKeyword: number;
+  scoreApplyKeyword: number;
+  threshold: number;
+  updatedAt?: string | null;
+};
+
+export type ExtensionDetectionConfigPatch = Partial<
+  Omit<ExtensionDetectionConfig, "updatedAt">
+>;
 
 export const api = {
   setUnauthorizedHandler,
 
   getMe() {
     return request<{ success: boolean; data: UserMe }>("/api/user/me");
+  },
+
+  patchApplyMode(applyMode: "auto_apply" | "review_apply") {
+    return request<{ success: boolean; data: UserMe }>("/api/user/apply-mode", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applyMode }),
+    });
+  },
+
+  postExtensionConnectInit(body: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    apiBase?: string;
+  }) {
+    return request<{
+      success: boolean;
+      data: { connectToken: string; expiresIn: number };
+    }>("/api/extension/connect/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  getExtensionDetectionConfig() {
+    return request<{ success: boolean; data: ExtensionDetectionConfig }>(
+      "/api/extension/detection-config",
+      { method: "GET" }
+    );
+  },
+
+  updateExtensionDetectionConfig(body: ExtensionDetectionConfigPatch) {
+    return request<{ success: boolean; data: ExtensionDetectionConfig }>(
+      "/api/admin/extension-detection-config",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
   },
 
   patchProfile(body: { firstName?: string; lastName?: string }) {
@@ -367,6 +426,20 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
     });
+  },
+
+  patchApplicationEmail(
+    applicationId: string,
+    body: { emailSubject: string; emailBody: string }
+  ) {
+    return request<{ success: boolean; data: ApplicationDetailRecord }>(
+      `/api/applications/${applicationId}/email`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
   },
 
   getEmailPreferences() {
@@ -668,6 +741,7 @@ export type ApplicationStatusPayload = {
   pollable: boolean;
   canRetry: boolean;
   canContinue: boolean;
+  canSend?: boolean;
   reviewReason?: string | null;
   version?: number;
   orchestrationEpoch?: number;
@@ -739,6 +813,7 @@ export type ApplicationRecord = {
   pollable?: boolean;
   canRetry?: boolean;
   canContinue?: boolean;
+  canSend?: boolean;
   reviewReason?: string | null;
   lastError?: string | null;
   retryCount?: number;

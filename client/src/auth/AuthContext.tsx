@@ -20,7 +20,9 @@ export type AuthUser = {
   lastName?: string | null;
   fullName?: string | null;
   avatarUrl?: string | null;
+  applyMode?: "auto_apply" | "review_apply";
   subscriptionTier?: string;
+  isAdmin?: boolean;
   flags?: Record<string, unknown>;
 };
 

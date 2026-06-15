@@ -486,8 +486,8 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
               </select>
             ) : (
               <p className={cn("border border-dashed border-border px-3 py-2 text-base text-muted-foreground", SETUP_BOX_RADIUS)}>
-                No certified models for this provider yet. Certify and promote a model from{" "}
-                <span className="font-medium text-foreground">/dev/model-certification</span> first.
+                No certified models for this provider yet. Certify and promote a model from the{" "}
+                <span className="font-medium text-foreground">Admin console → AI models</span> first.
               </p>
             )}
           </div>

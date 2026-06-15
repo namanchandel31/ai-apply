@@ -52,6 +52,13 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
       resumeSnapshotPath: resolved.filePath,
       emailSubject: options.emailSubject ?? null,
       emailBody: options.emailBody ?? null,
+      sourcePlatform: options.sourcePlatform ?? null,
+      sourceUrl: options.sourceUrl ?? null,
+      sourceEmail: options.sourceEmail ?? null,
+      discoveredAt: options.discoveredAt ?? null,
+      sourceCompanyName: options.sourceCompanyName ?? null,
+      sourceRecruiterName: options.sourceRecruiterName ?? null,
+      sourcePostId: options.sourcePostId ?? null,
     });
 
     dbJob = await createJob(

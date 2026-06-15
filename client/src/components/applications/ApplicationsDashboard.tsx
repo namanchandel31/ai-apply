@@ -79,6 +79,27 @@ function ApplicationsDashboardInner() {
     openDetails(id, "overview");
   };
 
+  const handleSend = async (id: string) => {
+    if (actionId) return;
+    setActionId(id);
+    const reg = globalOrchestrationRegistry.get(id);
+    broadcastRevive(id, (reg?.orchestrationEpoch ?? 0) + 1);
+    try {
+      await api.send(id);
+      patchApplicationAfterMutation(queryClient, id, {
+        uiStatus: "sending",
+        pollable: true,
+        terminal: false,
+        canSend: false,
+      });
+      toast.success("Send queued");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   return (
     <>
       <ApplicationsPageFilters isFetching={isFetching} />
@@ -92,6 +113,7 @@ function ApplicationsDashboardInner() {
           onSelectRow={(id) => openDetails(id)}
           onRetry={handleRetry}
           onContinue={handleContinue}
+          onSend={handleSend}
           actionId={actionId}
         />
         <ApplicationsTableFooter

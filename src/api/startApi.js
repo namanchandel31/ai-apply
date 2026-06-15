@@ -71,8 +71,11 @@ async function startApi(options = {}) {
           }
         }
 
-        const { pool, startPoolMetricsLogging, POOL_INSTANCE_ID } = require("../db");
-        startPoolMetricsLogging(pool);
+        const { pool, startPoolMetricsLogging, POOL_INSTANCE_ID, POOL_OWNER } = require("../db");
+        startPoolMetricsLogging(pool, 60_000, {
+          poolInstanceId: POOL_INSTANCE_ID,
+          poolOwner: POOL_OWNER,
+        });
 
         const { recoveryLoop } = require("../jobs/recovery.job");
         recoveryLoop().catch((err) => {

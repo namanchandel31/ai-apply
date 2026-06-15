@@ -44,7 +44,30 @@ describe("resolveResumeForAutoApply", () => {
     expect(getResumeById).toHaveBeenCalledWith("resume-explicit", "user-1");
   });
 
-  it("falls back to default resume when explicit resumeId omitted", async () => {
+  it("prefers latest parsed resume over default_resume_id when explicit resumeId omitted", async () => {
+    getLatestParsedResumeForUser.mockResolvedValue({
+      resumeId: "resume-latest",
+      parsedResumeId: "pr-latest",
+      parsedJson: { name: "Latest" },
+      filePath: "/latest.pdf",
+    });
+    getUserDefaults.mockResolvedValue({ defaultResumeId: "resume-default" });
+    getResumeById.mockResolvedValue({
+      resumeId: "resume-latest",
+      parsedResumeId: "pr-latest",
+      parsedJson: { name: "Latest" },
+      filePath: "/latest.pdf",
+    });
+
+    const result = await resolveResumeForAutoApply("user-1");
+
+    expect(result.resumeId).toBe("resume-latest");
+    expect(getLatestParsedResumeForUser).toHaveBeenCalledWith("user-1");
+    expect(getUserDefaults).not.toHaveBeenCalled();
+  });
+
+  it("falls back to default resume when no latest parsed resume exists", async () => {
+    getLatestParsedResumeForUser.mockResolvedValue(null);
     getUserDefaults.mockResolvedValue({ defaultResumeId: "resume-default" });
     getResumeById.mockResolvedValue({
       resumeId: "resume-default",
@@ -56,10 +79,11 @@ describe("resolveResumeForAutoApply", () => {
     const result = await resolveResumeForAutoApply("user-1");
 
     expect(result.resumeId).toBe("resume-default");
-    expect(getLatestParsedResumeForUser).not.toHaveBeenCalled();
+    expect(getLatestParsedResumeForUser).toHaveBeenCalledWith("user-1");
   });
 
   it("throws RESUME_NOT_FOUND when resume belongs to another user or is missing", async () => {
+    getLatestParsedResumeForUser.mockResolvedValue(null);
     getUserDefaults.mockResolvedValue({ defaultResumeId: "resume-other" });
     getResumeById.mockResolvedValue(null);
 

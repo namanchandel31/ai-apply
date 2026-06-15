@@ -17,7 +17,7 @@ startRuntimeDiagnostics(30000);
 registerGracefulShutdown();
 registerShutdownHook("api", stopApi, { priority: 80 });
 registerShutdownHook("redis", async () => {
-  const { closeBullmqQueues } = require("./src/queues/connection");
+  const { closeBullmqQueues } = require("./src/queues/bullmqShutdown");
   await closeBullmqQueues();
 }, { priority: 20 });
 registerShutdownHook("postgres", async () => {

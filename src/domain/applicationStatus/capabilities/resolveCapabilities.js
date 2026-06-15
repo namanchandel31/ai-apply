@@ -45,7 +45,13 @@ function resolveCapabilities(ctx, uiStatus) {
     !ctx.hasCompletedSendJob &&
     ctx.applicationStatus !== APPLICATION_STATUS.CANCELLED;
 
-  return { terminal, pollable, canContinue, canRetry };
+  const canSend =
+    ctx.applicationStatus === APPLICATION_STATUS.GENERATED &&
+    Boolean(ctx.emailSubject?.trim()) &&
+    Boolean(ctx.emailBody?.trim()) &&
+    !ctx.hasActiveSendJob;
+
+  return { terminal, pollable, canContinue, canRetry, canSend };
 }
 
 module.exports = { resolveCapabilities };

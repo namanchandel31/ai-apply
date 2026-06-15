@@ -35,8 +35,11 @@ async function startWorkers() {
   processWorker = processModule.worker;
   sendWorker = sendModule.worker;
 
-  const { pool, startPoolMetricsLogging } = require("../db");
-  startPoolMetricsLogging(pool);
+  const { pool, startPoolMetricsLogging, POOL_INSTANCE_ID, POOL_OWNER } = require("../db");
+  startPoolMetricsLogging(pool, 60_000, {
+    poolInstanceId: POOL_INSTANCE_ID,
+    poolOwner: POOL_OWNER,
+  });
 
   workersStarted = true;
   logInfo("WORKERS_BOOT_COMPLETE", {

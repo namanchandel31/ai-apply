@@ -1,7 +1,6 @@
 const { pool, instrumentedQuery } = require("../db");
 const { transitionApplicationState } = require("../services/transitionApplicationState");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
-const { autoAssignEmailSentTrackerStatus } = require("../services/trackerStatusService");
 
 const getApplicationByResumeAndJD = async (resumeId, jobDescriptionId, userId = null, client = null) => {
   const queryClient = client || pool;
@@ -86,6 +85,13 @@ const createApplication = async ({
   emailMetadata = null,
   emailFeedbackSignals = null,
   emailPreferencesSnapshot = null,
+  sourcePlatform = null,
+  sourceUrl = null,
+  sourceEmail = null,
+  discoveredAt = null,
+  sourceCompanyName = null,
+  sourceRecruiterName = null,
+  sourcePostId = null,
 }) => {
   const queryClient = client || pool;
 
@@ -95,9 +101,12 @@ const createApplication = async ({
         application_status, review_reason, recipient_email, resume_snapshot_path,
         normalized_job_title, normalized_company_name,
         parsed_jd_snapshot, parsed_resume_snapshot, match_score_snapshot,
-        email_metadata, email_feedback_signals, email_preferences_snapshot
+        email_metadata, email_feedback_signals, email_preferences_snapshot,
+        source_platform, source_url, source_email, discovered_at,
+        source_company_name, source_recruiter_name, source_post_id
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+             $20, $21, $22, $23, $24, $25, $26)
      ON CONFLICT (user_id, resume_id, job_description_id)
      DO UPDATE SET
         updated_at = NOW(),
@@ -133,6 +142,13 @@ const createApplication = async ({
       emailMetadata ? JSON.stringify(emailMetadata) : null,
       emailFeedbackSignals ? JSON.stringify(emailFeedbackSignals) : null,
       emailPreferencesSnapshot ? JSON.stringify(emailPreferencesSnapshot) : null,
+      sourcePlatform,
+      sourceUrl,
+      sourceEmail,
+      discoveredAt,
+      sourceCompanyName,
+      sourceRecruiterName,
+      sourcePostId,
     ]
   );
 
@@ -157,6 +173,13 @@ const updateApplicationFields = async (applicationId, fields, userId = null, cli
     "email_metadata",
     "email_feedback_signals",
     "email_preferences_snapshot",
+    "source_platform",
+    "source_url",
+    "source_email",
+    "discovered_at",
+    "source_company_name",
+    "source_recruiter_name",
+    "source_post_id",
     "tracker_status_id",
   ];
   const sets = [];
@@ -199,6 +222,7 @@ const markSentFromGenerated = async (applicationId, userId, providerMessageId = 
       );
     }
     if (userId) {
+      const { autoAssignEmailSentTrackerStatus } = require("../services/applicationTrackerStatusAssignment");
       await autoAssignEmailSentTrackerStatus(userId, applicationId, client);
     }
     return r.row;

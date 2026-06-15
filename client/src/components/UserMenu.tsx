@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Loader2, LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, Loader2, LogOut, Puzzle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { useLogout } from "@/auth/useLogout";
@@ -185,6 +185,16 @@ export function UserMenu() {
               />
             )}
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => navigate("/settings/extension")}>
+            <Puzzle className="mr-2 h-4 w-4" />
+            Chrome Extension
+          </DropdownMenuItem>
+          {user.isAdmin && (
+            <DropdownMenuItem onSelect={() => navigate("/admin")}>
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              Admin
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => handleLogout()}>
             <LogOut className="mr-2 h-4 w-4" />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -15,8 +15,6 @@ import {
   CertificationResultDetail,
   historyRowToResult,
 } from "@/components/certification/CertificationResultDetail";
-import { PAGE_PADDING_X } from "@/lib/pageLayout";
-import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
   { id: "gemini", label: "Gemini" },
@@ -28,7 +26,7 @@ const PROVIDERS = [
   { id: "nvidia", label: "NVIDIA NIM" },
 ];
 
-export function ModelCertificationPage() {
+export function ModelCertificationPanel() {
   const [provider, setProvider] = useState("gemini");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -62,7 +60,7 @@ export function ModelCertificationPage() {
   }, []);
 
   useEffect(() => {
-    loadMeta();
+    void loadMeta();
   }, [loadMeta]);
 
   const handleRun = async () => {
@@ -173,17 +171,11 @@ export function ModelCertificationPage() {
       : undefined;
 
   return (
-    <div className={cn("mx-auto max-w-4xl space-y-6 py-6", PAGE_PADDING_X)}>
-      <div className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <ShieldCheck className="h-6 w-6" />
-          OneTap model certification
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Dual-run dev certification: resume parse → email → judge. Results rank models for the
-          production dropdown.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Dual-run certification: resume parse → email → judge. Passing models can be promoted into the
+        product&apos;s AI model dropdowns.
+      </p>
 
       <Card>
         <CardHeader>
@@ -262,17 +254,13 @@ export function ModelCertificationPage() {
             {running && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Run certification
           </Button>
-          {running && progress && (
-            <p className="text-sm text-muted-foreground">{progress}</p>
-          )}
+          {running && progress && <p className="text-sm text-muted-foreground">{progress}</p>}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Promoted models — {providerLabel}
-          </CardTitle>
+          <CardTitle className="text-base">Promoted models — {providerLabel}</CardTitle>
           <CardDescription>
             Certified models in the production dropdown for this provider.
           </CardDescription>
@@ -384,7 +372,6 @@ export function ModelCertificationPage() {
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

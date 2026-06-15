@@ -18,7 +18,9 @@ async function buildUserMeResponse(userId) {
     lastName: row.last_name ?? null,
     fullName: row.full_name ?? null,
     avatarUrl: row.avatar_url ?? null,
+    applyMode: row.apply_mode ?? "review_apply",
     subscriptionTier: "free",
+    isAdmin: row.is_admin === true,
     flags: {},
     createdAt: row.created_at,
   };

@@ -19,7 +19,7 @@ startRuntimeDiagnostics(30000);
 registerGracefulShutdown();
 registerShutdownHook("workers", stopWorkers, { priority: 100 });
 registerShutdownHook("redis", async () => {
-  const { closeBullmqQueues } = require("../queues/connection");
+  const { closeBullmqQueues } = require("../queues/bullmqShutdown");
   await closeBullmqQueues();
 }, { priority: 20 });
 registerShutdownHook("postgres", async () => {

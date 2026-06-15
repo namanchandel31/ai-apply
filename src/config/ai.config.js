@@ -1,4 +1,4 @@
-const { str } = require("./env");
+const { str, int } = require("./env");
 
 const DEFAULT_AI_PROVIDER = "openai";
 const DEFAULT_AI_MODEL = "gpt-4.1-mini";
@@ -9,7 +9,7 @@ const LLM_RETRY_WINDOW_MS = 60_000;
 const LLM_CIRCUIT_BREAKER_THRESHOLD = 10;
 const LLM_CIRCUIT_BREAKER_COOLDOWN_MS = 30_000;
 
-const HEALTH_CHECK_TIMEOUT_MS = 30_000;
+const HEALTH_CHECK_TIMEOUT_MS = int("HEALTH_CHECK_TIMEOUT_MS", 20_000);
 const LOCAL_HEALTH_CHECK_TIMEOUT_MS = 5_000;
 const RUNTIME_GENERATION_TIMEOUT_MS = 45_000;
 const RUNTIME_EMAIL_TIMEOUT_MS = 10_000;
