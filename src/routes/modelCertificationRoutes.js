@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
-const modelCertificationGuard = require("../middlewares/modelCertificationGuard");
+const adminGuard = require("../middlewares/adminGuard");
 const {
   runCertificationController,
   listRunsController,
@@ -21,7 +21,7 @@ const router = express.Router();
 // Scope auth/guard to dev certification paths only — a router-level use() would
 // intercept every unmatched /api request and return a misleading 404 "Not found".
 const devRouter = express.Router();
-devRouter.use(supabaseAuthMiddleware, modelCertificationGuard);
+devRouter.use(supabaseAuthMiddleware, adminGuard);
 devRouter.post("/run", upload.single("resume"), runCertificationController);
 devRouter.get("/runs", listRunsController);
 devRouter.get("/curated", listCuratedAdminController);

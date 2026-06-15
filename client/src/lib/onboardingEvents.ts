@@ -2,6 +2,7 @@ const ACTIVATION_KEY = "onetap_activation_completed";
 
 export type OnboardingEventName =
   | "onboarding_started"
+  | "onboarding_completed"
   | "ai_key_validation_started"
   | "ai_key_verified"
   | "ai_key_validation_failed"

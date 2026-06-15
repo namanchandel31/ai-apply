@@ -19,6 +19,7 @@ const STATUS_QUERY_NAMES = new Set([
 ]);
 
 const logging = require("../config/logging.config");
+const serverConfig = require("../config/server.config");
 
 function queryShapeLoggingEnabled() {
   return logging.hasDebugScope("query");
@@ -231,7 +232,7 @@ async function instrumentedQuery(
   if (
     isStatusPath &&
     durationMs >= EXPLAIN_SLOW_MS &&
-    (queryShapeLoggingEnabled() || process.env.NODE_ENV !== "production")
+    (queryShapeLoggingEnabled() || !serverConfig.isProduction)
   ) {
     try {
       const explainTarget =
@@ -391,13 +392,11 @@ function startPoolMetricsLogging(pool, intervalMs = 60_000, meta = {}) {
   poolMetricsInterval = setInterval(() => {
     const m = getPoolMetrics(pool);
     if (m.poolWaiting > 0 || m.poolIdle === 0) {
-      let poolOwner;
-      try {
-        poolOwner = require("../db").POOL_OWNER;
-      } catch {
-        poolOwner = undefined;
-      }
-      logQueryEvent("POOL_METRICS", { ...m, poolOwner, poolInstanceId: meta.poolInstanceId });
+      logQueryEvent("POOL_METRICS", {
+        ...m,
+        poolOwner: meta.poolOwner,
+        poolInstanceId: meta.poolInstanceId,
+      });
     }
   }, intervalMs);
 

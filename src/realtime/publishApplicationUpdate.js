@@ -48,6 +48,7 @@ function buildRealtimePayload(applicationId, userId, serialized, meta) {
     pollable: serialized.pollable,
     canRetry: serialized.canRetry,
     canContinue: serialized.canContinue,
+    canSend: serialized.canSend,
     reviewReason: serialized.reviewReason ?? null,
     role: serialized.role ?? null,
     company: serialized.company ?? null,

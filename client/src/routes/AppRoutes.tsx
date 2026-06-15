@@ -7,6 +7,7 @@ import { AuthCallbackPage } from "@/pages/authCallback";
 import { Dashboard } from "@/pages/dashboard";
 import { Applications } from "@/pages/applications";
 import { Setup } from "@/pages/setup";
+import { SettingsExtension } from "@/pages/settingsExtension";
 import { Onboarding } from "@/pages/onboarding";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { GuestRoute } from "@/routes/GuestRoute";
@@ -14,7 +15,7 @@ import { OnboardingGuard } from "@/routes/OnboardingGuard";
 import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 import { SessionHandlers } from "@/auth/SessionHandlers";
 import { useAuth } from "@/auth/AuthContext";
-import { ModelCertificationPage } from "@/pages/dev/ModelCertification";
+import { AdminPage } from "@/pages/admin";
 
 function CatchAllRedirect() {
   const { session, isResolved } = useAuth();
@@ -29,6 +30,9 @@ function CatchAllRedirect() {
 }
 
 export function AppRoutes() {
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.isAdmin);
+
   return (
     <>
       <SessionHandlers />
@@ -54,10 +58,9 @@ export function AppRoutes() {
               <Route path="/applications" element={<Applications />} />
             </Route>
             <Route path="/setup" element={<Setup />} />
+            <Route path="/settings/extension" element={<SettingsExtension />} />
+            {isAdmin && <Route path="/admin" element={<AdminPage />} />}
           </Route>
-          {import.meta.env.VITE_MODEL_CERTIFICATION_ENABLED === "true" && (
-            <Route path="/dev/model-certification" element={<ModelCertificationPage />} />
-          )}
         </Route>
 
         <Route path="*" element={<CatchAllRedirect />} />

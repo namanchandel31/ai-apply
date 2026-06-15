@@ -1,0 +1,36 @@
+/**
+ * Extension static config.
+ *
+ * Supabase URL/anon key are public client config (safe to ship in the bundle).
+ * Copy values from client/.env (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).
+ * See extension/README.md.
+ *
+ * --- Switching environments ---------------------------------------------------
+ * `DEFAULT_API_BASE` is only a FALLBACK. The real API base is sent by the website
+ * during the connect handshake and stored per-install in chrome.storage.local, so
+ * a connected extension already talks to whatever origin the website was served
+ * from. This fallback is used only before the first connect (or if storage was
+ * cleared). To test/ship non-locally, set ENVIRONMENT to "production" (or override
+ * ENVIRONMENTS.production.apiBase) and rebuild.
+ */
+
+// Flip to "production" for hosted testing / Chrome Web Store builds.
+const ENVIRONMENT = "development";
+
+const ENVIRONMENTS = {
+  development: {
+    apiBase: "http://localhost:5000",
+  },
+  production: {
+    // TODO: replace with the deployed API origin before publishing to the Web Store.
+    apiBase: "https://api.onetap.app",
+  },
+};
+
+export const SUPABASE_URL = "https://ybfzpfouqmdacgfxieec.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliZnpwZm91cW1kYWNnZnhpZWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjkwMDUsImV4cCI6MjA5MTgwNTAwNX0.kTO_BT5uuSfDMeV6ZI8wLyz_Ni6qRitY44DBnt_doPc";
+
+export const DEFAULT_API_BASE = ENVIRONMENTS[ENVIRONMENT].apiBase;
+
+export const TOKEN_REFRESH_BUFFER_SEC = 60;
+export const REFRESH_ALARM_MINUTES = 50;

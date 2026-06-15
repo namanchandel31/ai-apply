@@ -24,6 +24,7 @@ const {
   continueApplication,
   retryApplication,
   cancelApplication,
+  patchApplicationEmail,
 } = require("../services/applicationCommandService");
 const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
@@ -34,6 +35,7 @@ const CLIENT_ERROR_MESSAGES = {
   NOT_FOUND: "Application not found",
   INVALID_EMAIL: "Invalid contact email format",
   INVALID_STATE: "Operation not allowed in current state",
+  BAD_REQUEST: "Invalid request",
   DUPLICATE_CONTINUE: "Duplicate continue request",
   SEND_ALREADY_IN_FLIGHT: "Send already in progress",
   ALREADY_SENT: "Application already sent",
@@ -46,6 +48,7 @@ function handleCommandError(res, err, req) {
     NOT_FOUND: 404,
     INVALID_EMAIL: 400,
     INVALID_STATE: 409,
+    BAD_REQUEST: 400,
     DUPLICATE_CONTINUE: 409,
     SEND_ALREADY_IN_FLIGHT: 409,
     ALREADY_SENT: 409,
@@ -217,6 +220,7 @@ const getApplicationStatusController = async (req, res) => {
       pollable: serialized.pollable,
       canRetry: serialized.canRetry,
       canContinue: serialized.canContinue,
+      canSend: serialized.canSend,
       reviewReason: serialized.reviewReason,
       version: Number(row.orchestration_version ?? 0),
       orchestrationEpoch: Number(row.orchestration_epoch ?? 0),
@@ -276,6 +280,23 @@ const cancelApplicationController = async (req, res) => {
   }
 };
 
+const patchApplicationEmailController = async (req, res) => {
+  try {
+    const { emailSubject, emailBody } = req.body || {};
+    await patchApplicationEmail(
+      req.user.id,
+      req.params.id,
+      { emailSubject, emailBody },
+      req.requestId
+    );
+    const row = await getApplicationById(req.params.id, req.user.id);
+    const detail = serializeApplicationDetail(row);
+    return ok(res, detail);
+  } catch (err) {
+    return handleCommandError(res, err, req);
+  }
+};
+
 const getApplicationJobController = async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
@@ -316,6 +337,7 @@ module.exports = {
   continueApplicationController,
   retryApplicationController,
   cancelApplicationController,
+  patchApplicationEmailController,
   getApplicationJobController,
   listApplicationsLegacyController,
 };

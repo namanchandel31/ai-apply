@@ -1,11 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("../db");
 
-/** Lazy load breaks circular dep with applicationModel → autoAssignEmailSentTrackerStatus. */
-function applicationModel() {
-  return require("../models/applicationModel");
-}
-
 const TRACKER_COLORS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"];
 
 const EMAIL_SENT_TRACKER_STATUS = {
@@ -234,16 +229,22 @@ async function deleteTrackerStatusOption(userId, statusId) {
 }
 
 async function setApplicationTrackerStatus(userId, applicationId, trackerStatusId) {
-  const { getApplicationById, updateApplicationFields } = applicationModel();
-  const app = await getApplicationById(applicationId, userId);
-  if (!app) {
+  const { rows: appRows } = await pool.query(
+    `SELECT id FROM applications WHERE id = $1 AND user_id = $2`,
+    [applicationId, userId]
+  );
+  if (!appRows.length) {
     const err = new Error("Application not found");
     err.code = "NOT_FOUND";
     throw err;
   }
 
   if (trackerStatusId == null || trackerStatusId === "") {
-    await updateApplicationFields(applicationId, { tracker_status_id: null }, userId);
+    await pool.query(
+      `UPDATE applications SET tracker_status_id = NULL, updated_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+      [applicationId, userId]
+    );
     return { trackerStatusId: null };
   }
 
@@ -255,7 +256,11 @@ async function setApplicationTrackerStatus(userId, applicationId, trackerStatusI
     throw err;
   }
 
-  await updateApplicationFields(applicationId, { tracker_status_id: trackerStatusId }, userId);
+  await pool.query(
+    `UPDATE applications SET tracker_status_id = $3, updated_at = NOW()
+     WHERE id = $1 AND user_id = $2`,
+    [applicationId, userId, trackerStatusId]
+  );
   return { trackerStatusId };
 }
 
@@ -343,22 +348,6 @@ async function getTrackerStatusSummary(userId, client = pool) {
   return { total, buckets, funnel, sideBuckets };
 }
 
-async function autoAssignEmailSentTrackerStatus(userId, applicationId, client = pool) {
-  if (!userId || !applicationId) return null;
-
-  await getTrackerStatusOptions(userId, client);
-
-  const { rows } = await client.query(
-    `UPDATE applications
-     SET tracker_status_id = $3, updated_at = NOW()
-     WHERE id = $1 AND user_id = $2
-     RETURNING tracker_status_id`,
-    [applicationId, userId, EMAIL_SENT_TRACKER_STATUS.id]
-  );
-
-  return rows[0]?.tracker_status_id ?? null;
-}
-
 module.exports = {
   TRACKER_COLORS,
   EMAIL_SENT_TRACKER_STATUS,
@@ -370,6 +359,5 @@ module.exports = {
   deleteTrackerStatusOption,
   getTrackerStatusSummary,
   setApplicationTrackerStatus,
-  autoAssignEmailSentTrackerStatus,
   sortTrackerStatusOptions,
 };

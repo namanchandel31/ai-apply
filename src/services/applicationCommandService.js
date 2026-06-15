@@ -3,6 +3,7 @@ const { withPgTransaction } = require("../db/pgClient");
 const {
   getApplicationById,
   transitionApplicationState,
+  updateApplicationFields,
 } = require("../models/applicationModel");
 const {
   createJob,
@@ -340,8 +341,65 @@ async function cancelApplication(userId, applicationId, reqId) {
   return { applicationId, status: APPLICATION_STATUS.CANCELLED };
 }
 
+async function patchApplicationEmail(userId, applicationId, { emailSubject, emailBody }, reqId) {
+  const trimmedSubject = typeof emailSubject === "string" ? emailSubject.trim() : "";
+  const trimmedBody = typeof emailBody === "string" ? emailBody.trim() : "";
+
+  if (!trimmedSubject || !trimmedBody) {
+    const err = new Error("emailSubject and emailBody must be non-empty strings");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (trimmedSubject.length > 500) {
+    const err = new Error("emailSubject exceeds 500 characters");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (trimmedBody.length > 20000) {
+    const err = new Error("emailBody exceeds 20000 characters");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  const app = await getApplicationById(applicationId, userId);
+  if (!app) {
+    const err = new Error("Application not found");
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  if (app.application_status !== APPLICATION_STATUS.GENERATED) {
+    const err = new Error("Email can only be edited when application is Ready");
+    err.code = "INVALID_STATE";
+    throw err;
+  }
+
+  const updated = await updateApplicationFields(
+    applicationId,
+    { email_subject: trimmedSubject, email_body: trimmedBody },
+    userId
+  );
+
+  if (!updated) {
+    const err = new Error("Failed to update application email");
+    err.code = "INTERNAL_ERROR";
+    throw err;
+  }
+
+  await recordEvent({
+    applicationId,
+    eventType: "ready_email_edited",
+    actorType: "user",
+    actorId: String(userId),
+    metadata: { reqId },
+  });
+
+  return updated;
+}
+
 module.exports = {
   continueApplication,
   retryApplication,
   cancelApplication,
+  patchApplicationEmail,
 };

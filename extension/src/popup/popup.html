@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OneTap</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; width: 280px; }
+      .muted { color: #64748b; font-size: 13px; margin: 4px 0; }
+      .row { margin-top: 8px; }
+      button { margin-top: 8px; width: 100%; padding: 8px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; }
+      button.primary { background: #2563eb; color: #fff; }
+      button.secondary { background: #e2e8f0; color: #0f172a; }
+      a { color: #2563eb; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h2 style="margin:0 0 8px;font-size:16px;">OneTap</h2>
+    <p id="status" class="muted">Checking connection…</p>
+    <p id="meta" class="muted"></p>
+    <p id="setup" class="muted"></p>
+    <p id="mode" class="muted"></p>
+    <div class="row">
+      <button id="dashboard" type="button" class="primary">Open Dashboard</button>
+      <button id="settings" type="button" class="secondary">Extension Settings</button>
+      <button id="disconnect" type="button" class="secondary" hidden>Disconnect</button>
+    </div>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

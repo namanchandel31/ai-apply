@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "OneTap",
+  "version": "0.1.0",
+  "description": "Discover LinkedIn hiring posts and add them to OneTap.",
+  "permissions": ["storage", "activeTab", "alarms"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://localhost:5000/*",
+    "http://localhost:5173/*",
+    "https://api.onetap.app/*",
+    "https://*.onetap.app/*",
+    "https://www.linkedin.com/*",
+    "https://linkedin.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/serviceWorker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "OneTap"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*", "https://linkedin.com/*"],
+      "js": ["src/content/linkedin/main.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": ["http://localhost:*/*", "https://*.onetap.app/*"]
+  }
+}

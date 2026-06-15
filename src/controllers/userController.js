@@ -7,7 +7,9 @@ const { buildUserMeResponse } = require('../services/userMeService');
 const {
   updateUserProfile,
   seedProfileFromEmail,
+  setUserApplyMode,
 } = require('../models/userModel');
+const { isValidApplyMode } = require('../services/applyModeService');
 const { deriveNameFromEmail } = require('../utils/deriveNameFromEmail');
 
 const getSetupStatusController = async (req, res) => {
@@ -92,9 +94,32 @@ const seedProfileFromEmailController = async (req, res) => {
   }
 };
 
+const patchApplyModeController = async (req, res) => {
+  const userId = req.user.id;
+  const { applyMode } = req.body || {};
+
+  if (!isValidApplyMode(applyMode)) {
+    return error(res, 400, 'applyMode must be auto_apply or review_apply', ERROR_CODES.BAD_REQUEST);
+  }
+
+  try {
+    const updated = await setUserApplyMode(userId, applyMode);
+    if (!updated) {
+      return error(res, 404, 'User not found', ERROR_CODES.NOT_FOUND);
+    }
+    const me = await buildUserMeResponse(userId);
+    logInfo('USER_APPLY_MODE_UPDATED', { userId, applyMode, reqId: req.requestId });
+    return ok(res, me);
+  } catch (err) {
+    logError('PATCH_APPLY_MODE_ERROR', err, { userId, reqId: req.requestId });
+    return error(res, 500, 'Failed to update apply mode', ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
 module.exports = {
   getSetupStatusController,
   getMeController,
   patchProfileController,
   seedProfileFromEmailController,
+  patchApplyModeController,
 };

@@ -9,6 +9,7 @@ const {
   continueApplicationController,
   retryApplicationController,
   cancelApplicationController,
+  patchApplicationEmailController,
   getApplicationJobController,
 } = require("../controllers/applicationController");
 const {
@@ -23,6 +24,7 @@ router.get(
   getTrackerStatusSummaryController
 );
 router.get("/applications/:id", supabaseAuthMiddleware, getApplicationController);
+router.patch("/applications/:id/email", supabaseAuthMiddleware, patchApplicationEmailController);
 router.get("/applications/:id/status", supabaseAuthMiddleware, getApplicationStatusController);
 router.post("/applications/:id/continue", supabaseAuthMiddleware, applyRateLimit, continueApplicationController);
 router.post("/applications/:id/retry", supabaseAuthMiddleware, applyRateLimit, retryApplicationController);

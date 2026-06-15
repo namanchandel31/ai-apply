@@ -1,6 +1,6 @@
 const express = require('express');
 const { getUserDefaultsController, setUserDefaultsController } = require('../controllers/userDefaultsController');
-const { getSetupStatusController, getMeController, patchProfileController, seedProfileFromEmailController } = require('../controllers/userController');
+const { getSetupStatusController, getMeController, patchProfileController, seedProfileFromEmailController, patchApplyModeController } = require('../controllers/userController');
 const {
   getEmailPreferencesController,
   patchEmailPreferencesController,
@@ -28,6 +28,7 @@ const router = express.Router();
  *         description: Current user profile
  */
 router.get('/user/me', supabaseAuthMiddleware, getMeController);
+router.patch('/user/apply-mode', supabaseAuthMiddleware, patchApplyModeController);
 router.patch('/user/profile', supabaseAuthMiddleware, patchProfileController);
 router.post('/user/profile/seed-from-email', supabaseAuthMiddleware, seedProfileFromEmailController);
 

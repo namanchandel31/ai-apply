@@ -9,7 +9,19 @@ const autoApplyController = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const { jobDescription, resumeId: bodyResumeId, emailSubject, emailBody } = req.body;
+    const {
+      jobDescription,
+      resumeId: bodyResumeId,
+      emailSubject,
+      emailBody,
+      sourcePlatform,
+      sourceUrl,
+      sourceEmail,
+      discoveredAt,
+      sourceCompanyName,
+      sourceRecruiterName,
+      sourcePostId,
+    } = req.body;
 
     if (!jobDescription || typeof jobDescription !== "string" || !jobDescription.trim()) {
       return sendError(res, {
@@ -64,6 +76,15 @@ const autoApplyController = async (req, res) => {
       resumeId: bodyResumeId,
       emailSubject: hasCustomEmail ? trimmedSubject : undefined,
       emailBody: hasCustomEmail ? trimmedBody : undefined,
+      sourcePlatform: typeof sourcePlatform === "string" ? sourcePlatform.trim() || undefined : undefined,
+      sourceUrl: typeof sourceUrl === "string" ? sourceUrl.trim() || undefined : undefined,
+      sourceEmail: typeof sourceEmail === "string" ? sourceEmail.trim() || undefined : undefined,
+      discoveredAt: discoveredAt ? new Date(discoveredAt) : undefined,
+      sourceCompanyName:
+        typeof sourceCompanyName === "string" ? sourceCompanyName.trim() || undefined : undefined,
+      sourceRecruiterName:
+        typeof sourceRecruiterName === "string" ? sourceRecruiterName.trim() || undefined : undefined,
+      sourcePostId: typeof sourcePostId === "string" ? sourcePostId.trim() || undefined : undefined,
     });
 
     return res.status(202).json({

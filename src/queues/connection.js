@@ -72,29 +72,11 @@ async function getRedisHealthStatus() {
   }
 }
 
-async function closeBullmqQueues() {
-  markBullmqShuttingDown();
-  const closes = [];
-  try {
-    const { processApplicationQueue } = require("./processApplicationQueue");
-    closes.push(processApplicationQueue.close());
-  } catch (_) {
-    /* queue module may not be loaded */
-  }
-  try {
-    const { sendApplicationQueue } = require("./sendApplicationQueue");
-    closes.push(sendApplicationQueue.close());
-  } catch (_) {
-    /* queue module may not be loaded */
-  }
-  await Promise.allSettled(closes);
-}
-
 module.exports = {
   getBullmqConnectionOptions,
   markBullmqShuttingDown,
   isBullmqShuttingDown,
+  createEphemeralRedisClient,
   pingRedis,
   getRedisHealthStatus,
-  closeBullmqQueues,
 };

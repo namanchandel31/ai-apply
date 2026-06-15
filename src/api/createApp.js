@@ -58,7 +58,6 @@ function createApp() {
   const orchestrationRoutes = require("../routes/orchestrationRoutes");
   const userRoutes = require("../routes/userRoutes");
   const aiRoutes = require("../routes/aiRoutes");
-  const modelCertificationConfig = require("../config/modelCertification.config");
 
   if (!config.server.isProduction) {
     const { swaggerUi, swaggerSpec } = require("../docs/swagger");
@@ -84,10 +83,12 @@ function createApp() {
   app.use("/api", readRateLimit, userRoutes);
   app.use("/api", aiRateLimit, aiRoutes);
 
-  if (modelCertificationConfig.isEnabled()) {
-    const modelCertificationRoutes = require("../routes/modelCertificationRoutes");
-    app.use("/api", modelCertificationRoutes);
-  }
+  // Admin-only (gated by users.is_admin via adminGuard inside the router).
+  const modelCertificationRoutes = require("../routes/modelCertificationRoutes");
+  app.use("/api", modelCertificationRoutes);
+
+  const extensionRoutes = require("../routes/extensionRoutes");
+  app.use("/api", readRateLimit, extensionRoutes);
 
   app.get("/internal/queue-health", async (req, res) => {
     const apiKey = req.headers["x-internal-api-key"];

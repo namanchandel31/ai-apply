@@ -10,7 +10,7 @@ import { applyPageDescription } from "@/lib/applyMode";
 import { shouldStartApplyWalkthrough } from "@/lib/applyWalkthrough";
 
 export function Dashboard() {
-  const { autoApplyEnabled, setAutoApplyEnabled } = useAutoApply();
+  const { autoApplyEnabled, setAutoApplyEnabled, isApplyModePending } = useAutoApply();
   const { data: status, isLoading, isSuccess, isError } = useSetupStatus();
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const walkthroughStartedRef = useRef(false);
@@ -55,8 +55,8 @@ export function Dashboard() {
         actions={
           <AutoApplyToggle
             enabled={autoApplyEnabled}
-            onEnabledChange={setAutoApplyEnabled}
-            disabled={!setupLoaded}
+            onEnabledChange={(v) => void setAutoApplyEnabled(v)}
+            disabled={!setupLoaded || isApplyModePending}
           />
         }
       >

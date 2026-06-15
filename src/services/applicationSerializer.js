@@ -20,6 +20,8 @@ function serializeApplication(row, jobs = {}) {
     latestProcessJob: jobs.processJob,
     latestSendJob: jobs.sendJob,
     retryCount: row.retry_count ?? 0,
+    emailSubject: row.email_subject,
+    emailBody: row.email_body,
   });
   const resolved = resolveUiStatus(ctx);
 
@@ -32,6 +34,7 @@ function serializeApplication(row, jobs = {}) {
     pollable: resolved.pollable,
     canRetry: resolved.canRetry,
     canContinue: resolved.canContinue,
+    canSend: resolved.canSend,
     reviewReason: row.review_reason,
     lastError: row.last_error,
     retryCount: row.retry_count ?? 0,

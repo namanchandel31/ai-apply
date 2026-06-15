@@ -12,6 +12,8 @@ function serializeApplicationFromSnapshot(row) {
     latestProcessJob: null,
     latestSendJob: null,
     retryCount: row.retry_count ?? 0,
+    emailSubject: row.email_subject,
+    emailBody: row.email_body,
   });
   const resolved = resolveUiStatus(ctx);
 
@@ -24,6 +26,7 @@ function serializeApplicationFromSnapshot(row) {
     pollable: resolved.pollable,
     canRetry: resolved.canRetry,
     canContinue: resolved.canContinue,
+    canSend: resolved.canSend,
     reviewReason: row.review_reason,
     lastError: row.last_error,
     retryCount: row.retry_count ?? 0,

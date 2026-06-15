@@ -38,6 +38,7 @@ type Props = {
   onSelectRow: (id: string) => void;
   onRetry: (id: string) => void;
   onContinue: (id: string) => void;
+  onSend: (id: string) => void;
   actionId: string | null;
 };
 
@@ -136,6 +137,7 @@ export function ApplicationsDataGrid({
   onSelectRow,
   onRetry,
   onContinue,
+  onSend,
   actionId,
 }: Props) {
   const { params, patchParams } = useApplicationsListParams();
@@ -221,11 +223,12 @@ export function ApplicationsDataGrid({
             onViewDetails={() => onSelectRow(row.original.id)}
             onRetry={() => onRetry(row.original.id)}
             onContinue={() => onContinue(row.original.id)}
+            onSend={() => onSend(row.original.id)}
           />
         ),
       },
     ],
-    [params.sort, params.order, actionId, onSelectRow, onRetry, onContinue, toggleSort]
+    [params.sort, params.order, actionId, onSelectRow, onRetry, onContinue, onSend, toggleSort]
   );
 
   const table = useReactTable({

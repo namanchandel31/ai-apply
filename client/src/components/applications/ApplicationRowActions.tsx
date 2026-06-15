@@ -1,4 +1,4 @@
-import { MoreHorizontal, Eye, RefreshCw, Play, Copy, Mail } from "lucide-react";
+import { MoreHorizontal, Eye, RefreshCw, Play, Copy, Mail, Send } from "lucide-react";
 import type { ApplicationRecord } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ type Props = {
   onViewDetails: () => void;
   onRetry: () => void;
   onContinue: () => void;
+  onSend?: () => void;
   disabled?: boolean;
 };
 
@@ -32,6 +33,7 @@ export function ApplicationRowActions({
   onViewDetails,
   onRetry,
   onContinue,
+  onSend,
   disabled,
 }: Props) {
   return (
@@ -62,6 +64,12 @@ export function ApplicationRowActions({
           <DropdownMenuItem onClick={onContinue}>
             <Play className="mr-2 h-4 w-4" />
             Continue send…
+          </DropdownMenuItem>
+        )}
+        {app.canSend && onSend && (
+          <DropdownMenuItem onClick={onSend}>
+            <Send className="mr-2 h-4 w-4" />
+            Send
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

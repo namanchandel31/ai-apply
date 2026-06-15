@@ -26,7 +26,8 @@ const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/ui
 const { computeMatch } = require("../services/matchingService");
 const { generateApplicationEmail } = require("../services/emailService");
 const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
-const { getEmailPreferenceLevels } = require("../models/userModel");
+const { getEmailPreferenceLevels, getUserApplyMode } = require("../models/userModel");
+const { shouldEnqueueSendAfterGeneration } = require("../services/applyModeService");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
 const { logInfo, logError } = require("../utils/logger");
@@ -265,6 +266,24 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       clearReviewReason: true,
     });
     if (!genTr.ok) throw new Error("Failed to transition to generated");
+
+    const applyMode = await getUserApplyMode(userId, client);
+    if (!shouldEnqueueSendAfterGeneration(applyMode)) {
+      await recordEvent(
+        {
+          applicationId,
+          eventType: "ready_for_review",
+          actorType: "worker",
+          actorId: "process-application",
+          metadata: { applyMode },
+        },
+        client
+      );
+      await client.query("COMMIT");
+      const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
+      await flushRealtimeAfterDbCommit([applicationId]);
+      return;
+    }
 
     const sendDbJob = await createJob(
       { applicationId, jobType: "send_email", status: "queued" },
