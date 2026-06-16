@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 
 const LAST_UPDATED = "June 17, 2026";
-const CONTACT_EMAIL = "privacy@onetap.app";
+// Optional: set VITE_SUPPORT_EMAIL once a real inbox exists. Until then the
+// contact section points to the Support page instead of a fake address.
+const CONTACT_EMAIL =
+  (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined)?.trim() || "";
 
 type Section = {
   id: string;
@@ -254,12 +257,21 @@ const SECTIONS: Section[] = [
   {
     id: "contact",
     title: "11. Contact Us",
-    body: (
+    body: CONTACT_EMAIL ? (
       <p>
         If you have any questions about this Privacy Policy or how your data is
         handled, contact us at{" "}
         <a className="text-primary underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>
           {CONTACT_EMAIL}
+        </a>
+        .
+      </p>
+    ) : (
+      <p>
+        If you have any questions about this Privacy Policy or how your data is
+        handled, please reach out through our{" "}
+        <a className="text-primary underline underline-offset-4" href="/support">
+          Support page
         </a>
         .
       </p>

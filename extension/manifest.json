@@ -29,6 +29,10 @@
     }
   ],
   "externally_connectable": {
-    "matches": ["http://localhost:*/*", "https://*.onetap.app/*"]
+    "matches": [
+      "http://localhost:*/*",
+      "https://onetap-ai-apply.vercel.app/*",
+      "https://*.onetap.app/*"
+    ]
   }
 }

@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 
-const SUPPORT_EMAIL = "support@onetap.app";
+// Optional: set VITE_SUPPORT_EMAIL once a real support inbox exists.
+// Until then the page shows a domain-agnostic fallback (no fake address).
+const SUPPORT_EMAIL =
+  (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined)?.trim() || "";
 const PRIVACY_PATH = "/privacy-policy";
 
 type FaqItem = {
@@ -53,7 +56,7 @@ const FAQS: FaqItem[] = [
   },
   {
     q: "How do I delete my account or data?",
-    a: (
+    a: SUPPORT_EMAIL ? (
       <>
         Email us at{" "}
         <a
@@ -63,6 +66,12 @@ const FAQS: FaqItem[] = [
           {SUPPORT_EMAIL}
         </a>{" "}
         and we&rsquo;ll help you remove your account and associated data.
+      </>
+    ) : (
+      <>
+        You can remove your uploaded resume, AI keys, and email credentials from the
+        dashboard at any time. To delete your entire account and associated data,
+        reach out through the contact channel listed above.
       </>
     ),
   },
@@ -89,16 +98,26 @@ export function SupportPage() {
 
         <section className="mb-12">
           <h2 className="mb-3 text-xl font-semibold tracking-tight">Contact us</h2>
-          <p className="text-base leading-relaxed text-muted-foreground">
-            The fastest way to reach us is by email. We aim to respond within 1&ndash;2
-            business days.
-          </p>
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
-            className="mt-4 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Email {SUPPORT_EMAIL}
-          </a>
+          {SUPPORT_EMAIL ? (
+            <>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                The fastest way to reach us is by email. We aim to respond within
+                1&ndash;2 business days.
+              </p>
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="mt-4 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Email {SUPPORT_EMAIL}
+              </a>
+            </>
+          ) : (
+            <p className="text-base leading-relaxed text-muted-foreground">
+              We&rsquo;re currently setting up a dedicated support inbox. In the
+              meantime, you can manage and remove your data directly from the OneTap
+              dashboard, and a contact address will be published here soon.
+            </p>
+          )}
         </section>
 
         <section>
