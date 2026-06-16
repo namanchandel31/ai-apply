@@ -16,6 +16,8 @@ import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 import { SessionHandlers } from "@/auth/SessionHandlers";
 import { useAuth } from "@/auth/AuthContext";
 import { AdminPage } from "@/pages/admin";
+import { PrivacyPolicyPage } from "@/pages/privacyPolicy";
+import { SupportPage } from "@/pages/support";
 
 function CatchAllRedirect() {
   const { session, isResolved } = useAuth();
@@ -38,6 +40,8 @@ export function AppRoutes() {
       <SessionHandlers />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/support" element={<SupportPage />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/" element={<LandingPage />} />
