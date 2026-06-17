@@ -1,10 +1,11 @@
-import { DEFAULT_API_BASE } from "../config/app.config.js";
+import { DEFAULT_WEB_BASE } from "../config/app.config.js";
 
 const POPUP_STATUS_CACHE_KEY = "cachedPopupStatus";
 
-async function getApiBase() {
-  const { apiBase } = await chrome.storage.local.get("apiBase");
-  return apiBase || DEFAULT_API_BASE;
+// The website origin is independent from the API origin, so it comes straight
+// from config (not derived from the stored apiBase).
+function openWebApp(path) {
+  chrome.tabs.create({ url: `${DEFAULT_WEB_BASE.replace(/\/$/, "")}${path}` });
 }
 
 function bgRequest(type, payload) {
@@ -32,9 +33,11 @@ const statusEl = document.getElementById("status");
 const metaEl = document.getElementById("meta");
 const setupEl = document.getElementById("setup");
 const modeEl = document.getElementById("mode");
+const openBtn = document.getElementById("open");
 const dashboardBtn = document.getElementById("dashboard");
-const settingsBtn = document.getElementById("settings");
 const disconnectBtn = document.getElementById("disconnect");
+
+let isConnected = false;
 
 function applyPopupStatusToUi(setup, applyMode) {
   const incomplete = [];
@@ -56,16 +59,14 @@ function formatConnectedAt(iso) {
   }
 }
 
-dashboardBtn.addEventListener("click", async () => {
-  const base = await getApiBase();
-  const dash = base.replace(/:\d+$/, ":5173");
-  chrome.tabs.create({ url: dash });
+// Connected → land on /settings/extension; otherwise (first run / signed out)
+// land on the dashboard, which routes unauthenticated users to sign in.
+openBtn.addEventListener("click", () => {
+  openWebApp(isConnected ? "/settings/extension" : "/dashboard");
 });
 
-settingsBtn.addEventListener("click", async () => {
-  const base = await getApiBase();
-  const settingsUrl = base.replace(/:\d+$/, ":5173") + "/settings/extension";
-  chrome.tabs.create({ url: settingsUrl });
+dashboardBtn.addEventListener("click", () => {
+  openWebApp("/dashboard");
 });
 
 disconnectBtn.addEventListener("click", async () => {
@@ -102,16 +103,22 @@ async function render() {
   }
 
   if (!ping.connected) {
+    isConnected = false;
     statusEl.textContent = "Not connected";
-    metaEl.textContent = "Open OneTap Settings → Chrome Extension to connect.";
+    metaEl.textContent = "Open OneTap to sign in and connect this extension.";
     setupEl.textContent = "";
     modeEl.textContent = "";
+    openBtn.textContent = "Open OneTap";
+    dashboardBtn.hidden = true;
     disconnectBtn.hidden = true;
     return;
   }
 
+  isConnected = true;
   statusEl.textContent = "Connected";
   metaEl.textContent = `Version: ${ping.version || "—"} · Connected: ${formatConnectedAt(ping.connectedAt)}`;
+  openBtn.textContent = "Extension Settings";
+  dashboardBtn.hidden = false;
   disconnectBtn.hidden = false;
 
   const cached = await readCachedPopupStatus();

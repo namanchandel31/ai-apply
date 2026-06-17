@@ -74,7 +74,7 @@ Supabase URL and anon key live in [`extension/src/config/app.config.js`](../../e
 ## Security
 
 - Connect token: UUID, 90s TTL, single-use
-- `externally_connectable`: localhost (dev), `*.onetap.app` (prod)
+- `externally_connectable`: localhost (dev), `onetap-ai-apply.vercel.app` (prod)
 - Tokens in `chrome.storage.local` — isolated from LinkedIn content scripts
 - Init requires Bearer auth; exchange requires one-time token
 

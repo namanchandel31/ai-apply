@@ -15,15 +15,20 @@
  */
 
 // Flip to "production" for hosted testing / Chrome Web Store builds.
-const ENVIRONMENT = "development";
+const ENVIRONMENT = "production";
 
 const ENVIRONMENTS = {
   development: {
     apiBase: "http://localhost:5000",
+    // Website origin (Vite dev server) the popup opens for dashboard / settings.
+    webBase: "http://localhost:5173",
   },
   production: {
-    // TODO: replace with the deployed API origin before publishing to the Web Store.
-    apiBase: "https://api.onetap.app",
+    // Backend API origin (Render). Only a fallback — the live value is sent by the
+    // website during connect (driven by the site's VITE_API_URL).
+    apiBase: "https://ai-apply-jwan.onrender.com",
+    // Website origin (Vercel) the popup opens for dashboard / settings.
+    webBase: "https://onetap-ai-apply.vercel.app",
   },
 };
 
@@ -31,6 +36,7 @@ export const SUPABASE_URL = "https://ybfzpfouqmdacgfxieec.supabase.co";
 export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliZnpwZm91cW1kYWNnZnhpZWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjkwMDUsImV4cCI6MjA5MTgwNTAwNX0.kTO_BT5uuSfDMeV6ZI8wLyz_Ni6qRitY44DBnt_doPc";
 
 export const DEFAULT_API_BASE = ENVIRONMENTS[ENVIRONMENT].apiBase;
+export const DEFAULT_WEB_BASE = ENVIRONMENTS[ENVIRONMENT].webBase;
 
 export const TOKEN_REFRESH_BUFFER_SEC = 60;
 export const REFRESH_ALARM_MINUTES = 50;

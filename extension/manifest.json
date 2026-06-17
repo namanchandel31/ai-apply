@@ -4,12 +4,17 @@
   "version": "0.1.0",
   "description": "Discover LinkedIn hiring posts and add them to OneTap.",
   "permissions": ["storage", "activeTab", "alarms"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "host_permissions": [
     "http://localhost/*",
     "http://localhost:5000/*",
     "http://localhost:5173/*",
-    "https://api.onetap.app/*",
-    "https://*.onetap.app/*",
+    "https://ai-apply-jwan.onrender.com/*",
     "https://www.linkedin.com/*",
     "https://linkedin.com/*"
   ],
@@ -19,7 +24,13 @@
   },
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "OneTap"
+    "default_title": "OneTap",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "content_scripts": [
     {
@@ -31,8 +42,7 @@
   "externally_connectable": {
     "matches": [
       "http://localhost:*/*",
-      "https://onetap-ai-apply.vercel.app/*",
-      "https://*.onetap.app/*"
+      "https://onetap-ai-apply.vercel.app/*"
     ]
   }
 }

@@ -64,34 +64,35 @@ If you don't see buttons:
 
 ## Production / Chrome Web Store build
 
-> **Placeholder domain:** every production origin below uses `onetap.app` as a
-> placeholder. Before deploying, replace it with the real deployed domain (API +
-> website). Search the repo for `onetap.app` to find every occurrence.
+Production origins:
+
+- **API (backend):** `https://ai-apply-jwan.onrender.com` (Render)
+- **Website (frontend):** `https://onetap-ai-apply.vercel.app` (Vercel)
 
 ### Pre-deploy checklist (things to take care of)
 
-1. **API origin** — set the production API URL in
-   [`src/config/app.config.js`](src/config/app.config.js):
-   `ENVIRONMENTS.production.apiBase` (currently `https://api.onetap.app`).
-   This is only a fallback; the live value comes from the website connect
-   handshake, so the website's `VITE_API_BASE` must point at the same origin.
-2. **Environment switch** — set `ENVIRONMENT = "production"` in `app.config.js`.
-3. **`manifest.json` `host_permissions`** — currently includes both
-   `http://localhost:*` (testing) and `https://api.onetap.app` /
-   `https://*.onetap.app` (production). For a Web Store submission, **remove the
-   `localhost` entries** and keep only the production API origin + LinkedIn hosts.
-   Update the `onetap.app` placeholder to the real domain.
+1. **Environment switch** — set `ENVIRONMENT = "production"` in
+   [`src/config/app.config.js`](src/config/app.config.js). That selects the
+   production `apiBase` (Render) and `webBase` (Vercel).
+2. **API origin** — `ENVIRONMENTS.production.apiBase` is only a fallback used before
+   the first connect; the live value comes from the website connect handshake, so
+   the website's `VITE_API_URL` (on Vercel) must point at the same Render origin.
+3. **`manifest.json` `host_permissions`** — must include the API origin
+   (`https://ai-apply-jwan.onrender.com/*`) so the extension can call the API. For a
+   Web Store submission, remove the `http://localhost:*` testing entries.
 4. **`manifest.json` `externally_connectable.matches`** — restricts which sites can
-   message the extension. Keep only the production website origin
-   (`https://*.onetap.app`); drop the `http://localhost:*` entry for the store build.
+   message the extension. Keep the production website origin
+   (`https://onetap-ai-apply.vercel.app/*`); drop `http://localhost:*` for the store
+   build.
 5. **Supabase** — confirm `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `app.config.js`
    match the production Supabase project (token refresh uses these).
 6. **Extension ID** — after publishing, set the published extension ID in the
    production website env (`VITE_ONETAP_EXTENSION_ID`) so the website targets the
    right extension during connect.
 
-### Where `onetap.app` appears (replace all)
+### Toolbar icon
 
-- `manifest.json` → `host_permissions` and `externally_connectable.matches`
-- `src/config/app.config.js` → `ENVIRONMENTS.production.apiBase`
-- `src/config/app.config.example.js` → same field in the template
+The toolbar/Web Store icon is generated from `client/public/onetap-logomark.svg`
+into `extension/icons/` (16/32/48/128 px) and wired via `manifest.json` `icons` +
+`action.default_icon`. Re-run `node scripts/genExtensionIcons.js` if the logo
+changes.

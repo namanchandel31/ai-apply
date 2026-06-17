@@ -12,9 +12,11 @@ const ENVIRONMENT = "development";
 const ENVIRONMENTS = {
   development: {
     apiBase: "http://localhost:5000",
+    webBase: "http://localhost:5173",
   },
   production: {
-    apiBase: "https://api.onetap.app",
+    apiBase: "https://ai-apply-jwan.onrender.com",
+    webBase: "https://onetap-ai-apply.vercel.app",
   },
 };
 
@@ -22,6 +24,7 @@ export const SUPABASE_URL = "";
 export const SUPABASE_ANON_KEY = "";
 
 export const DEFAULT_API_BASE = ENVIRONMENTS[ENVIRONMENT].apiBase;
+export const DEFAULT_WEB_BASE = ENVIRONMENTS[ENVIRONMENT].webBase;
 
 export const TOKEN_REFRESH_BUFFER_SEC = 60;
 export const REFRESH_ALARM_MINUTES = 50;
