@@ -1,15 +1,19 @@
 const { UI_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 
 const VISIBLE_UI = new Set([
+  UI_STATUS.DRAFT,
   UI_STATUS.QUEUED,
   UI_STATUS.PROCESSING,
+  UI_STATUS.RETRYING,
   UI_STATUS.GENERATED,
   UI_STATUS.SENT,
   UI_STATUS.FAILED,
   UI_STATUS.NEEDS_REVIEW,
   UI_STATUS.CANCELLED,
+  "draft",
   "queued",
   "processing",
+  "retrying",
   "generated",
   "sent",
   "failed",

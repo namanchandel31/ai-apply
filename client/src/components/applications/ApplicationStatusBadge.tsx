@@ -71,6 +71,11 @@ const STATUS_CONFIG: Record<
 
 const SPIN = new Set(["processing", "sending", "queued", "retrying"]);
 
+export function getApplicationStatusLabel(app: ApplicationRecord): string {
+  const ui = app.uiStatus || app.status;
+  return STATUS_CONFIG[ui]?.label ?? ui;
+}
+
 export function ApplicationStatusBadge({
   app,
   variant = "badge",

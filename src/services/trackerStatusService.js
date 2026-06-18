@@ -3,60 +3,114 @@ const { pool } = require("../db");
 
 const TRACKER_COLORS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"];
 
-const EMAIL_SENT_TRACKER_STATUS = {
-  id: "ts_email_sent",
-  name: "Email sent",
-  color: "green",
+const EMAIL_READY_TRACKER_STATUS = {
+  id: "ts_email_ready",
+  name: "Email Ready",
+  color: "blue",
   stage: 0,
   system: true,
 };
 
-/** Ordered linear funnel — 4 system statuses. */
+const EMAIL_SENT_TRACKER_STATUS = {
+  id: "ts_email_sent",
+  name: "Email Sent",
+  color: "green",
+  stage: 1,
+  system: true,
+};
+
+/** Default status options shown in Applications status picker. */
 const SYSTEM_TRACKER_STATUSES = [
+  EMAIL_READY_TRACKER_STATUS,
   EMAIL_SENT_TRACKER_STATUS,
   {
-    id: "ts_first_interview",
-    name: "First interview",
+    id: "ts_screening",
+    name: "Screening",
     color: "yellow",
-    stage: 1,
+    stage: 2,
     system: true,
   },
   {
-    id: "ts_second_interview",
-    name: "Second interview",
+    id: "ts_interviewing",
+    name: "Interviewing",
     color: "orange",
-    stage: 2,
+    stage: 3,
     system: true,
   },
   {
     id: "ts_offer",
     name: "Offer",
-    color: "blue",
-    stage: 3,
+    color: "purple",
+    stage: 4,
+    system: true,
+  },
+  {
+    id: "ts_withdrawn",
+    name: "Withdrawn",
+    color: "brown",
+    stage: 5,
+    system: true,
+  },
+  {
+    id: "ts_ghosted",
+    name: "Ghosted",
+    color: "gray",
+    stage: 6,
+    system: true,
+  },
+  {
+    id: "ts_rejected",
+    name: "Rejected",
+    color: "red",
+    stage: 7,
+    system: true,
+  },
+  {
+    id: "ts_accepted",
+    name: "Accepted",
+    color: "green",
+    stage: 8,
     system: true,
   },
 ];
 
 const SYSTEM_STATUS_IDS = new Set(SYSTEM_TRACKER_STATUSES.map((s) => s.id));
+const LEGACY_STATUS_ID_REMAP = new Map([
+  ["ts_applied", "ts_email_sent"],
+  ["ts_interview", "ts_interviewing"],
+  ["ts_first_interview", "ts_screening"],
+  ["ts_second_interview", "ts_interviewing"],
+]);
 
-/** Legacy default ids replaced by the linear funnel (kept as custom if still present). */
-const LEGACY_DEFAULT_IDS = new Set(["ts_applied", "ts_interview", "ts_rejected"]);
+/** Legacy default ids replaced by the current status set. */
+const LEGACY_DEFAULT_IDS = new Set([
+  "ts_applied",
+  "ts_interview",
+  "ts_first_interview",
+  "ts_second_interview",
+  "ts_rejected",
+]);
 
 const DEFAULT_TRACKER_STATUS_OPTIONS = [...SYSTEM_TRACKER_STATUSES];
+
+function remapLegacyStatusId(id) {
+  return LEGACY_STATUS_ID_REMAP.get(id) ?? id;
+}
 
 function normalizeOptions(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((o) => o && typeof o.id === "string" && typeof o.name === "string")
     .map((o) => {
+      const normalizedId = remapLegacyStatusId(o.id);
       const next = {
-        id: o.id,
+        id: normalizedId,
         name: String(o.name).trim(),
         color: TRACKER_COLORS.includes(o.color) ? o.color : "gray",
       };
-      if (o.system === true || SYSTEM_STATUS_IDS.has(o.id)) {
+      if (o.system === true || SYSTEM_STATUS_IDS.has(normalizedId)) {
         next.system = true;
-        const systemDef = SYSTEM_TRACKER_STATUSES.find((s) => s.id === o.id);
+        const systemDef = SYSTEM_TRACKER_STATUSES.find((s) => s.id === normalizedId);
         next.stage = systemDef?.stage ?? (typeof o.stage === "number" ? o.stage : null);
       } else if (typeof o.stage === "number") {
         next.stage = o.stage;
@@ -77,41 +131,19 @@ function sortTrackerStatusOptions(options) {
 }
 
 function migrateLegacyOptions(options) {
-  const byId = new Map(options.map((o) => [o.id, o]));
-  const custom = [];
+  const customById = new Map();
 
   for (const opt of options) {
-    if (SYSTEM_STATUS_IDS.has(opt.id)) continue;
-
-    if (opt.id === "ts_interview") {
-      continue;
-    }
-
-    if (LEGACY_DEFAULT_IDS.has(opt.id)) {
-      custom.push({
-        id: opt.id,
+    const normalizedId = remapLegacyStatusId(opt.id);
+    if (SYSTEM_STATUS_IDS.has(normalizedId)) continue;
+    if (LEGACY_DEFAULT_IDS.has(opt.id)) continue;
+    if (!customById.has(normalizedId)) {
+      customById.set(normalizedId, {
+        id: normalizedId,
         name: opt.name,
         color: opt.color,
+        system: false,
       });
-      continue;
-    }
-
-    if (opt.system === true) {
-      custom.push({
-        id: opt.id,
-        name: opt.name,
-        color: opt.color,
-      });
-      continue;
-    }
-
-    custom.push(opt);
-  }
-
-  const customById = new Map();
-  for (const opt of custom) {
-    if (!SYSTEM_STATUS_IDS.has(opt.id) && !customById.has(opt.id)) {
-      customById.set(opt.id, opt);
     }
   }
 
@@ -145,6 +177,8 @@ async function getTrackerStatusOptions(userId, client = pool) {
   if (!options.length) {
     options = DEFAULT_TRACKER_STATUS_OPTIONS;
     await persistTrackerStatusOptions(userId, options, client);
+    await syncLegacyApplicationTrackerStatusIds(userId, client);
+    await syncDefaultApplicationTrackerStatuses(userId, client);
     return options;
   }
 
@@ -154,7 +188,46 @@ async function getTrackerStatusOptions(userId, client = pool) {
   if (serialized !== original) {
     await persistTrackerStatusOptions(userId, merged, client);
   }
+  await syncLegacyApplicationTrackerStatusIds(userId, client);
+  await syncDefaultApplicationTrackerStatuses(userId, client);
   return merged;
+}
+
+async function syncLegacyApplicationTrackerStatusIds(userId, client = pool) {
+  const legacyIds = Array.from(LEGACY_STATUS_ID_REMAP.keys());
+  if (!legacyIds.length) return;
+  await client.query(
+    `UPDATE applications
+     SET tracker_status_id = CASE tracker_status_id
+       WHEN 'ts_applied' THEN 'ts_email_sent'
+       WHEN 'ts_interview' THEN 'ts_interviewing'
+       WHEN 'ts_first_interview' THEN 'ts_screening'
+       WHEN 'ts_second_interview' THEN 'ts_interviewing'
+       ELSE tracker_status_id
+     END,
+     updated_at = NOW()
+     WHERE user_id = $1
+       AND tracker_status_id = ANY($2::text[])`,
+    [userId, legacyIds]
+  );
+}
+
+/** Backfill missing tracker statuses for existing applications. */
+async function syncDefaultApplicationTrackerStatuses(userId, client = pool) {
+  await client.query(
+    `UPDATE applications
+     SET tracker_status_id = CASE
+       WHEN application_status = 'sent' THEN $2
+       WHEN application_status = 'generated' THEN $3
+       WHEN application_status = 'needs_review' THEN $3
+       ELSE tracker_status_id
+     END,
+     updated_at = NOW()
+     WHERE user_id = $1
+       AND tracker_status_id IS NULL
+       AND application_status IN ('sent', 'generated', 'needs_review')`,
+    [userId, EMAIL_SENT_TRACKER_STATUS.id, EMAIL_READY_TRACKER_STATUS.id]
+  );
 }
 
 async function createTrackerStatusOption(userId, { name, color }) {
@@ -350,6 +423,7 @@ async function getTrackerStatusSummary(userId, client = pool) {
 
 module.exports = {
   TRACKER_COLORS,
+  EMAIL_READY_TRACKER_STATUS,
   EMAIL_SENT_TRACKER_STATUS,
   SYSTEM_TRACKER_STATUSES,
   SYSTEM_STATUS_IDS,
@@ -360,4 +434,5 @@ module.exports = {
   getTrackerStatusSummary,
   setApplicationTrackerStatus,
   sortTrackerStatusOptions,
+  syncDefaultApplicationTrackerStatuses,
 };

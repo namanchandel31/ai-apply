@@ -35,5 +35,7 @@ export function normalizeApplicationEvent(
           ? Number(raw.match_score)
           : null,
     jdEnrichment: raw.jdEnrichment as ApplicationUpdatedPayload["jdEnrichment"],
+    canSend: Boolean(raw.canSend),
+    trackerStatusId: (raw.trackerStatusId as string | null | undefined) ?? null,
   };
 }

@@ -92,6 +92,7 @@ const createApplication = async ({
   sourceCompanyName = null,
   sourceRecruiterName = null,
   sourcePostId = null,
+  trackerStatusId = null,
 }) => {
   const queryClient = client || pool;
 
@@ -103,10 +104,10 @@ const createApplication = async ({
         parsed_jd_snapshot, parsed_resume_snapshot, match_score_snapshot,
         email_metadata, email_feedback_signals, email_preferences_snapshot,
         source_platform, source_url, source_email, discovered_at,
-        source_company_name, source_recruiter_name, source_post_id
+        source_company_name, source_recruiter_name, source_post_id, tracker_status_id
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-             $20, $21, $22, $23, $24, $25, $26)
+             $20, $21, $22, $23, $24, $25, $26, $27)
      ON CONFLICT (user_id, resume_id, job_description_id)
      DO UPDATE SET
         updated_at = NOW(),
@@ -120,7 +121,8 @@ const createApplication = async ({
         recipient_email = EXCLUDED.recipient_email,
         resume_snapshot_path = EXCLUDED.resume_snapshot_path,
         normalized_job_title = EXCLUDED.normalized_job_title,
-        normalized_company_name = EXCLUDED.normalized_company_name
+        normalized_company_name = EXCLUDED.normalized_company_name,
+        tracker_status_id = COALESCE(EXCLUDED.tracker_status_id, applications.tracker_status_id)
      RETURNING *`,
     [
       id,
@@ -149,6 +151,7 @@ const createApplication = async ({
       sourceCompanyName,
       sourceRecruiterName,
       sourcePostId,
+      trackerStatusId,
     ]
   );
 

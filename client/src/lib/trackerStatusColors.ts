@@ -17,15 +17,23 @@ export type TrackerStatusOption = {
   system?: boolean;
 };
 
-/** System-assigned when application email is sent. */
+/** System-assigned when application is ready for manual send. */
+export const EMAIL_READY_TRACKER_STATUS_ID = "ts_email_ready";
+
+/** System-assigned when application email is sent or auto-apply is enabled. */
 export const EMAIL_SENT_TRACKER_STATUS_ID = "ts_email_sent";
 
-/** All built-in funnel statuses (cannot be deleted). */
+/** All built-in default statuses (cannot be deleted). */
 export const SYSTEM_TRACKER_STATUS_IDS = new Set([
+  "ts_email_ready",
   "ts_email_sent",
-  "ts_first_interview",
-  "ts_second_interview",
+  "ts_screening",
+  "ts_interviewing",
   "ts_offer",
+  "ts_withdrawn",
+  "ts_ghosted",
+  "ts_rejected",
+  "ts_accepted",
 ]);
 
 export function isSystemTrackerStatus(option: Pick<TrackerStatusOption, "id" | "system">) {

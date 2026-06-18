@@ -53,6 +53,7 @@ function buildRealtimePayload(applicationId, userId, serialized, meta) {
     role: serialized.role ?? null,
     company: serialized.company ?? null,
     matchScore: serialized.matchScore ?? null,
+    trackerStatusId: serialized.trackerStatusId ?? null,
     traceId: trace.traceId,
     requestId: trace.requestId,
     orchestrationId: applicationId,

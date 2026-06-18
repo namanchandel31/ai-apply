@@ -6,6 +6,7 @@ const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail, RetryableError } = require("./emailService");
 const { buildEmailGenerationContext } = require("./emailContextBuilder");
 const { getEmailPreferenceLevels } = require("../models/userModel");
+const { EMAIL_READY_TRACKER_STATUS } = require("./trackerStatusService");
 const { logInfo, logError } = require("../utils/logger");
 
 /**
@@ -132,7 +133,8 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
           emailFeedbackSignals: cachedEmail.emailFeedbackSignals,
           emailPreferencesSnapshot: generationSnapshot,
           userId,
-          client
+          client,
+          trackerStatusId: EMAIL_READY_TRACKER_STATUS.id,
         });
 
         logInfo("application_saved", { reqId, resumeId, jobDescriptionId, applicationId: appRecord.id });

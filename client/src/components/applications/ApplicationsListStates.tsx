@@ -11,11 +11,11 @@ export function TableSkeletonRows({ rows = 6 }: { rows?: number }) {
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
-            <Skeleton className="h-4 w-40" />
+          <TableCell className={cn("w-12 pl-0 pr-0", tableCellPaddingX, "py-2.5")}>
+            <Skeleton className="h-[18px] w-[18px]" />
           </TableCell>
           <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
-            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-40" />
           </TableCell>
           <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-4 w-16" />
@@ -32,6 +32,24 @@ export function TableSkeletonRows({ rows = 6 }: { rows?: number }) {
         </TableRow>
       ))}
     </>
+  );
+}
+
+export function ApplicationsListErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <p className="font-medium">Could not load applications</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">{message}</p>
+      <Button className="mt-4" variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
   );
 }
 
@@ -75,7 +93,7 @@ export function ApplicationsTableShell({ children }: { children: React.ReactNode
   return (
     <div className="overflow-x-auto">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+        <TableHeader className="sticky top-0 z-10 bg-background">
           {children}
         </TableHeader>
       </Table>

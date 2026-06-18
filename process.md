@@ -1,5 +1,121 @@
 ## Log (newest first)
 
+### 2026-06-18 — No-contact apply status / filter fix
+- **Prompt:** JD pasted without email logs app but default status filter hides it; should be ready to review/review
+- **Outcome:** Root cause: missing-contact applies correctly transition to `application_status=needs_review` but got no `tracker_status_id`, so the Status column showed the empty "Select status" placeholder and summary/review views missed them. Fixed by assigning `Email Ready` tracker status on needs_review (worker + backfill sync), inferring it in SSE cache patches, and rendering a "Needs review" label in the table instead of the tracker picker for those rows.
+
+### 2026-06-18 — Trim sidebar metadata footer
+- **Prompt:** Remove ID/orchestration/retries from details footer; show timestamps on one line.
+- **Outcome:** Details section now only lists Created/Updated/Sent/Completed/Failed with date and time on a single line (e.g. `21 May 2026, 9:42 PM`).
+
+### 2026-06-18 — Debug apply not showing after hard refresh
+- **Prompt:** applied with auto apply on, hard refresh, still not in Applications tab
+- **Outcome:** Backend/DB confirmed healthy (applications persist; GET /api/applications returns them). Root cause was client list fetch: `refetchOnMount: false` plus refresh firing before auth left stale/empty cache, and URL page/filter state (e.g. page>1 or status filter) hiding new rows after hard refresh. Fixed with `refetchOnMount: 'always'`, auth-gated refetch on Applications mount, sessionStorage flag to reset to page 1/clear filters after apply, and error UI when list fetch fails.
+
+### 2026-06-18 — Simplify application details sidebar
+- **Prompt:** Remove extra sidebar tabs; default to email with recipient on top; de-emphasize metadata at bottom.
+- **Outcome:** Replaced tabbed ApplicationDetailsSheet with a single scrollable view—header keeps role/company/status/match score, email (To, subject, body) is primary content, errors show inline when present, and timestamps/ID/orchestration sit in a muted Details section at the bottom.
+
+### 2026-06-18 — Fix applications not logging from apply
+- **Prompt:** when applying by pasting JD or extension, applications not showing in Application tab
+- **Outcome:** Root cause was stale list cache: realtime SSE only patched the active query key, optimistic inserts used uiStatus for status-filter matching (blocking draft rows), and `refetchOnMount: false` meant bootstrap prefetch could overwrite optimistic rows without a refetch. Fixed by patching all list query keys on SSE, matching filters on `application_status`, refetching the list after ApplyComposer success, and refetching when the Applications tab mounts (covers extension applies).
+
+### 2026-06-18 — Status column shimmer text (no pill)
+- **Prompt:** Remove spinning send-icon pill under status; use shimmer text only (e.g. "Sending").
+- **Outcome:** Processing/sending rows show status label with text shimmer instead of ApplicationStatusBadge pill.
+
+### 2026-06-18 — Instant application logging from Apply tab
+- **Prompt:** Applications tab should show new applies immediately with processing spinner, shimmer, error/retry UI.
+- **Outcome:** Optimistic cache upsert on apply start (all list query keys), SSE publish fix for draft/queued, table row processing spinner + shimmer + failed status/retry button.
+
+### 2026-06-18 — Send email row button sends
+- **Prompt:** Send email opens the sidebar; it should send the email.
+- **Outcome:** Email Ready row Send email button now calls `onSend` to queue the email instead of opening the details sheet.
+
+### 2026-06-18 — Larger bulk actions bar
+- **Prompt:** Make the bulk action bar bigger.
+- **Outcome:** Increased bar padding, button height (`h-10`), type size (`text-base`), icons, dividers, and corner radius on the floating bulk actions bar only.
+
+### 2026-06-18 — Send email button corner radius
+- **Prompt:** Same corner roundness as Summary button.
+- **Outcome:** Row Send email button uses `rounded-[10px]` to match Summary and filter controls.
+
+### 2026-06-18 — Send email button text size
+- **Prompt:** Bump up send button text size to match other table row text.
+- **Outcome:** Row Send email button uses `text-base font-normal` to align with applications table typography.
+
+### 2026-06-18 — Larger checkbox tap target
+- **Prompt:** Increase the tap area of checkbox.
+- **Outcome:** Row select checkbox hit area increased to 44×44px (`h-11 w-11`) with label wrapper so taps anywhere in the target toggle selection.
+
+### 2026-06-18 — Applications table zero left padding
+- **Prompt:** Make table row and table head use padding left 0.
+- **Outcome:** `tableCellPaddingX` is now `pl-0 pr-[14px]`; checkbox column also uses `pl-0`.
+
+### 2026-06-18 — Send email button height bump
+- **Prompt:** Make it a bit taller.
+- **Outcome:** Email Ready row Send email button height increased from `h-9` to `h-10`.
+
+### 2026-06-18 — Send email row button styling
+- **Prompt:** Rename Review email to Send email, add icon, increase height 4px; no other UI changes.
+- **Outcome:** Email Ready row button only: label `Send email`, Send icon, `h-9` (was `h-8`); behavior unchanged.
+
+### 2026-06-18 — Floating bulk actions bar
+- **Prompt:** Bulk action bar should be a floating bar from the bottom like Linear.
+- **Outcome:** Bulk actions now render as a fixed bottom-center dark pill with slide-up animation, upward-opening menus, and an X to clear selection.
+
+### 2026-06-18 — Hide row menu when Review email shown
+- **Prompt:** When Review email button is there, remove the 3-dot button.
+- **Outcome:** ApplicationRowActions menu is hidden on Email Ready rows that show the Review email button.
+
+### 2026-06-18 — Review email button radius
+- **Prompt:** Make the button less rounded.
+- **Outcome:** Review email row button uses `rounded-sm` instead of the default `rounded-lg`.
+
+### 2026-06-18 — Hide select-all checkbox in table head
+- **Prompt:** Don't show checkbox in table head.
+- **Outcome:** Removed header select-all checkbox; row checkboxes unchanged with empty header cell for alignment.
+
+### 2026-06-18 — Fix row checkbox selection
+- **Prompt:** Selection not working; checkbox state doesn't change; tappable area too small.
+- **Outcome:** Removed stale row memo blocking selection re-renders; checkbox uses explicit `rowSelection` state with 36px hit target and row-click isolation on the select cell.
+
+### 2026-06-18 — Bulk send email for selected rows
+- **Prompt:** Multi-select rows should also have a Send email bulk action.
+- **Outcome:** Bulk actions bar shows Send email for selected Email Ready rows (`canSend`); queues send per application with success/failure toasts and clears selection on success.
+
+### 2026-06-18 — Review email primary row button
+- **Prompt:** Make send email button primary black; label Review email; open sidebar instead of sending.
+- **Outcome:** Email Ready rows show a primary `Review email` button that opens the application details sheet on the Email tab.
+
+### 2026-06-18 — Applications table bulk selection
+- **Prompt:** Add row checkboxes with select-all and bulk actions (change status, delete).
+- **Outcome:** Checkbox column with page select-all; bulk actions bar for status updates and permanent delete; new POST bulk tracker-status and delete API endpoints with list cache updates.
+
+### 2026-06-18 — Fix default Email Ready / Email Sent assignment
+- **Prompt:** Default status still shows Select status; only Email Ready (auto apply off) or Email Sent (auto apply on + sent) should apply.
+- **Outcome:** Assign Email Ready when review-mode email reaches generated; assign Email Sent only after SMTP success; backfill null tracker statuses on list load; propagate trackerStatusId through realtime cache updates.
+
+### 2026-06-18 — Remove applications table background
+- **Prompt:** Remove background from table.
+- **Outcome:** Dropped card background and shadow from the Applications table wrapper; sticky header now uses page background instead of card tint.
+
+### 2026-06-18 — Fix company edit layout shift
+- **Prompt:** When tapping to edit company, the UI shifts — it should stay fixed.
+- **Outcome:** Company cell now uses a shared fixed-height shell with matching border box in view and edit modes so row layout no longer jumps on tap.
+
+### 2026-06-18 — Inline editable company in tracker table
+- **Prompt:** In the application tracking tab, the company name should be inline editable.
+- **Outcome:** Added inline company-name editing in the Applications table (click cell to edit, Enter/blur to save, Esc to cancel) plus a new authenticated PATCH endpoint to persist company updates and keep normalized company fields in sync.
+
+### 2026-06-18 — Email ready row send action
+- **Prompt:** If status is Email Ready, keep default as Email Ready and show Send email button in table row.
+- **Outcome:** Added inline `Send email` button in Applications table rows when tracker status is `Email Ready` and send is allowed; kept menu send action hidden in that case to avoid duplication.
+
+### 2026-06-18 — Application default tracker statuses
+- **Prompt:** Set Applications tab defaults to Email Ready/Email Sent behavior with a new status list.
+- **Outcome:** Replaced default tracker statuses with Email Ready, Email Sent, Screening, Interviewing, Offer, Withdrawn, Ghosted, Rejected, Accepted; new applications now default to Email Ready in review mode and Email Sent in auto-apply mode.
+
 ### 2026-06-14 — Remove footer
 - **Prompt:** Remove footer.
 - **Outcome:** Dropped `MindooFooter` from landing page.

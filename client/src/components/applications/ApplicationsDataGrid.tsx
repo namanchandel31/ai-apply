@@ -1,12 +1,14 @@
-import { memo, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type Row,
+  type RowSelectionState,
+  type OnChangeFn,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw, Send } from "lucide-react";
 import type { ApplicationRecord, ApplicationsListSortField } from "@/lib/api";
 import {
   Table,
@@ -16,18 +18,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { displayCompany, displayRole } from "@/queries/applicationsCache";
+import { displayRole } from "@/queries/applicationsCache";
 import { useApplicationsListParams } from "@/contexts/ApplicationsListParamsContext";
-import { ApplicationTrackerStatusCell } from "@/components/applications/ApplicationTrackerStatusCell";
-import { MatchScoreCell } from "@/components/applications/MatchScoreCell";
-import { DateTimeCell } from "@/components/applications/DateTimeCell";
+import {
+  ApplicationTableShimmerText,
+  ApplicationTableStatusCell,
+} from "@/components/applications/ApplicationTableStatusCell";
+import { ApplicationCompanyCell } from "@/components/applications/ApplicationCompanyCell";
+import { formatDateTime } from "@/lib/formatDateTime";
 import { ApplicationRowActions } from "@/components/applications/ApplicationRowActions";
+import { TableRowSelectCheckbox } from "@/components/applications/TableRowSelectCheckbox";
+import { Button } from "@/components/ui/button";
 import {
   EmptyApplicationsState,
   TableSkeletonRows,
 } from "@/components/applications/ApplicationsListStates";
 import { cn } from "@/lib/utils";
 import { tableTextPrimary, tableTextSecondary, tableCellPaddingX } from "@/components/applications/applicationsTableTypography";
+import { EMAIL_READY_TRACKER_STATUS_ID } from "@/lib/trackerStatusColors";
+import { isApplicationRowFailed, isApplicationRowProcessing } from "@/lib/applicationRowState";
 
 type Props = {
   items: ApplicationRecord[];
@@ -35,6 +44,8 @@ type Props = {
   isFetching: boolean;
   hasActiveFilters: boolean;
   selectedId: string | null;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: OnChangeFn<RowSelectionState>;
   onSelectRow: (id: string) => void;
   onRetry: (id: string) => void;
   onContinue: (id: string) => void;
@@ -44,62 +55,140 @@ type Props = {
 
 type ApplicationTableRowProps = {
   row: Row<ApplicationRecord>;
+  isSelected: boolean;
   selectedId: string | null;
   actionId: string | null;
   onSelectRow: (id: string) => void;
   onRetry: (id: string) => void;
   onContinue: (id: string) => void;
+  onSend: (id: string) => void;
 };
 
-const ApplicationTableRow = memo(function ApplicationTableRow({
+function ApplicationTableRow({
   row,
+  isSelected,
   selectedId,
+  actionId,
   onSelectRow,
+  onRetry,
+  onContinue,
+  onSend,
 }: ApplicationTableRowProps) {
+  const app = row.original;
+  const processing = isApplicationRowProcessing(app);
+  const failed = isApplicationRowFailed(app);
+
   return (
     <TableRow
       data-state={selectedId === row.id ? "selected" : undefined}
       className={cn(
         "cursor-pointer transition-colors hover:bg-muted/50",
-        selectedId === row.id && "bg-muted/40"
+        selectedId === row.id && "bg-muted/40",
+        isSelected && "bg-muted/30",
+        processing && "bg-primary/[0.03]"
       )}
       onClick={() => onSelectRow(row.original.id)}
     >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell
-          key={cell.id}
-          className={cn(
-            tableCellPaddingX,
-            "py-2.5",
-            cell.column.id === "match" && "hidden sm:table-cell",
-            cell.column.id === "updated" && "hidden md:table-cell"
-          )}
-        >
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
+      {row.getVisibleCells().map((cell) => {
+        if (cell.column.id === "select") {
+          return (
+            <TableCell
+              key={cell.id}
+              className={cn(tableCellPaddingX, "w-12 py-2.5 pl-0 pr-0")}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {processing ? (
+                <div
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center"
+                  aria-label="Processing application"
+                >
+                  <Loader2 className="h-[18px] w-[18px] animate-spin text-primary" />
+                </div>
+              ) : (
+                <TableRowSelectCheckbox
+                  checked={isSelected}
+                  onCheckedChange={(checked) => row.toggleSelected(checked)}
+                  aria-label={`Select ${displayRole(row.original)}`}
+                />
+              )}
+            </TableCell>
+          );
+        }
+
+        return (
+          <TableCell
+            key={cell.id}
+            className={cn(
+              tableCellPaddingX,
+              "py-2.5",
+              cell.column.id === "match" && "hidden sm:table-cell",
+              cell.column.id === "updated" && "hidden md:table-cell"
+            )}
+          >
+            {cell.column.id === "actions" ? (
+              (() => {
+                const showSendEmail =
+                  !failed &&
+                  row.original.trackerStatusId === EMAIL_READY_TRACKER_STATUS_ID &&
+                  row.original.canSend;
+                const showRetry = failed && row.original.canRetry;
+                return (
+                  <div className="flex items-center justify-end gap-1">
+                    {showRetry ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 rounded-[10px] border-destructive/40 px-2.5 text-base font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={actionId === row.original.id || actionId === "bulk"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRetry(row.original.id);
+                        }}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Retry
+                      </Button>
+                    ) : null}
+                    {showSendEmail ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="default"
+                        className="h-10 rounded-[10px] px-2.5 text-base font-normal"
+                        disabled={actionId === row.original.id || actionId === "bulk"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSend(row.original.id);
+                        }}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Send email
+                      </Button>
+                    ) : null}
+                    {!showSendEmail && !showRetry ? (
+                      <ApplicationRowActions
+                        app={row.original}
+                        disabled={actionId === row.original.id || actionId === "bulk"}
+                        onViewDetails={() => onSelectRow(row.original.id)}
+                        onRetry={() => onRetry(row.original.id)}
+                        onContinue={() => onContinue(row.original.id)}
+                        onSend={() => onSend(row.original.id)}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })()
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
+          </TableCell>
+        );
+      })}
     </TableRow>
   );
-}, (prev, next) => {
-  if (prev.selectedId !== next.selectedId) {
-    const id = prev.row.id;
-    if (id === prev.selectedId || id === next.selectedId) return false;
-  }
-  if (prev.actionId !== next.actionId && prev.row.id === next.row.id) return false;
-  const a = prev.row.original;
-  const b = next.row.original;
-  return (
-    a.id === b.id &&
-    a.updatedAt === b.updatedAt &&
-    a.uiStatus === b.uiStatus &&
-    a.status === b.status &&
-    a.role === b.role &&
-    a.company === b.company &&
-    a.matchScore === b.matchScore &&
-    a.trackerStatusId === b.trackerStatusId &&
-    (a as { _partial?: boolean })._partial === (b as { _partial?: boolean })._partial
-  );
-});
+}
 
 function SortHeader({
   label,
@@ -134,6 +223,8 @@ export function ApplicationsDataGrid({
   isFetching,
   hasActiveFilters,
   selectedId,
+  rowSelection,
+  onRowSelectionChange,
   onSelectRow,
   onRetry,
   onContinue,
@@ -156,10 +247,19 @@ export function ApplicationsDataGrid({
   const columns = useMemo<ColumnDef<ApplicationRecord>[]>(
     () => [
       {
+        id: "select",
+        header: () => null,
+        cell: () => null,
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
         id: "role",
         header: () => <span className={tableTextSecondary}>Role</span>,
         cell: ({ row }) => (
-          <span className={tableTextPrimary}>{displayRole(row.original)}</span>
+          <ApplicationTableShimmerText app={row.original} className={tableTextPrimary}>
+            {displayRole(row.original)}
+          </ApplicationTableShimmerText>
         ),
       },
       {
@@ -173,14 +273,12 @@ export function ApplicationsDataGrid({
             onSort={toggleSort}
           />
         ),
-        cell: ({ row }) => (
-          <span className={tableTextSecondary}>{displayCompany(row.original)}</span>
-        ),
+        cell: ({ row }) => <ApplicationCompanyCell app={row.original} />,
       },
       {
         id: "status",
         header: () => <span className={tableTextSecondary}>Status</span>,
-        cell: ({ row }) => <ApplicationTrackerStatusCell app={row.original} />,
+        cell: ({ row }) => <ApplicationTableStatusCell app={row.original} />,
       },
       {
         id: "match",
@@ -193,7 +291,16 @@ export function ApplicationsDataGrid({
             onSort={toggleSort}
           />
         ),
-        cell: ({ row }) => <MatchScoreCell score={row.original.matchScore} variant="table" />,
+        cell: ({ row }) => {
+          const score = row.original.matchScore;
+          const label =
+            score == null || Number.isNaN(score) ? "—" : `${Math.round(score)}%`;
+          return (
+            <ApplicationTableShimmerText app={row.original} className={cn(tableTextSecondary, "tabular-nums")}>
+              {label}
+            </ApplicationTableShimmerText>
+          );
+        },
       },
       {
         id: "updated",
@@ -206,29 +313,23 @@ export function ApplicationsDataGrid({
             onSort={toggleSort}
           />
         ),
-        cell: ({ row }) => (
-          <DateTimeCell
-            iso={row.original.updatedAt ?? row.original.createdAt}
-            variant="inline"
-          />
-        ),
+        cell: ({ row }) => {
+          const { date, time } = formatDateTime(row.original.updatedAt ?? row.original.createdAt);
+          const line = date === "—" ? "—" : time ? `${date} · ${time}` : date;
+          return (
+            <ApplicationTableShimmerText app={row.original} className={tableTextSecondary}>
+              {line}
+            </ApplicationTableShimmerText>
+          );
+        },
       },
       {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
-        cell: ({ row }) => (
-          <ApplicationRowActions
-            app={row.original}
-            disabled={actionId === row.original.id}
-            onViewDetails={() => onSelectRow(row.original.id)}
-            onRetry={() => onRetry(row.original.id)}
-            onContinue={() => onContinue(row.original.id)}
-            onSend={() => onSend(row.original.id)}
-          />
-        ),
+        cell: () => null,
       },
     ],
-    [params.sort, params.order, actionId, onSelectRow, onRetry, onContinue, onSend, toggleSort]
+    [params.sort, params.order, toggleSort]
   );
 
   const table = useReactTable({
@@ -236,13 +337,17 @@ export function ApplicationsDataGrid({
     columns,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
+    enableRowSelection: true,
+    onRowSelectionChange,
+    state: { rowSelection },
   });
 
   if (isLoading && items.length === 0) {
     return (
       <Table className="text-base">
-        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+        <TableHeader className="sticky top-0 z-10 bg-background">
           <TableRow>
+            <TableHead className={cn("w-12 pl-0 pr-0", tableCellPaddingX)} />
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Role</TableHead>
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Company</TableHead>
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Status</TableHead>
@@ -274,7 +379,7 @@ export function ApplicationsDataGrid({
       )}
     >
       <Table className="text-base">
-        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+        <TableHeader className="sticky top-0 z-10 bg-background">
           {table.getHeaderGroups().map((hg) => (
             <TableRow key={hg.id}>
               {hg.headers.map((h) => (
@@ -283,11 +388,14 @@ export function ApplicationsDataGrid({
                   className={cn(
                     tableTextSecondary,
                     tableCellPaddingX,
+                    h.id === "select" && "w-12 pl-0 pr-0",
                     h.id === "match" && "hidden sm:table-cell",
                     h.id === "updated" && "hidden md:table-cell"
                   )}
                 >
-                  {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                  {h.id === "select" ? null : h.isPlaceholder ? null : (
+                    flexRender(h.column.columnDef.header, h.getContext())
+                  )}
                 </TableHead>
               ))}
             </TableRow>
@@ -298,11 +406,13 @@ export function ApplicationsDataGrid({
             <ApplicationTableRow
               key={row.id}
               row={row}
+              isSelected={row.getIsSelected()}
               selectedId={selectedId}
               actionId={actionId}
               onSelectRow={onSelectRow}
               onRetry={onRetry}
               onContinue={onContinue}
+              onSend={onSend}
             />
           ))}
         </TableBody>
