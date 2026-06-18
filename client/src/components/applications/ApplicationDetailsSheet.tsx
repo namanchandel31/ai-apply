@@ -10,15 +10,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApplicationStatusBadge } from "@/components/applications/ApplicationStatusBadge";
 import { MatchScoreCell } from "@/components/applications/MatchScoreCell";
-import { DateTimeCell } from "@/components/applications/DateTimeCell";
 import { SafeContent } from "@/components/applications/SafeContent";
-import { JsonViewer } from "@/components/applications/JsonViewer";
 import { formatDateTime } from "@/lib/formatDateTime";
 import { patchApplicationAfterMutation } from "@/queries/applicationsCache";
 import { useRealtime } from "@/contexts/useRealtime";
@@ -29,17 +26,16 @@ type Props = {
   applicationId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialTab?: string;
 };
 
 function TimestampRow({ label, iso }: { label: string; iso?: string | null }) {
   const { date, time } = formatDateTime(iso);
+  if (!date || date === "—") return null;
   return (
-    <div className="flex justify-between gap-4 py-1.5 text-sm border-b border-border/40 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right">
-        <span className="block">{date}</span>
-        {time ? <span className="text-xs text-muted-foreground">{time}</span> : null}
+    <div className="flex justify-between gap-4 py-1 text-xs text-muted-foreground/80">
+      <span>{label}</span>
+      <span className="text-right tabular-nums">
+        {time ? `${date}, ${time}` : date}
       </span>
     </div>
   );
@@ -49,7 +45,6 @@ export function ApplicationDetailsSheet({
   applicationId,
   open,
   onOpenChange,
-  initialTab = "overview",
 }: Props) {
   const queryClient = useQueryClient();
   const { broadcastRevive } = useRealtime();
@@ -179,7 +174,7 @@ export function ApplicationDetailsSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col p-0 gap-0 sm:max-w-xl md:max-w-2xl">
-        <SheetHeader className="px-6 py-4 shrink-0">
+        <SheetHeader className="px-6 py-4 shrink-0 border-b border-border/40">
           {isLoading ? (
             <>
               <SheetTitle>Loading…</SheetTitle>
@@ -218,9 +213,9 @@ export function ApplicationDetailsSheet({
         )}
 
         {app && !isLoading && (
-          <div className="flex flex-1 flex-col min-h-0 overflow-hidden px-6 pb-6">
+          <div className="flex flex-1 flex-col min-h-0 overflow-y-auto px-6 py-4">
             {(app.canRetry || app.canContinue || app.canSend) && (
-              <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+              <div className="flex flex-wrap gap-2 mb-5 shrink-0">
                 {app.canRetry && (
                   <Button size="sm" variant="outline" disabled={actionBusy} onClick={() => void handleRetry()}>
                     Retry
@@ -249,150 +244,94 @@ export function ApplicationDetailsSheet({
               </div>
             )}
 
-            <Tabs defaultValue={initialTab} className="flex flex-1 flex-col min-h-0">
-              <TabsList className="w-full justify-start shrink-0">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="errors">Errors</TabsTrigger>
-                <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
-                <TabsTrigger value="raw">Raw</TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-              </TabsList>
-              <div className="flex-1 overflow-y-auto mt-4 pr-1">
-                <TabsContent value="overview" className="mt-0 space-y-4">
-                  <div className="rounded-md border p-3">
-                    <TimestampRow label="Created" iso={app.createdAt} />
-                    <TimestampRow label="Updated" iso={app.updatedAt} />
-                    <TimestampRow label="Sent" iso={app.sentAt} />
-                    <TimestampRow label="Completed" iso={app.completedAt} />
-                    <TimestampRow label="Failed" iso={app.failedAt} />
+            <div className="space-y-4">
+              {app.recipientEmail ? (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">To</p>
+                  <p className="text-sm">{app.recipientEmail}</p>
+                </div>
+              ) : app.canContinue ? null : (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">To</p>
+                  <p className="text-sm text-muted-foreground">No recipient yet</p>
+                </div>
+              )}
+
+              {isReadyEditable ? (
+                <>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+                    <Input
+                      value={editSubject}
+                      onChange={(e) => setEditSubject(e.target.value)}
+                      className="text-sm"
+                      disabled={actionBusy}
+                    />
                   </div>
-                  <div className="text-sm space-y-1">
-                    <p>
-                      <span className="text-muted-foreground">ID: </span>
-                      <code className="text-xs">{app.id}</code>
-                    </p>
-                    {app.recipientEmail && (
-                      <p>
-                        <span className="text-muted-foreground">Recipient: </span>
-                        {app.recipientEmail}
-                      </p>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
+                    <Textarea
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      className="min-h-[240px] text-sm"
+                      disabled={actionBusy}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={actionBusy}
+                      onClick={() => void handleSaveEmail()}
+                    >
+                      Save changes
+                    </Button>
+                    {app.canSend && (
+                      <Button size="sm" disabled={actionBusy} onClick={() => void handleSend()}>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send
+                      </Button>
                     )}
-                    <p>
-                      <span className="text-muted-foreground">Orchestration: </span>
-                      v{app.orchestrationVersion ?? 0} / epoch {app.orchestrationEpoch ?? 0}
-                    </p>
-                    <p>
-                      <span className="text-muted-foreground">Retries: </span>
-                      {app.retryCount ?? 0}
-                    </p>
                   </div>
-                </TabsContent>
-                <TabsContent value="email" className="mt-0 space-y-3">
-                  {isReadyEditable ? (
-                    <>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
-                        <Input
-                          value={editSubject}
-                          onChange={(e) => setEditSubject(e.target.value)}
-                          className="text-sm"
-                          disabled={actionBusy}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
-                        <Textarea
-                          value={editBody}
-                          onChange={(e) => setEditBody(e.target.value)}
-                          className="min-h-[200px] text-sm"
-                          disabled={actionBusy}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actionBusy}
-                          onClick={() => void handleSaveEmail()}
-                        >
-                          Save changes
-                        </Button>
-                        {app.canSend && (
-                          <Button size="sm" disabled={actionBusy} onClick={() => void handleSend()}>
-                            <Send className="h-4 w-4 mr-2" />
-                            Send
-                          </Button>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
-                        <SafeContent text={app.emailSubject} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
-                        <SafeContent text={app.emailBody} className="max-h-96 overflow-auto" />
-                      </div>
-                    </>
-                  )}
-                </TabsContent>
-                <TabsContent value="errors" className="mt-0 space-y-3">
-                  {app.lastError && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Last error</p>
-                      <SafeContent text={app.lastError} />
-                    </div>
-                  )}
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+                    <SafeContent text={app.emailSubject} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Body</p>
+                    <SafeContent text={app.emailBody} />
+                  </div>
+                </>
+              )}
+
+              {app.lastError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                  <p className="text-xs font-medium text-destructive mb-1">Error</p>
+                  <SafeContent text={app.lastError} className="text-sm text-destructive/90" />
                   {app.failureStage && (
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Failure stage: </span>
-                      {app.failureStage}
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      Stage: {app.failureStage}
                     </p>
                   )}
-                  <JsonViewer data={app.error} title="Error payload" />
-                </TabsContent>
-                <TabsContent value="snapshots" className="mt-0 space-y-3">
-                  <JsonViewer data={app.parsedJdSnapshot} title="Parsed JD" />
-                  <JsonViewer data={app.parsedResumeSnapshot} title="Parsed resume" />
-                  <JsonViewer data={app.emailMetadata} title="Email metadata" />
-                  <JsonViewer data={app.emailFeedbackSignals} title="Feedback signals" />
-                </TabsContent>
-                <TabsContent value="raw" className="mt-0">
-                  {app.llmRawOutputTruncated && (
-                    <p className="text-xs text-warning mb-2 rounded-lg bg-warning/10 px-2 py-1">
-                      Output truncated on server for size — full load may be added later.
-                    </p>
-                  )}
-                  <SafeContent text={app.llmRawOutput} className="font-mono text-xs max-h-[60vh] overflow-auto" />
-                </TabsContent>
-                <TabsContent value="activity" className="mt-0">
-                  {!app.events?.length ? (
-                    <p className="text-sm text-muted-foreground">No activity events recorded.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {app.events.map((ev) => (
-                        <li
-                          key={ev.id}
-                          className="rounded-md border px-3 py-2 text-sm"
-                        >
-                          <div className="flex justify-between gap-2">
-                            <span className="font-medium">{ev.eventType}</span>
-                            <DateTimeCell iso={ev.createdAt} />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {ev.actorType}
-                            {ev.actorId ? ` · ${ev.actorId}` : ""}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </TabsContent>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-border/30">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60 mb-2">
+                Details
+              </p>
+              <div className="rounded-md bg-muted/30 px-3 py-2">
+                <TimestampRow label="Created" iso={app.createdAt} />
+                <TimestampRow label="Updated" iso={app.updatedAt} />
+                <TimestampRow label="Sent" iso={app.sentAt} />
+                <TimestampRow label="Completed" iso={app.completedAt} />
+                <TimestampRow label="Failed" iso={app.failedAt} />
               </div>
-            </Tabs>
+            </div>
           </div>
         )}
       </SheetContent>

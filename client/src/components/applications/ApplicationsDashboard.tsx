@@ -1,5 +1,6 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { RowSelectionState } from "@tanstack/react-table";
 import { Wifi, WifiOff } from "lucide-react";
 import { ApplicationsListParamsProvider, useApplicationsListParams } from "@/contexts/ApplicationsListParamsContext";
 import { getApplicationsListQueryOptions } from "@/queries/applicationsListQuery";
@@ -9,17 +10,23 @@ import {
   normalizeApplicationsListData,
 } from "@/lib/applicationsListResponse";
 import { ApplicationsPageFilters } from "@/components/applications/ApplicationsPageFilters";
+import { ApplicationsListErrorState } from "@/components/applications/ApplicationsListStates";
 import { ApplicationsDataGrid } from "@/components/applications/ApplicationsDataGrid";
+import { ApplicationsBulkActionsBar } from "@/components/applications/ApplicationsBulkActionsBar";
 import { ApplicationsTableFooter } from "@/components/applications/ApplicationsTableFooter";
 import { ApplicationDetailsSheet } from "@/components/applications/ApplicationDetailsSheet";
 import { useRealtime } from "@/contexts/useRealtime";
 import { globalOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
 import { api } from "@/lib/api";
-import { patchApplicationAfterMutation } from "@/queries/applicationsCache";
+import {
+  patchApplicationAfterMutation,
+  refreshApplicationsList,
+  consumePendingNewApplication,
+} from "@/queries/applicationsCache";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { registerActiveListParams } from "@/services/realtime/cache/activeListParamsRegistry";
-import { useEffect } from "react";
+import { defaultApplicationsListParams } from "@/lib/normalizeApplicationsListParams";
 import { useAuthReady } from "@/auth/AuthContext";
 
 function ApplicationsDashboardInner() {
@@ -28,15 +35,37 @@ function ApplicationsDashboardInner() {
   const { broadcastRevive } = useRealtime();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [sheetTab, setSheetTab] = useState("overview");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection]
+  );
 
   useEffect(() => {
     registerActiveListParams(params);
+    return () => registerActiveListParams(defaultApplicationsListParams());
   }, [params]);
 
+  useEffect(() => {
+    if (consumePendingNewApplication()) {
+      patchParams({ page: 1, status: undefined, datePreset: undefined, q: undefined });
+    }
+  }, [patchParams]);
+
   const { isResolved, isAuthenticated } = useAuthReady();
-  const { data, isLoading, isFetching } = useQuery({
+
+  useEffect(() => {
+    if (!isResolved || !isAuthenticated) return;
+    void refreshApplicationsList(queryClient);
+  }, [queryClient, isResolved, isAuthenticated]);
+
+  useEffect(() => {
+    setRowSelection({});
+  }, [params.page, params.pageSize]);
+
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     ...getApplicationsListQueryOptions(params),
     enabled: isResolved && isAuthenticated,
     retry: (failureCount, error) => {
@@ -48,9 +77,8 @@ function ApplicationsDashboardInner() {
   const page = normalizeApplicationsListData(data ?? EMPTY_APPLICATIONS_LIST);
   const items = getApplicationsListItems(page);
 
-  const openDetails = (id: string, tab = "overview") => {
+  const openDetails = (id: string) => {
     setSelectedId(id);
-    setSheetTab(tab);
     setSheetOpen(true);
   };
 
@@ -76,7 +104,7 @@ function ApplicationsDashboardInner() {
   };
 
   const handleContinue = (id: string) => {
-    openDetails(id, "overview");
+    openDetails(id);
   };
 
   const handleSend = async (id: string) => {
@@ -100,16 +128,60 @@ function ApplicationsDashboardInner() {
     }
   };
 
+  const selectedApplications = useMemo(
+    () => items.filter((app) => selectedIds.includes(app.id)),
+    [items, selectedIds]
+  );
+
+  const handleBulkSend = async (ids: string[]) => {
+    if (actionId) return { queued: 0, failed: ids.length };
+    setActionId("bulk");
+    let queued = 0;
+    let failed = 0;
+    for (const id of ids) {
+      const reg = globalOrchestrationRegistry.get(id);
+      broadcastRevive(id, (reg?.orchestrationEpoch ?? 0) + 1);
+      try {
+        await api.send(id);
+        patchApplicationAfterMutation(queryClient, id, {
+          uiStatus: "sending",
+          pollable: true,
+          terminal: false,
+          canSend: false,
+        });
+        queued += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setActionId(null);
+    return { queued, failed };
+  };
+
+  if (isError && !items.length) {
+    return (
+      <>
+        <ApplicationsPageFilters isFetching={isFetching} />
+        <ApplicationsListErrorState
+          message={error instanceof Error ? error.message : "Request failed"}
+          onRetry={() => void refetch()}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <ApplicationsPageFilters isFetching={isFetching} />
-      <div className="rounded-[10px] bg-card shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="overflow-hidden">
         <ApplicationsDataGrid
           items={items}
           isLoading={isLoading}
           isFetching={isFetching}
           hasActiveFilters={hasActiveFilters}
           selectedId={sheetOpen ? selectedId : null}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
           onSelectRow={(id) => openDetails(id)}
           onRetry={handleRetry}
           onContinue={handleContinue}
@@ -132,7 +204,13 @@ function ApplicationsDashboardInner() {
           setSheetOpen(open);
           if (!open) setSelectedId(null);
         }}
-        initialTab={sheetTab}
+      />
+
+      <ApplicationsBulkActionsBar
+        selectedApplications={selectedApplications}
+        onBulkSend={handleBulkSend}
+        onClearSelection={() => setRowSelection({})}
+        sendBusy={actionId === "bulk"}
       />
     </>
   );

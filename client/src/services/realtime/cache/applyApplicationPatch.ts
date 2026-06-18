@@ -14,6 +14,8 @@ export function patchApplicationRow(
     pollable: event.pollable,
     canRetry: event.canRetry,
     canContinue: event.canContinue,
+    canSend: event.canSend,
     reviewReason: event.reviewReason ?? undefined,
+    trackerStatusId: event.trackerStatusId ?? app.trackerStatusId,
   };
 }

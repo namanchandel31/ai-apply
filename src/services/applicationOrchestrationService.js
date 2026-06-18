@@ -93,7 +93,10 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
     );
   });
 
-  enqueuePostCommitPublish(applicationId, userId, { source: "auto_apply" });
+  enqueuePostCommitPublish(applicationId, userId, {
+    source: "auto_apply",
+    forceRevive: true,
+  });
   await flushRealtimeAfterDbCommit([applicationId]);
 
   try {

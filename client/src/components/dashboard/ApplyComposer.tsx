@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, type ApiError } from "@/lib/api";
 import {
   EMAIL_LENGTH_OPTIONS,
   EMAIL_TONE_OPTIONS,
@@ -15,7 +15,13 @@ import {
   type ToneOptionId,
 } from "@/lib/emailPreferencePresets";
 import { trackPreferencesUpdated } from "@/lib/emailPreferenceEvents";
-import { upsertOptimisticApplication } from "@/queries/applicationsCache";
+import {
+  upsertOptimisticApplication,
+  removeOptimisticApplication,
+  refreshApplicationsList,
+  markPendingNewApplication,
+} from "@/queries/applicationsCache";
+import { buildPendingApplicationRow } from "@/lib/applicationRowState";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -157,24 +163,35 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
     }
 
     setSending(true);
+    const optimisticId = `pending-${crypto.randomUUID()}`;
+    upsertOptimisticApplication(
+      queryClient,
+      buildPendingApplicationRow({
+        id: optimisticId,
+        uiStatus: "processing",
+        role: previewMeta?.jobTitle ?? null,
+        company: previewMeta?.company ?? null,
+        matchScore: previewMeta?.matchScore ?? null,
+      })
+    );
 
     try {
       const applyRes = await api.autoApply(trimmedJd, {
         emailSubject: emailSubject.trim(),
         emailBody: emailBody.trim(),
       });
-      upsertOptimisticApplication(queryClient, {
-        id: applyRes.applicationId,
-        status: "draft",
-        uiStatus: "processing",
-        terminal: false,
-        pollable: true,
-        canRetry: false,
-        canContinue: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        jdEnrichment: "pending",
-      });
+      removeOptimisticApplication(queryClient, optimisticId);
+      upsertOptimisticApplication(
+        queryClient,
+        buildPendingApplicationRow({
+          id: applyRes.applicationId,
+          status: applyRes.status || "draft",
+          uiStatus: "processing",
+          role: previewMeta?.jobTitle ?? null,
+          company: previewMeta?.company ?? null,
+          matchScore: previewMeta?.matchScore ?? null,
+        })
+      );
 
       if (isAutoMode) {
         toast.success("Application sent — your email is going out automatically.", {
@@ -186,10 +203,52 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
         });
       }
 
+      markPendingNewApplication(applyRes.applicationId);
       clearComposer();
+      void refreshApplicationsList(queryClient);
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Application flow failed");
+      const message = err instanceof Error ? err.message : "Application flow failed";
+      const applicationId =
+        err instanceof Error && "meta" in err
+          ? (err as ApiError).meta?.applicationId as string | undefined
+          : undefined;
+
+      removeOptimisticApplication(queryClient, optimisticId);
+      if (applicationId) {
+        upsertOptimisticApplication(
+          queryClient,
+          buildPendingApplicationRow({
+            id: applicationId,
+            uiStatus: "failed",
+            status: "failed",
+            terminal: true,
+            pollable: false,
+            canRetry: true,
+            lastError: message,
+            role: previewMeta?.jobTitle ?? null,
+            company: previewMeta?.company ?? null,
+            matchScore: previewMeta?.matchScore ?? null,
+          })
+        );
+      } else {
+        upsertOptimisticApplication(
+          queryClient,
+          buildPendingApplicationRow({
+            id: optimisticId,
+            uiStatus: "failed",
+            status: "failed",
+            terminal: true,
+            pollable: false,
+            canRetry: false,
+            lastError: message,
+            role: previewMeta?.jobTitle ?? null,
+            company: previewMeta?.company ?? null,
+            matchScore: previewMeta?.matchScore ?? null,
+          })
+        );
+      }
+      toast.error(message);
       return false;
     } finally {
       setSending(false);
@@ -203,6 +262,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
     previewStale,
     emailSubject,
     emailBody,
+    previewMeta,
     isAutoMode,
     queryClient,
     clearComposer,
