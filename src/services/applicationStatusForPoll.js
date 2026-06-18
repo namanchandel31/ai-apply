@@ -35,6 +35,7 @@ function serializeApplicationFromSnapshot(row) {
     sentAt: row.sent_at,
     completedAt: row.completed_at,
     matchScore: row.match_score ?? null,
+    trackerStatusId: row.tracker_status_id ?? null,
   };
 }
 

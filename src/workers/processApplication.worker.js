@@ -28,6 +28,7 @@ const { generateApplicationEmail } = require("../services/emailService");
 const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
 const { getEmailPreferenceLevels, getUserApplyMode } = require("../models/userModel");
 const { shouldEnqueueSendAfterGeneration } = require("../services/applyModeService");
+const { autoAssignEmailReadyTrackerStatus } = require("../services/applicationTrackerStatusAssignment");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
 const { logInfo, logError } = require("../utils/logger");
@@ -241,6 +242,8 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       });
       if (!tr.ok) throw new Error("Failed to transition to needs_review");
 
+      await autoAssignEmailReadyTrackerStatus(userId, applicationId, client);
+
       await recordEvent(
         {
           applicationId,
@@ -269,6 +272,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
 
     const applyMode = await getUserApplyMode(userId, client);
     if (!shouldEnqueueSendAfterGeneration(applyMode)) {
+      await autoAssignEmailReadyTrackerStatus(userId, applicationId, client);
       await recordEvent(
         {
           applicationId,

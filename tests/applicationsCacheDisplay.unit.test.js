@@ -8,6 +8,18 @@ function shouldApplyDisplayPatch(existing, incoming) {
   return incoming.updatedAt >= existing.updatedAt;
 }
 
+function shouldInsertNewRowIntoList(params, row) {
+  if (params.page !== 1) return false;
+  if (params.q?.trim()) return false;
+  if (params.datePreset) return false;
+  if (params.status?.length) {
+    const appStatus = (row.status || "").toLowerCase();
+    const allowed = params.status.map((s) => s.toLowerCase());
+    if (!allowed.includes(appStatus)) return false;
+  }
+  return true;
+}
+
 describe("shouldApplyDisplayPatch", () => {
   it("rejects older updatedAt so stale SSE cannot overwrite newer role", () => {
     const existing = {
@@ -45,6 +57,24 @@ describe("shouldApplyDisplayPatch", () => {
         { updatedAt: "2026-05-20T12:00:00.000Z" },
         { role: "X" }
       )
+    ).toBe(false);
+  });
+});
+
+describe("shouldInsertNewRowIntoList", () => {
+  it("matches application_status filters, not uiStatus alone", () => {
+    const params = { page: 1, pageSize: 20, status: ["draft"] };
+    expect(
+      shouldInsertNewRowIntoList(params, {
+        status: "draft",
+        uiStatus: "processing",
+      })
+    ).toBe(true);
+    expect(
+      shouldInsertNewRowIntoList(params, {
+        status: "generated",
+        uiStatus: "generated",
+      })
     ).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ const { metrics } = require("../observability/orchestrationMetrics");
 const { getJobById } = require("../models/applicationJobModel");
 const { validateApplicationsListQuery } = require("../schemas/validateApplicationsListQuery");
 const { serializeApplicationsListResult } = require("../services/applicationListSerializer");
+const { syncDefaultApplicationTrackerStatuses, getTrackerStatusOptions } = require("../services/trackerStatusService");
 const { serializeApplicationDetail } = require("../services/applicationDetailSerializer");
 const { listEventsForApplication } = require("../models/applicationEventModel");
 const {
@@ -25,6 +26,7 @@ const {
   retryApplication,
   cancelApplication,
   patchApplicationEmail,
+  patchApplicationCompany,
 } = require("../services/applicationCommandService");
 const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
@@ -93,6 +95,8 @@ const listApplicationsController = async (req, res) => {
       });
     }
 
+    await getTrackerStatusOptions(req.user.id);
+    await syncDefaultApplicationTrackerStatuses(req.user.id);
     const { rows } = await listApplicationsPaginated(req.user.id, validated.data);
     const data = serializeApplicationsListResult(rows, validated.data);
     return ok(res, data);
@@ -297,6 +301,23 @@ const patchApplicationEmailController = async (req, res) => {
   }
 };
 
+const patchApplicationCompanyController = async (req, res) => {
+  try {
+    const { companyName } = req.body || {};
+    await patchApplicationCompany(
+      req.user.id,
+      req.params.id,
+      { companyName },
+      req.requestId
+    );
+    const row = await getApplicationById(req.params.id, req.user.id);
+    const detail = serializeApplicationDetail(row);
+    return ok(res, detail);
+  } catch (err) {
+    return handleCommandError(res, err, req);
+  }
+};
+
 const getApplicationJobController = async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
@@ -338,6 +359,7 @@ module.exports = {
   retryApplicationController,
   cancelApplicationController,
   patchApplicationEmailController,
+  patchApplicationCompanyController,
   getApplicationJobController,
   listApplicationsLegacyController,
 };

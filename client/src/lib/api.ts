@@ -13,6 +13,7 @@ export type ApiError = Error & {
   code?: string;
   retryable?: boolean;
   retryAfterMs?: number;
+  meta?: Record<string, unknown>;
 };
 
 export type RequestOptions = RequestInit & {
@@ -78,13 +79,15 @@ function parseApiErrorBody(body: Record<string, unknown>): {
   message: string;
   code?: string;
   retryable?: boolean;
+  meta?: Record<string, unknown>;
 } {
-  const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean } }).error;
+  const e = (body as { error?: string | { code?: string; message?: string; retryable?: boolean; meta?: Record<string, unknown> } }).error;
   if (typeof e === "object" && e !== null) {
     return {
       message: e.message ?? "Request failed",
       code: e.code ?? parseApiErrorCode(body),
       retryable: e.retryable,
+      meta: e.meta,
     };
   }
   if (ENABLE_LEGACY_ERROR_COMPAT && typeof e === "string") {
@@ -121,7 +124,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
-    const { message, code, retryable } = parseApiErrorBody(body);
+    const { message, code, retryable, meta } = parseApiErrorBody(body);
     const authCtx: AuthErrorContext = { status: res.status, code };
 
     if (
@@ -143,6 +146,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     err.status = res.status;
     err.code = code;
     err.retryable = retryable ?? shouldRetryAfterAuthError(authCtx);
+    if (meta) err.meta = meta;
     if (res.status === 429) {
       err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
     }
@@ -184,7 +188,7 @@ async function requestApplicationStatus(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
-    const { message, code, retryable } = parseApiErrorBody(body);
+    const { message, code, retryable, meta } = parseApiErrorBody(body);
     const authCtx: AuthErrorContext = { status: res.status, code };
 
     if (res.status === 401 || res.status === 403) {
@@ -195,6 +199,7 @@ async function requestApplicationStatus(
     err.status = res.status;
     err.code = code;
     err.retryable = retryable ?? shouldRetryAfterAuthError(authCtx);
+    if (meta) err.meta = meta;
     if (res.status === 429) {
       err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
     }
@@ -434,6 +439,17 @@ export const api = {
   ) {
     return request<{ success: boolean; data: ApplicationDetailRecord }>(
       `/api/applications/${applicationId}/email`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+  },
+
+  patchApplicationCompany(applicationId: string, body: { companyName: string }) {
+    return request<{ success: boolean; data: ApplicationDetailRecord }>(
+      `/api/applications/${applicationId}/company`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -722,6 +738,28 @@ export const api = {
     });
   },
 
+  bulkSetApplicationTrackerStatus(applicationIds: string[], trackerStatusId: string | null) {
+    return request<{
+      success: boolean;
+      data: { updatedCount: number; trackerStatusId: string | null };
+    }>("/api/applications/bulk/tracker-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicationIds, trackerStatusId }),
+    });
+  },
+
+  bulkDeleteApplications(applicationIds: string[]) {
+    return request<{
+      success: boolean;
+      data: { deletedCount: number; deletedIds: string[] };
+    }>("/api/applications/bulk/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicationIds }),
+    });
+  },
+
   getTrackerStatusSummary() {
     return request<{
       success: boolean;
@@ -750,6 +788,7 @@ export type ApplicationStatusPayload = {
   company?: string | null;
   matchScore?: number | null;
   jdEnrichment?: JdEnrichmentState;
+  trackerStatusId?: string | null;
 };
 
 export type ApplicationsListSortField =

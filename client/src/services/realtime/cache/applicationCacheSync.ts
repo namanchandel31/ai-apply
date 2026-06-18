@@ -14,7 +14,11 @@ import { logDebug } from "@/services/logging/orchestrationLogger";
 import { metrics } from "@/services/logging/metricsHooks";
 import { isDebugEnabled } from "@/services/logging/debugFlags";
 import { applicationsListQueryKey } from "@/queries/applicationsListQuery";
-import { EMAIL_SENT_TRACKER_STATUS_ID } from "@/lib/trackerStatusColors";
+import {
+  forEachApplicationsListQuery,
+  shouldInsertNewRowIntoList,
+} from "@/queries/applicationsCache";
+import { EMAIL_READY_TRACKER_STATUS_ID, EMAIL_SENT_TRACKER_STATUS_ID } from "@/lib/trackerStatusColors";
 import { getActiveListParams } from "./activeListParamsRegistry";
 import {
   normalizeApplicationsListData,
@@ -78,7 +82,8 @@ function buildPartialRow(event: ApplicationUpdatedPayload): ApplicationRecord {
 function applyPatchToPaginatedList(
   current: ApplicationsListResponse | ApplicationRecord[] | undefined,
   applicationId: string,
-  buildPatch: (existing: ApplicationRecord | undefined) => Partial<ApplicationRecord> | null
+  buildPatch: (existing: ApplicationRecord | undefined) => Partial<ApplicationRecord> | null,
+  allowInsert = true
 ): ApplicationsListResponse | undefined {
   const page = normalizeApplicationsListData(current);
   const items = page.items ?? [];
@@ -104,6 +109,10 @@ function applyPatchToPaginatedList(
     delete merged._partial;
     nextItems[idx] = merged;
     return { ...page, items: nextItems };
+  }
+
+  if (!allowInsert) {
+    return current as ApplicationsListResponse | undefined;
   }
 
   const partial = buildPartialRow({
@@ -166,8 +175,15 @@ function buildEventRowPatch(
   });
   const merged = { ...orch, ...display };
   const incomingUi = event.uiStatus || event.status;
-  if (incomingUi === "sent") {
+  if (event.trackerStatusId) {
+    merged.trackerStatusId = event.trackerStatusId;
+  } else if (incomingUi === "sent") {
     merged.trackerStatusId = EMAIL_SENT_TRACKER_STATUS_ID;
+  } else if (
+    incomingUi === "needs_review" ||
+    (incomingUi === "generated" && event.canSend)
+  ) {
+    merged.trackerStatusId = EMAIL_READY_TRACKER_STATUS_ID;
   }
   if (
     isDebugEnabled("reconciliation") &&
@@ -210,22 +226,33 @@ export function applyRealtimeEventsToCache(
   const valid = events.filter((e) => !e.type || e.type === "application.updated");
   if (!valid.length) return;
 
-  const listKey = applicationsListQueryKey(getActiveListParams());
-  queryClient.setQueryData<ApplicationsListResponse>(listKey, (current) => {
-    let page = normalizeApplicationsListData(current);
-    for (const event of valid) {
-      const registry = globalOrchestrationRegistry.get(event.applicationId);
-      const registryEpoch = registry?.orchestrationEpoch ?? 0;
-      const next = applyPatchToPaginatedList(page, event.applicationId, (existing) =>
-        buildEventRowPatch(event, existing, registryEpoch)
-      );
-      if (next) {
-        page = normalizeApplicationsListData(next);
+  forEachApplicationsListQuery(queryClient, (queryKey, params) => {
+    queryClient.setQueryData<ApplicationsListResponse>(queryKey, (current) => {
+      let page = normalizeApplicationsListData(current);
+      for (const event of valid) {
+        const registry = globalOrchestrationRegistry.get(event.applicationId);
+        const registryEpoch = registry?.orchestrationEpoch ?? 0;
+        const rowFromEvent = {
+          id: event.applicationId,
+          status: event.status || "draft",
+          uiStatus: event.uiStatus || event.status || "draft",
+        } as ApplicationRecord;
+        const allowInsert = shouldInsertNewRowIntoList(params, rowFromEvent);
+        const next = applyPatchToPaginatedList(
+          page,
+          event.applicationId,
+          (existing) => buildEventRowPatch(event, existing, registryEpoch),
+          allowInsert
+        );
+        if (next) {
+          page = normalizeApplicationsListData(next);
+        }
       }
-    }
-    return page;
+      return page;
+    });
   });
 
+  const listKey = applicationsListQueryKey(getActiveListParams());
   const page = normalizeApplicationsListData(
     queryClient.getQueryData<ApplicationsListResponse>(listKey)
   );

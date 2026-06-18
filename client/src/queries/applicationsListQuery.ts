@@ -10,9 +10,10 @@ export function applicationsListQueryKey(params: ApplicationsListParams) {
 }
 
 const sharedQueryOptions = {
-  refetchOnMount: false as const,
+  // Always reconcile with server when the Applications view mounts (hard refresh / tab return).
+  refetchOnMount: "always" as const,
   refetchOnWindowFocus: false as const,
-  refetchOnReconnect: false as const,
+  refetchOnReconnect: true as const,
 };
 
 export function getApplicationsListQueryOptions(params: ApplicationsListParams) {

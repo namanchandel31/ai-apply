@@ -397,9 +397,82 @@ async function patchApplicationEmail(userId, applicationId, { emailSubject, emai
   return updated;
 }
 
+async function patchApplicationCompany(userId, applicationId, { companyName }, reqId) {
+  if (typeof companyName !== "string") {
+    const err = new Error("companyName must be a string");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  const trimmedCompany = companyName.trim();
+  if (!trimmedCompany) {
+    const err = new Error("companyName must be non-empty");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+  if (trimmedCompany.length > 200) {
+    const err = new Error("companyName exceeds 200 characters");
+    err.code = "BAD_REQUEST";
+    throw err;
+  }
+
+  const app = await getApplicationById(applicationId, userId);
+  if (!app) {
+    const err = new Error("Application not found");
+    err.code = "NOT_FOUND";
+    throw err;
+  }
+
+  const normalizedCompany = trimmedCompany.toLowerCase();
+  const updated = await withPgTransaction(pool, async (client) => {
+    const jdUpdate = await client.query(
+      `UPDATE job_descriptions jd
+       SET company_name = $3
+       FROM applications a
+       WHERE a.job_description_id = jd.id
+         AND a.id = $1
+         AND a.user_id = $2
+       RETURNING jd.id`,
+      [applicationId, userId, trimmedCompany]
+    );
+    if (!jdUpdate.rows[0]) {
+      const err = new Error("Application not found");
+      err.code = "NOT_FOUND";
+      throw err;
+    }
+
+    return updateApplicationFields(
+      applicationId,
+      {
+        normalized_company_name: normalizedCompany,
+        source_company_name: trimmedCompany,
+      },
+      userId,
+      client
+    );
+  });
+
+  if (!updated) {
+    const err = new Error("Failed to update application company");
+    err.code = "INTERNAL_ERROR";
+    throw err;
+  }
+
+  await recordEvent({
+    applicationId,
+    eventType: "company_name_edited",
+    actorType: "user",
+    actorId: String(userId),
+    metadata: { reqId },
+  });
+
+  return updated;
+}
+
 module.exports = {
   continueApplication,
   retryApplication,
   cancelApplication,
   patchApplicationEmail,
+  patchApplicationCompany,
 };
