@@ -182,6 +182,8 @@ async function collectRuntimeDiagnostics() {
 }
 
 function startRuntimeDiagnostics(intervalMs = 30000) {
+  const config = require("../config");
+  if (config.server.isProduction) return;
   if (diagnosticsTimer) return;
 
   const tick = async () => {
@@ -202,9 +204,17 @@ function startRuntimeDiagnostics(intervalMs = 30000) {
   }
 }
 
+function resetRuntimeDiagnosticsForTests() {
+  if (diagnosticsTimer) {
+    clearInterval(diagnosticsTimer);
+    diagnosticsTimer = null;
+  }
+}
+
 module.exports = {
   registerProcessLifecycleHandlers,
   startRuntimeDiagnostics,
+  resetRuntimeDiagnosticsForTests,
   collectRuntimeDiagnostics,
   inferSubsystemFromStack,
   markBootPhaseComplete,

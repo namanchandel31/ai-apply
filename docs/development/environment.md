@@ -46,7 +46,7 @@ Copy to `client/.env`:
 
 | Constant | Location |
 |----------|----------|
-| Worker concurrency (process: 2, send: 3) | `queue.config.js` |
+| Worker concurrency (process: 1, send: 1) | `queue.config.js` |
 | Job max attempts | `queue.config.js` |
 | LLM timeouts, circuit breaker | `ai.config.js` |
 | Platform AI provider/model | `ai.config.js` (`openai`, `gpt-4.1-mini`) |

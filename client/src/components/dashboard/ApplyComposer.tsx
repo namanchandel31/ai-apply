@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { api, type ApiError } from "@/lib/api";
-import {
-  EMAIL_LENGTH_OPTIONS,
-  EMAIL_TONE_OPTIONS,
-  resolveLengthOption,
-  resolveToneOption,
-  structureForLengthOption,
-  toneForToneOption,
-  type LengthOptionId,
-  type PresetId,
-  type ToneOptionId,
-} from "@/lib/emailPreferencePresets";
-import { trackPreferencesUpdated } from "@/lib/emailPreferenceEvents";
+import { useEmailPreferences } from "@/hooks/useEmailPreferences";
+import { EmailStyleControls } from "@/components/EmailStyleControls";
 import {
   upsertOptimisticApplication,
   removeOptimisticApplication,
@@ -26,11 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { LoadingTimer } from "@/components/loading-timer";
 import { cn } from "@/lib/utils";
 
-const EMAIL_PREFS_QUERY_KEY = ["email-preferences"] as const;
 const PREVIEW_DEBOUNCE_MS = 800;
 const PANEL_HEIGHT = "h-[580px]";
 const LABEL_ROW = "flex min-h-7 items-center justify-between gap-2";
@@ -48,7 +36,7 @@ type Props = {
 export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason }: Props) {
   const isAutoMode = autoApplyEnabled;
   const queryClient = useQueryClient();
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefs = useEmailPreferences();
   const previewRequestRef = useRef(0);
   const autoSubmitJdRef = useRef<string | null>(null);
   const [jdText, setJdText] = useState("");
@@ -60,71 +48,9 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
     company?: string | null;
     matchScore?: number;
   } | null>(null);
-  const [toneOverride, setToneOverride] = useState<number | null>(null);
-  const [structureOverride, setStructureOverride] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [emailStyleOpen, setEmailStyleOpen] = useState(true);
-
-  const { data: emailPrefs } = useQuery({
-    queryKey: EMAIL_PREFS_QUERY_KEY,
-    queryFn: async () => {
-      const res = await api.getEmailPreferences();
-      return res.data;
-    },
-  });
-
-  const toneLevel = toneOverride ?? emailPrefs?.emailToneLevel ?? 50;
-  const structureLevel = structureOverride ?? emailPrefs?.emailStructureLevel ?? 60;
-  const lengthOption = resolveLengthOption(structureLevel);
-  const toneOption = resolveToneOption(toneLevel);
-  const lengthLabel =
-    EMAIL_LENGTH_OPTIONS.find((o) => o.id === lengthOption)?.label ?? "Medium";
-  const toneLabel = EMAIL_TONE_OPTIONS.find((o) => o.id === toneOption)?.label ?? "Balanced";
-
-  const patchMutation = useMutation({
-    mutationFn: (body: { emailToneLevel: number; emailStructureLevel: number }) =>
-      api.patchEmailPreferences(body),
-    onSuccess: (res) => {
-      queryClient.setQueryData(EMAIL_PREFS_QUERY_KEY, res.data);
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to save email style");
-    },
-  });
-
-  const schedulePatch = useCallback(
-    (nextTone: number, nextStructure: number) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        patchMutation.mutate(
-          { emailToneLevel: nextTone, emailStructureLevel: nextStructure },
-          {
-            onSuccess: (res) => {
-              trackPreferencesUpdated({
-                emailToneLevel: res.data.emailToneLevel,
-                emailStructureLevel: res.data.emailStructureLevel,
-                selectedPreset: res.data.selectedPreset as PresetId,
-              });
-            },
-          }
-        );
-      }, 400);
-    },
-    [patchMutation]
-  );
-
-  const handleLengthChange = (id: LengthOptionId) => {
-    const nextStructure = structureForLengthOption(id);
-    setStructureOverride(nextStructure);
-    schedulePatch(toneLevel, nextStructure);
-  };
-
-  const handleToneChange = (id: ToneOptionId) => {
-    const nextTone = toneForToneOption(id);
-    setToneOverride(nextTone);
-    schedulePatch(nextTone, structureLevel);
-  };
 
   const trimmedJd = jdText.trim();
   const hasJdContent = trimmedJd.length > 0;
@@ -135,10 +61,6 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
 
   useEffect(() => {
     autoSubmitJdRef.current = null;
-    if (isAutoMode) {
-      setToneOverride(null);
-      setStructureOverride(null);
-    }
   }, [autoApplyEnabled, isAutoMode]);
 
   const clearComposer = useCallback(() => {
@@ -330,7 +252,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
     }, PREVIEW_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmedJd, canApply, toneLevel, structureLevel]);
+  }, [trimmedJd, canApply, prefs.toneLevel, prefs.structureLevel]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,25 +363,17 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                                   "transition-opacity duration-150 ease-in"
                                 )}
                               >
-                                {lengthLabel} · {toneLabel}
+                                {prefs.lengthLabel} · {prefs.toneLabel}
                               </span>
                             )}
                           </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {patchMutation.isPending && (
-                              <span className={cn(PREVIEW_TEXT_SECONDARY, "flex items-center gap-1")}>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Saving…
-                              </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-in",
+                              emailStyleOpen && "rotate-180"
                             )}
-                            <ChevronDown
-                              className={cn(
-                                "h-4 w-4 text-muted-foreground transition-transform duration-150 ease-in",
-                                emailStyleOpen && "rotate-180"
-                              )}
-                              aria-hidden
-                            />
-                          </div>
+                            aria-hidden
+                          />
                         </button>
                         <div
                           className={cn(
@@ -468,26 +382,14 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                           )}
                         >
                           <div className="overflow-hidden">
-                            <div className="grid grid-cols-2 gap-3 px-3 pb-3 pt-3 mt-3 border-t border-black/[0.06]">
-                              <SegmentedControl
-                                label="Length"
-                                value={lengthOption}
-                                options={EMAIL_LENGTH_OPTIONS.map((o) => ({
-                                  value: o.id,
-                                  label: o.label,
-                                }))}
-                                onValueChange={handleLengthChange}
+                            <div className="px-3 pb-3 pt-3 mt-3 border-t border-black/[0.06]">
+                              <EmailStyleControls
+                                lengthOption={prefs.lengthOption}
+                                toneOption={prefs.toneOption}
+                                onLengthChange={prefs.setLengthOption}
+                                onToneChange={prefs.setToneOption}
                                 disabled={busy}
-                              />
-                              <SegmentedControl
-                                label="Tone"
-                                value={toneOption}
-                                options={EMAIL_TONE_OPTIONS.map((o) => ({
-                                  value: o.id,
-                                  label: o.label,
-                                }))}
-                                onValueChange={handleToneChange}
-                                disabled={busy}
+                                isSaving={prefs.isSaving}
                               />
                             </div>
                           </div>

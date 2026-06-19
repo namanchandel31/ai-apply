@@ -91,6 +91,12 @@ function buildTargetedRewriteGuidance(critique, draft = {}) {
   const paras = splitParagraphs(draft.body || "");
   const guidance = [];
 
+  if (/greeting|signoff|sender_name|envelope/i.test(critique)) {
+    guidance.push(
+      "REWRITE to add mandatory envelope: salutation on line 1, body paragraphs, sign-off phrase, then sender full name on the last line. Use blank lines between sections."
+    );
+  }
+
   if (/opening|first|preview|generic/i.test(critique)) {
     guidance.push(
       `REWRITE ONLY paragraph 1 (opening): ${paras[0]?.slice(0, 60) || "opening"}... — keep other paragraphs unchanged.`

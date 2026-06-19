@@ -5,8 +5,8 @@ const WORKER_MODE = str("WORKER_MODE", "separate").toLowerCase();
 
 /** Code-only — do not expose via env. Scale via worker replicas. */
 const WORKER_CONCURRENCY = {
-  process: 2,
-  send: 3,
+  process: 1,
+  send: 1,
 };
 
 const SEND_JOB_MAX_ATTEMPTS = 5;

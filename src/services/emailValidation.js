@@ -223,6 +223,21 @@ function hasSignoffLikeClosing(body) {
   );
 }
 
+function hasSenderName(body, candidateName) {
+  if (!candidateName?.trim()) return true;
+  const lines = body
+    .trim()
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return false;
+  const lastLine = lines[lines.length - 1].toLowerCase();
+  const normalizedName = candidateName.trim().toLowerCase();
+  const nameParts = normalizedName.split(/\s+/).filter(Boolean);
+  const lastName = nameParts[nameParts.length - 1];
+  return lastLine === normalizedName || (lastName && lastLine.includes(lastName));
+}
+
 function validateEmailStructure(body, context = {}) {
   const validationWarnings = [];
   const hardFailures = [];
@@ -248,10 +263,17 @@ function validateEmailStructure(body, context = {}) {
   }
 
   if (!hasGreetingLikeOpening(body)) {
-    validationWarnings.push("structure:greeting_missing");
+    hardFailures.push("broken_structure:greeting_missing");
   }
   if (!hasSignoffLikeClosing(body)) {
-    validationWarnings.push("structure:signoff_missing");
+    hardFailures.push("broken_structure:signoff_missing");
+  }
+  if (!hasSenderName(body, context.candidate?.name)) {
+    hardFailures.push("broken_structure:sender_name_missing");
+  }
+
+  if (paras.length < 2 && wc > 40) {
+    hardFailures.push("broken_structure:missing_paragraph_separation");
   }
 
   const range = context.emailPreferences?.targetWordRange;
