@@ -35,23 +35,37 @@ registerShutdownHook("postgres", async () => {
 }, { priority: 10 });
 
 async function startAll() {
+  const workersEnabled = process.env.ENABLE_WORKERS !== "false";
+
   logInfo("BOOTSTRAP_START", {
     component: "bootstrap",
     mode: "combined",
     workerMode: config.queue.workerDeploymentMode(),
+    workersEnabled,
     port: config.server.port,
   });
 
   // COMBINED STARTUP ORDER (do not reorder):
-  // 1. startWorkers() — validates Redis + starts BullMQ consumers
+  // 1. startWorkers() — validates Redis + starts BullMQ consumers (optional: ENABLE_WORKERS=false)
   // 2. startApi()     — validates Redis again (idempotent) + binds HTTP
-  await startWorkers();
+  if (workersEnabled) {
+    await startWorkers();
+  } else {
+    logInfo("WORKERS_DISABLED_BY_CONFIG", {
+      component: "bootstrap",
+      enableWorkers: process.env.ENABLE_WORKERS ?? "(unset)",
+    });
+  }
+
   await startApi();
 
   logInfo("BOOTSTRAP_READY", {
     component: "bootstrap",
     port: config.server.port,
-    workers: ["process-application", "send-application"],
+    workersEnabled,
+    workers: workersEnabled
+      ? ["process-application", "send-application"]
+      : [],
   });
 }
 
