@@ -81,8 +81,8 @@ export type ToneOptionId = "casual" | "balanced" | "executive";
 
 /** Three-option length control → emailStructureLevel (conversational / balanced / scannable). */
 export const EMAIL_LENGTH_OPTIONS: { id: LengthOptionId; label: string; structure: number }[] = [
-  { id: "short", label: "Short", structure: 25 },
-  { id: "medium", label: "Medium", structure: 60 },
+  { id: "short", label: "Short", structure: 15 },
+  { id: "medium", label: "Medium", structure: 50 },
   { id: "long", label: "Long", structure: 85 },
 ];
 
@@ -112,7 +112,7 @@ export function resolveToneOption(toneLevel: number): ToneOptionId {
 }
 
 export function structureForLengthOption(id: LengthOptionId): number {
-  return EMAIL_LENGTH_OPTIONS.find((o) => o.id === id)?.structure ?? 60;
+  return EMAIL_LENGTH_OPTIONS.find((o) => o.id === id)?.structure ?? 50;
 }
 
 export function toneForToneOption(id: ToneOptionId): number {

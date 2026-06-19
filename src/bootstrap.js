@@ -42,6 +42,9 @@ async function startAll() {
     port: config.server.port,
   });
 
+  // COMBINED STARTUP ORDER (do not reorder):
+  // 1. startWorkers() — validates Redis + starts BullMQ consumers
+  // 2. startApi()     — validates Redis again (idempotent) + binds HTTP
   await startWorkers();
   await startApi();
 

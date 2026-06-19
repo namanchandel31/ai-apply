@@ -1,4 +1,4 @@
-const PROMPT_VERSION = "email_generate_v3";
+const PROMPT_VERSION = "email_generate_v4";
 
 const SYSTEM_PROMPT_BASE = `You write real job application emails that sound like a competent professional reaching out directly.
 
@@ -9,6 +9,14 @@ Output ONLY valid JSON:
   "subject": "string (5-120 chars)",
   "body": "string (plain text)"
 }
+
+MANDATORY EMAIL SHAPE (every body must follow this letter format):
+1. Salutation on its own first line (e.g. "Hi," or "Hello,")
+2. Body paragraphs in the middle (tone/length/structure guidance applies HERE only)
+3. Sign-off phrase on its own line before the name (e.g. "Best regards," or "Thanks,")
+4. Sender full name on the final line (from candidate data)
+
+Use blank lines between salutation, body paragraphs, sign-off, and name. Never output one uninterrupted paragraph for the entire email.
 
 STRICT BANS (never use):
 - "I am excited to apply", "I believe my skills align", "thank you for your consideration"
@@ -91,18 +99,54 @@ function formatUserToneBlock(toneProfile) {
   return `User tone profile (${toneProfile}): ${hints[toneProfile] || hints.balanced}`;
 }
 
-function formatStructureBlock(structureMode) {
-  const blocks = {
-    conversational:
-      "Structure: 2-3 flowing paragraphs. Natural transitions. Minimal line breaks.",
-    balanced:
-      "Structure: Greeting, opening hook, fit paragraph (2-4 specific points), brief resume mention, CTA, sign-off. Use blank lines between sections.",
-    structured:
-      "Structure: Clearly separated sections with blank lines — greeting, hook, why I fit (short lines or tight paragraph), resume mention, CTA, sign-off.",
-    highly_scannable:
-      "Structure: Greeting, one-line hook, fit as 2-5 short lines each starting with - (plain hyphen bullets only, no markdown), brief resume mention, CTA, sign-off. Optimize for mobile skim.",
+function formatEnvelopeBlock(candidate, toneProfile) {
+  const senderName = candidate?.name?.trim() || null;
+  const salutationByTone = {
+    casual: 'Use "Hi," or "Hello," as the salutation (first line).',
+    balanced: 'Use "Hi," or "Hello," as the salutation (first line).',
+    professional: 'Use "Hello," or "Dear Hiring Team," as the salutation (first line).',
+    executive: 'Use "Dear Hiring Manager," or "Dear [Name]," if personalization provides a name.',
   };
-  return blocks[structureMode] || blocks.balanced;
+  const signoffByTone = {
+    casual: 'Use "Thanks," or "Best," as the sign-off line.',
+    balanced: 'Use "Best regards," or "Thank you," as the sign-off line.',
+    professional: 'Use "Best regards," or "Sincerely," as the sign-off line.',
+    executive: 'Use "Sincerely," or "Best regards," as the sign-off line.',
+  };
+
+  const lines = [
+    "Envelope (fixed for every email; tone affects salutation/sign-off wording only):",
+    `- Salutation: ${salutationByTone[toneProfile] || salutationByTone.balanced}`,
+    "- Body: middle section only (see structure/length guidance below)",
+    `- Sign-off: ${signoffByTone[toneProfile] || signoffByTone.balanced}`,
+  ];
+
+  if (senderName) {
+    lines.push(`- Sender name: end with exactly "${senderName}" on the last line after the sign-off`);
+  } else {
+    lines.push("- Sender name: end with the candidate name from provided data on the last line");
+  }
+
+  lines.push(
+    "Put a blank line after the salutation, between body paragraphs, before the sign-off, and before the sender name."
+  );
+
+  return lines.join("\n");
+}
+
+function formatStructureBlock(structureMode) {
+  const bodyLayouts = {
+    conversational:
+      "1-2 short body paragraphs between salutation and sign-off. Natural flow.",
+    balanced:
+      "body paragraphs for: opening hook, fit (2-4 specifics), brief resume mention, one-line CTA.",
+    structured:
+      "clearly separated body paragraphs: hook, fit evidence, resume mention, CTA (blank line between each).",
+    highly_scannable:
+      "body: one-line hook, then 2-5 fit lines each starting with - (hyphen bullets only), resume mention, CTA.",
+  };
+  const layout = bodyLayouts[structureMode] || bodyLayouts.balanced;
+  return `Middle body layout (${structureMode}): ${layout} Length/tone sliders control this middle section only.`;
 }
 
 function formatLengthGuidance(targetWordRange, seniorityBand) {
@@ -158,6 +202,8 @@ function buildEmailUserPrompt({
   }
 
   const prefBlocks = [];
+  const toneProfile = emailPreferences?.toneProfile || "balanced";
+  prefBlocks.push(formatEnvelopeBlock(candidate, toneProfile));
   if (emailPreferences?.toneProfile) {
     prefBlocks.push(formatUserToneBlock(emailPreferences.toneProfile));
   }
@@ -221,6 +267,7 @@ function buildRetryUserPrompt({
     priorDraft.body,
     "",
     "Output revised JSON with subject and body. Same rules as initial generation.",
+    "Preserve mandatory envelope: salutation line, body paragraphs, sign-off line, sender name on final line.",
   ].join("\n");
 }
 
@@ -232,4 +279,5 @@ module.exports = {
   buildRetryUserPrompt,
   formatUserToneBlock,
   formatStructureBlock,
+  formatEnvelopeBlock,
 };

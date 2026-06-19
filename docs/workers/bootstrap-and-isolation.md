@@ -6,15 +6,17 @@
 
 | Mode | When |
 |------|------|
+| **combined** | `WORKER_MODE=combined` or `npm start` (`bootstrap.js`) — recommended for current Render deploy |
 | **inline** | `NODE_ENV=development`, API process, not worker argv |
-| **separate** | Production API, or `npm run worker` |
+| **separate** | Split API (`npm run start:api`) + worker (`npm run worker`) — use when scaling |
 
-`workerDeploymentMode()` returns `inline` | `separate`.
+`workerDeploymentMode()` returns `combined` | `inline` | `separate`.
 
 ## Production
 
-- API: **never** loads worker modules
-- Workers: dedicated process(es), scale replicas
+**Default (current scale):** combined — API + workers in one process via `bootstrap.js`.
+
+**Scale-out:** split into dedicated API and worker service(s); scale worker replicas independently.
 
 ## Development
 

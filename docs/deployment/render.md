@@ -44,3 +44,19 @@ Set `VITE_API_URL` to your Render service URL (e.g. `https://ai-apply-api.onrend
 | Combined (current) | `npm start` |
 
 No code changes required — only the start command and `WORKER_MODE`.
+
+
+## Scaling / split services
+
+When traffic grows, split without code changes:
+
+| Service | Start command | `WORKER_MODE` |
+|---------|---------------|-----------------|
+| API | `npm run start:api` | `separate` |
+| Worker | `npm run worker` | `separate` |
+
+Suspend the combined service after split is verified. Keep worker service config when moving to combined (suspend, do not delete).
+
+## Redis optimization
+
+See [../ops/redis-optimization-baseline.md](../ops/redis-optimization-baseline.md) and [../ops/redis-optimization-comparison.md](../ops/redis-optimization-comparison.md).

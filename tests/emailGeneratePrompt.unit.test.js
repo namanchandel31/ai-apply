@@ -5,8 +5,15 @@ const {
 } = require("../src/prompts/emailGeneratePrompt");
 
 describe("emailGeneratePrompt", () => {
-  it("exports v3 prompt version", () => {
-    expect(PROMPT_VERSION).toBe("email_generate_v3");
+  it("exports v4 prompt version", () => {
+    expect(PROMPT_VERSION).toBe("email_generate_v4");
+  });
+
+  it("SYSTEM_PROMPT includes mandatory email envelope", () => {
+    expect(SYSTEM_PROMPT).toMatch(/MANDATORY EMAIL SHAPE/i);
+    expect(SYSTEM_PROMPT).toMatch(/Salutation/i);
+    expect(SYSTEM_PROMPT).toMatch(/Sign-off/i);
+    expect(SYSTEM_PROMPT).toMatch(/Sender full name/i);
   });
 
   it("SYSTEM_PROMPT includes imperfection and anti-AI-punctuation rules", () => {
@@ -36,7 +43,8 @@ describe("emailGeneratePrompt", () => {
       },
     });
     expect(prompt).toContain("User tone profile (professional)");
-    expect(prompt).toContain("Structure:");
+    expect(prompt).toContain("Envelope (fixed for every email");
+    expect(prompt).toContain("Middle body layout (structured)");
     expect(prompt).toContain("Frontend Engineer");
     expect(prompt).toContain("Jane Doe");
     expect(prompt).toContain("react");

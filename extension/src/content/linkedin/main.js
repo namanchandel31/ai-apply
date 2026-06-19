@@ -177,11 +177,16 @@ function ensureStyles() {
   const style = document.createElement("style");
   style.id = ONETAP_STYLE_ID;
   style.textContent = `
-[data-onetap-btn]{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s ease;}
-[data-onetap-btn]:hover{background:rgba(37,99,235,.10);}
+[data-onetap-btn]{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 [data-onetap-btn]:disabled{cursor:default;}
-[data-onetap-btn]:disabled:hover{background:transparent;}
-.onetap-ico{width:28px;height:28px;display:block;overflow:visible;}
+.onetap-standalone{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:transparent;transition:background .2s ease;}
+.onetap-standalone:hover{background:rgba(37,99,235,.10);}
+.onetap-standalone:disabled:hover{background:transparent;}
+.onetap-action{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:transparent;}
+.onetap-action .onetap-label{font-weight:600;font-size:14px;line-height:1;color:var(--color-text-low-emphasis,rgba(0,0,0,.6));}
+.onetap-ico{display:block;overflow:visible;}
+.onetap-standalone .onetap-ico{width:28px;height:28px;}
+.onetap-action .onetap-ico{width:20px;height:20px;}
 .onetap-ico .ot-mark{fill:#2563eb;transition:opacity .25s ease;}
 .onetap-ico .ot-ring{fill:none;stroke:#2563eb;stroke-width:3.5;stroke-linecap:round;opacity:0;transform:rotate(-90deg);transform-box:fill-box;transform-origin:center;transition:stroke .35s ease;}
 .onetap-ico .ot-check{fill:none;stroke:#16a34a;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;opacity:0;}
@@ -202,20 +207,102 @@ function ensureStyles() {
   (document.head || document.documentElement).appendChild(style);
 }
 
-function createOneTapButton() {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.dataset.onetapBtn = "1";
-  btn.setAttribute("aria-label", "Add to OneTap");
-  btn.title = "Add to OneTap";
-  btn.innerHTML = `
+const ICON_SVG = `
     <svg class="onetap-ico" viewBox="0 0 52 52" fill="none" aria-hidden="true">
       <g class="ot-mark" transform="translate(6,2)"><path fill-rule="evenodd" clip-rule="evenodd" d="${ONETAP_MARK_PATH}"/></g>
       <circle class="ot-ring" cx="26" cy="26" r="23"/>
       <path class="ot-check" d="M15 27 l7 7 l15 -15"/>
     </svg>
   `;
+
+// Standalone circular button — fallback used only when the post's action bar
+// can't be located (e.g. detail views without a Like/Comment/Repost/Send row).
+function createStandaloneButton() {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.dataset.onetapBtn = "1";
+  btn.className = "onetap-standalone";
+  btn.setAttribute("aria-label", "Add to OneTap");
+  btn.title = "Add to OneTap";
+  btn.innerHTML = ICON_SVG;
   return btn;
+}
+
+const ACTION_LABELS = ["like", "comment", "repost", "send"];
+
+function matchesLabel(btn, label) {
+  const txt = (btn.innerText || "").trim().toLowerCase();
+  const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+  return (
+    txt === label || txt.startsWith(label) || aria === label || aria.startsWith(label + " ")
+  );
+}
+
+function isActionButton(btn) {
+  return ACTION_LABELS.some((label) => matchesLabel(btn, label));
+}
+
+// LinkedIn's feed is SDUI with no stable class hooks, so we locate the social
+// action bar by its action buttons (Like/Comment/Repost/Send) and return one of
+// their items to clone. Cloning inherits LinkedIn's exact flex + padding, so our
+// button slots in as an equal 5th action with matching spacing.
+function findActionBarInfo(container) {
+  const candidates = Array.from(container.querySelectorAll("button")).filter(
+    isActionButton
+  );
+  if (candidates.length < 3) return null;
+
+  let bar = candidates[0].parentElement;
+  while (bar && bar !== container.parentElement) {
+    if (candidates.filter((c) => bar.contains(c)).length >= 3) break;
+    bar = bar.parentElement;
+  }
+  if (!bar) return null;
+
+  const inBar = candidates.filter((c) => bar.contains(c));
+  if (inBar.length < 3) return null;
+
+  // Prefer a structurally simple action to clone — Send/Repost sometimes carry
+  // dropdown triggers, while Comment/Like are plain buttons.
+  const reference =
+    inBar.find((b) => matchesLabel(b, "comment")) ||
+    inBar.find((b) => matchesLabel(b, "like")) ||
+    inBar[0];
+
+  let item = reference;
+  while (item.parentElement && item.parentElement !== bar) {
+    item = item.parentElement;
+  }
+  if (item.parentElement !== bar) return null;
+
+  return { bar, item };
+}
+
+// Clone a sibling action item for exact layout parity, then swap its contents
+// for the OneTap icon + label. Only the blue circular icon hints at the brand;
+// everything else (size, padding, hover) is inherited from LinkedIn.
+function createActionButton(item) {
+  const wrapper = item.cloneNode(true);
+  wrapper.removeAttribute("id");
+  wrapper.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+  wrapper.dataset.onetapItem = "1";
+
+  const btn = wrapper.matches("button") ? wrapper : wrapper.querySelector("button");
+  if (!btn) return null;
+
+  wrapper.querySelectorAll("button").forEach((b) => {
+    if (b !== btn) b.remove();
+  });
+
+  btn.setAttribute("type", "button");
+  btn.dataset.onetapBtn = "1";
+  btn.classList.add("onetap-action");
+  btn.setAttribute("aria-label", "Add to OneTap");
+  btn.title = "Add to OneTap";
+  btn.removeAttribute("aria-pressed");
+  btn.innerHTML = `${ICON_SVG}<span class="onetap-label">OneTap</span>`;
+
+  return { wrapper, btn };
 }
 
 function injectButton(container, text, permalink, config) {
@@ -226,14 +313,29 @@ function injectButton(container, text, permalink, config) {
 
   ensureStyles();
 
-  const row = document.createElement("div");
-  row.dataset.onetapRow = "1";
-  row.style.cssText = "padding:2px 6px 6px;";
+  let btn = null;
+  const barInfo = findActionBarInfo(container);
+  if (barInfo) {
+    const built = createActionButton(barInfo.item);
+    if (built) {
+      barInfo.bar.appendChild(built.wrapper);
+      btn = built.btn;
+    }
+  }
 
-  const btn = createOneTapButton();
-  row.appendChild(btn);
-  container.appendChild(row);
+  if (!btn) {
+    const row = document.createElement("div");
+    row.dataset.onetapRow = "1";
+    row.style.cssText = "padding:2px 6px 6px;";
+    btn = createStandaloneButton();
+    row.appendChild(btn);
+    container.appendChild(row);
+  }
 
+  wireButton(btn, text, permalink, email);
+}
+
+function wireButton(btn, text, permalink, email) {
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -242,6 +344,7 @@ function injectButton(container, text, permalink, config) {
     btn.disabled = true;
 
     const ico = btn.querySelector(".onetap-ico");
+    const label = btn.querySelector(".onetap-label");
     ico.classList.remove("is-error");
     ico.classList.add("is-loading");
 
@@ -255,6 +358,7 @@ function injectButton(container, text, permalink, config) {
       });
       ico.classList.remove("is-loading");
       ico.classList.add("is-success");
+      if (label) label.textContent = "Added";
       btn.title = "Added to OneTap";
       btn.setAttribute("aria-label", "Added to OneTap");
     } catch (err) {
@@ -262,6 +366,7 @@ function injectButton(container, text, permalink, config) {
       ico.classList.add("is-error");
       btn.disabled = false;
       delete btn.dataset.busy;
+      if (label) label.textContent = "OneTap";
       btn.title = err instanceof Error ? err.message : "Failed — tap to retry";
       window.setTimeout(() => ico.classList.remove("is-error"), 600);
       console.error("[OneTap]", err);

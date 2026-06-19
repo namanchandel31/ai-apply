@@ -7,7 +7,7 @@
  * ENVIRONMENT to "production" (and set the production apiBase) for hosted builds.
  */
 
-const ENVIRONMENT = "development";
+const ENVIRONMENT = "production";
 
 const ENVIRONMENTS = {
   development: {
