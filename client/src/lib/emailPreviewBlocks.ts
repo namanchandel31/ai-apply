@@ -8,7 +8,7 @@ const TONE_BLOCKS: Record<
 > = {
   casual: {
     greeting: "Hi Hiring Team,",
-    hook: "I saw the Flutter Developer role and wanted to reach out — it looks like a strong match for my background.",
+    hook: "I saw the Flutter Developer role and wanted to reach out. It looks like a strong match for my background.",
     cta: "Happy to chat if you think I could be a fit.",
     closing: "Best,",
   },

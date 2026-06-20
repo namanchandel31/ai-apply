@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { HeroHeadline, HERO_SUBHEAD } from "@/components/landing/HeroHeadline";
-import { HeroWaitlistInput } from "@/components/landing/HeroWaitlistInput";
-import { HeroApplyAnimation } from "@/components/landing/HeroApplyAnimation";
+import { Link } from "react-router-dom";
+import { HeroHeadline, HERO_LEAD } from "@/components/landing/HeroHeadline";
+import { mindooScrollTo } from "@/hooks/useMindooScroll";
 import "@/styles/mindoo.css";
 
 export function MindooHeroSection() {
   const [ready, setReady] = useState(false);
-  const [autoApply, setAutoApply] = useState(true);
 
   useEffect(() => {
     const t1 = window.setTimeout(() => setReady(true), 80);
@@ -18,29 +17,41 @@ export function MindooHeroSection() {
       data-hero="section"
       className={`mindoo-hero${ready ? " mh-ready" : ""}`}
     >
-      <div className="mh-padding-global mh-hero-split-wrap">
-        <div className="mh-container mh-hero-split">
-          <div className="mh-hero-left">
-            <div className="mh-hero-copy">
-              <div className="mh-heading-list">
-                <HeroHeadline
-                  ready={ready}
-                  autoApply={autoApply}
-                  onAutoApplyChange={setAutoApply}
-                />
-                <p data-hero="subheading" className="mh-subhead">
-                  {autoApply ? HERO_SUBHEAD.on : HERO_SUBHEAD.off}
-                </p>
-              </div>
-
-              <HeroWaitlistInput ready={ready} />
+      <div className="m-padding-global mh-hero-stack-wrap">
+        <div className="m-container mh-hero-stack">
+          <div className="mh-hero-intro">
+            <HeroHeadline ready={ready} />
+            <p data-hero="subheading" className="mh-hero-lead m-body-text">
+              <span className="mh-hero-lead-line">{HERO_LEAD.line1}</span>
+              <span className="mh-hero-lead-line">{HERO_LEAD.line2}</span>
+            </p>
+            <div className={`mh-hero-actions${ready ? " is-ready" : ""}`}>
+              <button
+                type="button"
+                className="mh-hero-btn mh-hero-btn-primary"
+                onClick={() => mindooScrollTo("pricing")}
+              >
+                Get started
+              </button>
+              <Link to="/support" className="mh-hero-btn mh-hero-btn-secondary">
+                Get a demo
+              </Link>
             </div>
           </div>
 
-          <div className="mh-hero-right">
-            <div className="mh-product-center">
-              <HeroApplyAnimation autoApply={autoApply} />
-            </div>
+          <div className={`mh-hero-video-wrap${ready ? " is-ready" : ""}`}>
+            <video
+              className="mh-hero-video"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              aria-label="OneTap product demo"
+            >
+              <source src="/hero-demo.mp4" type="video/mp4" />
+              <source src="/hero-demo.mov" type="video/quicktime" />
+            </video>
           </div>
         </div>
       </div>

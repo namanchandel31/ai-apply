@@ -1,53 +1,95 @@
+import { useEffect, useState, type CSSProperties } from "react";
+
 type Props = {
   ready: boolean;
-  autoApply: boolean;
-  onAutoApplyChange: (value: boolean) => void;
 };
 
-/** Fixed outcome — the vision: more interviews, faster */
-const LINE_ONE = ["Land", "more", "interviews,"];
-
-/** The toggle is AutoApply — it only changes how involved you are */
-const TAIL = {
-  on: "hands-free.",
-  off: "hands-on.",
+export const HERO_LEAD = {
+  line1: "Upload your resume once, connect to Gmail, and paste any job description.",
+  line2:
+    "One Tap generates a personalized application, sends it from your account, and tracks everything in one place.",
 } as const;
 
-export const HERO_SUBHEAD = {
-  on: "Apply from LinkedIn or any job post in one click. AI writes a personalized email from your résumé and sends it from your Gmail — automatically.",
-  off: "Apply from LinkedIn or any job post in one click. AI writes a personalized email from your résumé for you to review, refine, and send from your Gmail.",
-} as const;
+const ROTATING_WORDS = ["apply", "track", "manage", "improve"] as const;
+const LOOP_WORDS = [...ROTATING_WORDS, ROTATING_WORDS[0]];
+const ROTATE_MS = 2800;
+const ROTATE_TRANSITION_MS = 650;
 
-export function HeroHeadline({ ready, autoApply, onAutoApplyChange }: Props) {
+function HeroRotatingWord() {
+  const [index, setIndex] = useState(0);
+  const [animate, setAnimate] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const id = window.setInterval(() => {
+      setIndex((current) => current + 1);
+    }, ROTATE_MS);
+    return () => window.clearInterval(id);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion || index !== ROTATING_WORDS.length) return;
+
+    const timeout = window.setTimeout(() => {
+      setAnimate(false);
+      setIndex(0);
+    }, ROTATE_TRANSITION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [index, reduceMotion]);
+
+  useEffect(() => {
+    if (animate) return;
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setAnimate(true));
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [animate]);
+
   return (
-    <h1
-      data-hero="heading"
-      className={`mh-h1${ready ? " mh-h1-ready" : ""}`}
-    >
-      <span className="mh-h1-line">
-        {LINE_ONE.map((word) => (
-          <span key={word} className="mh-h1-word-static">
+    <span className="mh-hero-rotate" aria-hidden="true">
+      <span
+        className={`mh-hero-rotate-track${animate ? "" : " is-instant"}`}
+        style={
+          reduceMotion
+            ? undefined
+            : ({ "--rotate-index": index } as CSSProperties)
+        }
+      >
+        {LOOP_WORDS.map((word, i) => (
+          <span key={`${word}-${i}`} className="mh-hero-rotate-word">
             {word}
           </span>
         ))}
       </span>
+      <span className="sr-only">{ROTATING_WORDS.join(", ")}</span>
+    </span>
+  );
+}
 
-      <span className="mh-h1-line mh-h1-line-second">
-        <button
-          type="button"
-          className={`mh-h1-toggle${autoApply ? " is-on" : ""}`}
-          aria-pressed={autoApply}
-          aria-label={autoApply ? "AutoApply on" : "AutoApply off"}
-          onClick={() => onAutoApplyChange(!autoApply)}
-        >
-          <span className="mh-h1-toggle-track">
-            <span className="mh-h1-toggle-thumb" />
-          </span>
-        </button>
-        <span className="mh-h1-word-static mh-h1-line-tail">
-          {autoApply ? TAIL.on : TAIL.off}
+export function HeroHeadline({ ready }: Props) {
+  return (
+    <div className={`mh-hero-headline${ready ? " is-ready" : ""}`}>
+      <h1 data-hero="heading" className="mh-h1-paper">
+        <span className="sr-only">
+          The fastest way to apply, track, manage, and improve your job applications.
         </span>
-      </span>
-    </h1>
+        <span className="mh-h1-line" aria-hidden="true">
+          The fastest way to <HeroRotatingWord />
+        </span>
+        <span className="mh-h1-line" aria-hidden="true">
+          your job applications.
+        </span>
+      </h1>
+    </div>
   );
 }

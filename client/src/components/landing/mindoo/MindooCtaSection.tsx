@@ -1,34 +1,25 @@
-import { SplitHeading } from "./shared";
-import { WaitlistForm } from "./WaitlistForm";
+import { mindooScrollTo } from "@/hooks/useMindooScroll";
 
 export function MindooCtaSection() {
   return (
-    <section id="waitlist" className="m-section m-cta">
-      <div className="m-spacing-xl" />
+    <section id="get-started" className="m-section m-cta">
       <div className="m-padding-global">
         <div className="m-container">
-          <div className="m-cta-inner">
-            <SplitHeading
-              className="m-h1 m-ch-18 m-text-center"
-              primary="Because job searching is already stressful enough."
-            />
-            <p data-reveal="" className="m-cta-sub m-text-center">
-              Create breathing room for your search,
-              <br />
-              without spending hours on every application.
+          <div data-reveal="" className="m-cta-card">
+            <h2 className="m-cta-card-title">Stop drafting applications at 11pm.</h2>
+            <p className="m-cta-card-sub m-body-text">
+              Pick a plan and set up in three minutes.
             </p>
-
-            <div data-reveal="" className="m-waitlist-card">
-              <WaitlistForm />
-            </div>
-
-            <p data-reveal="" className="m-text-caption m-text-center">
-              No spam. We&apos;ll only reach out when we&apos;re ready.
-            </p>
+            <button
+              type="button"
+              className="m-cta-card-btn"
+              onClick={() => mindooScrollTo("pricing")}
+            >
+              View plans →
+            </button>
           </div>
         </div>
       </div>
-      <div className="m-spacing-xl" />
     </section>
   );
 }

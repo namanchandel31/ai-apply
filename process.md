@@ -1,5 +1,801 @@
 ## Log (newest first)
 
+### 2026-06-20 — Commit and push current branch
+- **Prompt:** git push and commit
+- **Outcome:** Started git status/diff/log checks, then staged, committed, and pushed current branch changes.
+
+### 2026-06-20 — Extension prompt after email skip
+- **Prompt:** Skipping Gmail during onboarding skips the Chrome extension install page; it should appear whether email is connected or skipped
+- **Outcome:** Persist email-step skip + extension-pending in sessionStorage; always run celebration → extension after email step resolves; pending flag overrides stale localStorage dismiss.
+
+### 2026-06-20 — Signup, plans, and password reset
+- **Prompt:** Build signup (name/email), show plan selection after submit, integrate Razorpay subscribe flow, and add forgot-password email reset.
+- **Outcome:** Added Supabase email auth screens (signup/login/forgot/reset), protected `/pricing` flow with Razorpay order+verification APIs, and subscription access gating before onboarding/dashboard.
+
+### 2026-06-20 — Extension prompt vertical buttons
+- **Prompt:** Place extension step buttons vertically
+- **Outcome:** Add to Chrome and Skip for now stack full-width in a column on all breakpoints.
+
+### 2026-06-20 — Larger extension callout text
+- **Prompt:** Make handwritten “Install the extension…” callout bigger
+- **Outcome:** Callout font 1.125rem→1.5rem; column width 6.75rem→8.25rem.
+
+### 2026-06-20 — Larger OneTap highlight ring
+- **Prompt:** Ellipse covering button — make it slightly bigger
+- **Outcome:** Increased highlight ring inset so it frames the OneTap button instead of overlapping it.
+
+### 2026-06-20 — Card full width; callout absolute right
+- **Prompt:** Restore card width/layout; move handwritten text/arrow outside via absolute positioning only
+- **Outcome:** Card back to full `max-w-lg` width; callout absolutely positioned right of card, outside UI.
+
+### 2026-06-20 — Callout right of LinkedIn card
+- **Prompt:** Move install-extension text to right of card; reposition hand-drawn highlight like screenshot
+- **Outcome:** Side-by-side layout: card left, Caveat callout + left-pointing arrow right; ring on OneTap button; prompt `max-w-xl`.
+
+### 2026-06-20 — Callout text outside LinkedIn card
+- **Prompt:** Move handwritten extension callout outside the post UI card
+- **Outcome:** Callout + arrow sit above the card; hand-drawn ring stays on OneTap button inside.
+
+### 2026-06-20 — OneTap button callout on LinkedIn visual
+- **Prompt:** Highlight OneTap button with hand-drawn circle + handwritten note about extension on every job post
+- **Outcome:** Caveat font, sketch ring + arrow + callout on `LinkedInApplyVisual` (extension prompt).
+
+### 2026-06-20 — Remove globe icon on LinkedIn post
+- **Prompt:** Remove globe/visibility icon next to post timestamp
+- **Outcome:** Dropped globe icon and dot from onboarding visual and landing feed posts.
+
+### 2026-06-20 — OneTap post button radius
+- **Prompt:** Add corner radius to OneTap button on LinkedIn post visual
+- **Outcome:** `m-li-post-onetap` uses explicit `12px` radius (works outside `.mindoo-site` on onboarding).
+
+### 2026-06-20 — Wider extension LinkedIn visual
+- **Prompt:** Make the extension prompt LinkedIn visual wider
+- **Outcome:** Removed `max-w-[18rem]` cap so the post card spans the full prompt width.
+
+### 2026-06-20 — Extension prompt layout reorder
+- **Prompt:** Fix extension step order: heading, para, visual, bullets; static website-style LinkedIn visual
+- **Outcome:** Single-column stack; `LinkedInApplyVisual` uses landing `m-li-post` styles (no animation).
+
+### 2026-06-20 — Swap Gmail step buttons
+- **Prompt:** Swap Connect Gmail and Skip for now button positions
+- **Outcome:** Skip for now left/first; Connect Gmail right/second on step 3.
+
+### 2026-06-20 — Gmail step intro typography
+- **Prompt:** Step 3 intro line should match font size/color of previous onboarding steps
+- **Outcome:** `text-sm` → `text-base text-muted-foreground` on Gmail intro paragraph.
+
+### 2026-06-20 — Restore Gmail app password copy
+- **Prompt:** Bring back original app-password callout copy on onboarding step 3
+- **Outcome:** Restored full paragraph + padding/button sizing in the generate-password box.
+
+### 2026-06-20 — Compact Gmail onboarding step
+- **Prompt:** Step 3 copy too long; skip button below fold — tighten copy, keep skip in first viewport
+- **Outcome:** Shorter intro + compact app-password box; Connect/Skip side-by-side; one-line Setup note.
+
+### 2026-06-20 — Skippable onboarding Gmail step
+- **Prompt:** Email/SMTP step skippable; clear copy for non-tech users; skip button; connect later in Setup for Auto apply
+- **Outcome:** Optional step 3 with skip UI; onboarding completes after AI+resume; backend no longer requires email for `onboardingRequired`.
+
+### 2026-06-20 — Onboarding Gmail app password link
+- **Prompt:** SMTP step link buried in paragraph; make it specific and clearly placed
+- **Outcome:** Dedicated callout box + full-width “Open Google App Passwords” button above the form fields.
+
+### 2026-06-20 — Onboarding provider select placeholder
+- **Prompt:** OpenAI first in provider list looked like placeholder; only Groq/Gemini supported — use “Select your model provider”
+- **Outcome:** Updated onboarding `SelectValue` placeholder; sorted supported providers first; muted placeholder styling on select trigger.
+
+### 2026-06-20 — Confirm Razorpay cleanup task completion
+- **Prompt:** Perform any needed follow-up after subagent completion without repeating its result.
+- **Outcome:** Added required log entry; no additional follow-up needed at this point.
+
+### 2026-06-20 — Remove payment route crash path
+- **Prompt:** Fix `Cannot find module '../routes/paymentRoutes'` from `src/api/createApp.js` and remove Razorpay remnants without touching unrelated work.
+- **Outcome:** Identified unconditional payment route require as crash root cause and started focused backend/frontend cleanup plus startup verification.
+
+### 2026-06-20 — Remove Razorpay remnants after rollback
+- **Prompt:** Server crashes with `Cannot find module '../routes/paymentRoutes'`; remove everything related to Razorpay for now.
+- **Outcome:** Logged the issue and started a full cleanup to remove Razorpay imports/routes and restore app startup.
+
+### 2026-06-20 — Onboarding providers: Groq not Grok
+- **Prompt:** Grok is not supported; Groq is
+- **Outcome:** `AVAILABLE_PROVIDER_IDS` → gemini + groq; grok marked coming soon.
+
+### 2026-06-20 — Onboarding model provider defaults
+- **Prompt:** OpenAI was default but unsupported; placeholder “Please select a model provider”; only Gemini and Grok available; rest “Coming soon”
+- **Outcome:** No default provider in onboarding; `remoteProviders` allows only gemini/grok; coming-soon on all others.
+
+### 2026-06-20 — Nav “How it Works” link
+- **Prompt:** Add “How it Works” to navigation; link to three-step setup section
+- **Outcome:** Nav item scrolls to `#how-it-works` (`MindooSetupSection`); section id updated; headline → “Set up in two minutes.”
+
+### 2026-06-20 — Scrolled nav pill padding (tighter)
+- **Prompt:** Reduce scrolled nav left/right padding more
+- **Outcome:** Outer inset 0.75rem→0.375rem, inner padding 1rem→0.625rem.
+
+### 2026-06-20 — Scrolled nav pill padding
+- **Prompt:** Reduce left/right padding in the navigation’s scrolled (2nd) state
+- **Outcome:** Tightened scrolled pill: outer inset 1.5rem→0.75rem, inner padding 1.5rem→1rem via `--m-nav-pill-inset` / `--m-nav-pill-inner-padding`.
+
+### 2026-06-20 — Fix extension prompt blank screen
+- **Prompt:** Local server shows no content on extension install step
+- **Outcome:** Replaced invalid `Chrome` lucide import (broke module load); fixed empty onboarding state when all steps complete.
+
+### 2026-06-20 — Paid landing copy + Razorpay trust
+- **Prompt:** Fix free/paid inconsistencies across site; Razorpay in pricing; remove free messaging
+- **Outcome:** Hero/bottom CTAs → pricing; removed beta/free copy; setup + BYOK providers aligned; pricing Razorpay note + Subscribe CTAs; billing/payment FAQs; `#get-started` section id.
+
+### 2026-06-20 — Post-onboarding Chrome extension prompt
+- **Prompt:** After onboarding’s three steps, add a skippable Chrome extension install screen with benefits and LinkedIn Apply visual
+- **Outcome:** Added `ExtensionInstallPrompt` + `LinkedInApplyVisual` after celebration; shared `CHROME_EXTENSION_URL`; skip persists via localStorage; then routes to dashboard.
+
+### 2026-06-20 — Landing copy audit (free vs paid)
+- **Prompt:** Audit whole site for free/paid inconsistencies; remove free messaging; add Razorpay trust in pricing; report conflicts first
+- **Outcome:** Audited live landing + related pages; reported explicit “free” CTAs, waitlist leftovers, setup/plan mismatches, provider list drift, and missing payment flow copy.
+
+### 2026-06-20 — Remove encrypted API keys from pricing
+- **Prompt:** Remove "Encrypted API keys, never shared" from pricing
+- **Outcome:** Dropped that bullet from BYOK plan features in `MindooPricingSection`.
+
+### 2026-06-20 — Nav default state in container
+- **Prompt:** Default nav content should be within container, not edge-to-edge
+- **Outcome:** Default nav uses `--m-padding` + `--m-container` max-width; scrolled pill state unchanged.
+
+### 2026-06-20 — Smooth nav scroll transition + wider pill
+- **Prompt:** Nav transition jittery; scrolled pill should be wider with smooth animation between full-width and floating states
+- **Outcome:** Reworked nav: wrapper padding drives pill width, links animate via transform only, pill max 68rem, removed container/padding toggles.
+
+### 2026-06-20 — Nav links right by default, center on scroll
+- **Prompt:** Default: links + sign-in far right; on scroll: links center, get started appears
+- **Outcome:** Hero nav flex layout switches from right-clustered links to centered pill layout when scrolling.
+
+### 2026-06-20 — Remove Problem from nav
+- **Prompt:** Remove problem from the navigation
+- **Outcome:** Dropped Problem link from `MindooNav` desktop and mobile menus.
+
+### 2026-06-20 — Nav default state no horizontal padding
+- **Prompt:** Default nav state should have no left/right padding
+- **Outcome:** Removed horizontal padding from `.m-padding-global` and `.m-nav-inner` until scroll; pill state restores padding.
+
+### 2026-06-20 — Mobbin-style fixed floating nav
+- **Prompt:** Nav should stay fixed/floating and visible everywhere on page like Mobbin
+- **Outcome:** Nav at page root with z-index 100; scroll-started updates on every scroll so pill + CTAs appear reliably.
+
+### 2026-06-20 — Extension button auto width
+- **Prompt:** Download Chrome extension button should be auto width, not full width
+- **Outcome:** `.m-feature-row-copy .mh-hero-btn` uses `align-self: flex-start` and `width: auto`.
+
+### 2026-06-20 — Problem last tab only (revert broad fix)
+- **Prompt:** Only fix last tab Google bg + fade gradient; revert transparent-all-tabs change
+- **Outcome:** Restored default inactive tab styling; only `.is-last` tab + favicon use `#dde6ef`; fade gradient reverted to original.
+
+### 2026-06-20 — Problem browser tab color match
+- **Prompt:** Last tab in problem section doesn't match toolbar background
+- **Outcome:** Inactive tabs transparent; fade gradient aligned to frame; favicon bg matches toolbar/active tab.
+
+### 2026-06-20 — Fixed landing nav
+- **Prompt:** Navigation should also be fixed and sticky in nature
+- **Outcome:** Switched `.m-nav-wrap` to `position: fixed`; scroll hide/show moves entire bar; pointer-events pass-through when hidden.
+
+### 2026-06-20 — Mobbin-style landing nav
+- **Prompt:** Match Mobbin nav — no buttons at top, pill + CTAs on scroll, hide on scroll down
+- **Outcome:** Refactored landing nav CSS: transparent bar at top, floating pill on scroll, action buttons fade in, nav hides when scrolling down.
+
+### 2026-06-20 — Extension button matches hero
+- **Prompt:** Download Chrome extension button should match hero section
+- **Outcome:** Reuses `mh-hero-btn mh-hero-btn-primary`; removed custom extension button styles.
+
+### 2026-06-20 — Chrome extension download button
+- **Prompt:** Add Download Chrome extension button in extension section with Web Store link
+- **Outcome:** Added CTA linking to OneTap Chrome Web Store listing in the LinkedIn extension feature row.
+
+### 2026-06-20 — Smooth nav scroll
+- **Prompt:** Nav clicks scroll instantly; should be smooth
+- **Outcome:** Nav anchors use `mindooScrollTo`; global hash click handler; smooth scroll on landing; scroll-margin for sticky nav.
+
+### 2026-06-20 — Vend Sans for logo and nav
+- **Prompt:** OneTap logo and navigation on website (and elsewhere) should use Vend Sans
+- **Outcome:** `OneTapBrand` wordmark uses `font-heading`; landing nav links and app shell nav tabs use Vend Sans.
+
+### 2026-06-20 — Remove pricing feature line
+- **Prompt:** Remove No provider account or token bills from pricing
+- **Outcome:** Dropped that bullet from OneTap AI plan features.
+
+### 2026-06-20 — Footer visibility fix
+- **Prompt:** I don't see any footer
+- **Outcome:** Moved footer into `main` above fixed hero bg; added `z-index: 1`; spacing via section gap.
+
+### 2026-06-20 — Tighter hero heading–paragraph gap
+- **Prompt:** Reduce gap between hero heading and paragraph
+- **Outcome:** Reduced `.mh-hero-intro` gap from `1.5rem` to `1rem`.
+
+### 2026-06-20 — Setup section 200px top padding
+- **Prompt:** Two minutes to set up section should have 200px top padding
+- **Outcome:** Set `padding-top: 200px` on `.m-setup`.
+
+### 2026-06-20 — Single-line site footer
+- **Prompt:** Add a single-line footer at the bottom of the website
+- **Outcome:** Polished `MindooFooter` (© OneTap · Privacy · Support · Sign in); border-top bar styles; removed legacy footer CSS.
+
+### 2026-06-20 — Equal 200px section spacing
+- **Prompt:** Section spacing should be equal throughout, make it 200
+- **Outcome:** `--m-section-gap: 200px`; removed extra padding on problem, showcase, setup, and FAQ sections.
+
+### 2026-06-20 — Body copy font-weight 400
+- **Prompt:** Make body font weight 400 for descriptions and paragraphs sitewide
+- **Outcome:** Landing `--m-body-text-weight` and base weight 400; app `body`/`p` set to 400.
+
+### 2026-06-20 — Pricing OneTap AI feature copy
+- **Prompt:** "Fastest onboarding: apply same day" is dumb
+- **Outcome:** Replaced with "No provider account or token bills" on OneTap AI plan.
+
+### 2026-06-20 — Landing green to brand blue
+- **Prompt:** Pricing and everywhere on landing — replace green accent with blue
+- **Outcome:** Pricing highlights, badges, feature bullets, and primary CTAs now use `#2563eb` / `#1d4ed8`.
+
+### 2026-06-20 — FAQ de-pricing after pricing section
+- **Prompt:** FAQ starting with cost question is dumb right below pricing
+- **Outcome:** Removed pricing/plan duplicate questions; FAQ leads with privacy, Gmail, extension, and setup.
+
+### 2026-06-20 — CTA button copy
+- **Prompt:** CTA should be get started for free
+- **Outcome:** Updated bottom CTA button to “Get started for free →”.
+
+### 2026-06-20 — CTA section brand blue
+- **Prompt:** Stop drafting applications at 11pm section — green is random, use our blue
+- **Outcome:** CTA card gradient and button use brand blue `#2563eb` instead of lime green.
+
+### 2026-06-20 — Remove em dashes from site copy
+- **Prompt:** remove the em dash from whole website's copy
+- **Outcome:** Replaced em dashes with commas, periods, or colons across landing, FAQ, login, onboarding, dashboard, and app UI strings.
+
+### 2026-06-20 — FAQ label removed, extra top spacing
+- **Prompt:** remove — FAQ —; add more space between faq and section above
+- **Outcome:** Dropped FAQ label; added `padding-top: 4rem` on `.m-faq` above pricing gap.
+
+### 2026-06-20 — FAQ aligned with pricing plans
+- **Prompt:** update faq answers and questions based on pricing section updated
+- **Outcome:** Rewrote pricing-related FAQ for ₹99 BYOK and ₹149 OneTap AI plans; removed free-beta copy.
+
+### 2026-06-20 — Faster FAQ expand/collapse
+- **Prompt:** expanding and collapsing should be faster
+- **Outcome:** FAQ height transition 0.35s → 0.2s.
+
+### 2026-06-20 — FAQ icon plus/minus
+- **Prompt:** plus icon bigger; expanded becomes minus
+- **Outcome:** FAQ toggle icon 1.75rem; open state shows `−` instead of rotated `+`.
+
+### 2026-06-20 — FAQ block height animation
+- **Prompt:** the height of the block should have animation
+- **Outcome:** Replaced `<details>` with state-driven accordion so grid row transition animates full item height.
+
+### 2026-06-20 — FAQ expand animation
+- **Prompt:** expanding a faq is instant, it shouldn't be that way
+- **Outcome:** Added grid height + opacity transition on FAQ answer body; + icon rotates to × on open.
+
+### 2026-06-20 — Pricing two-plan update
+- **Prompt:** Remove — Pricing —; 2 plans — BYOK ₹99/mo, OneTap LLM ₹149/mo; unlimited apps, differentiated benefits
+- **Outcome:** Rewrote `MindooPricingSection` with Bring your own AI and OneTap AI tiers; removed pricing label.
+
+### 2026-06-20 — Less space before setup cards
+- **Prompt:** Reduce space between heading and the 3 setup cards
+- **Outcome:** Reduced `.m-setup-inner` gap from `4rem` to `clamp(2rem, 4vw, 2.5rem)`.
+
+### 2026-06-20 — Reduce setup visual height slightly
+- **Prompt:** Not that much height — reduce a little
+- **Outcome:** Tuned `.m-setup-visual-wrap` min-height to `clamp(15rem, 26vw, 18rem)`.
+
+### 2026-06-20 — Setup visual height fix
+- **Prompt:** Setup mockups clipped — increase height
+- **Outcome:** Replaced fixed aspect-ratio with `min-height: clamp(18rem, 32vw, 22rem)` and `overflow: visible` on `.m-setup-visual-wrap`.
+
+### 2026-06-20 — Setup step visuals
+- **Prompt:** Work on visuals for the 3 setup blocks
+- **Outcome:** Added `SetupStepVisual` mini mockups (model form, PDF dropzone, Gmail SMTP) replacing gradient placeholders in `MindooSetupSection`.
+
+### 2026-06-20 — Restore upload resume description
+- **Prompt:** Bring back same description copy (upload resume step)
+- **Outcome:** Restored body to “Upload a PDF once. OneTap tailors every email from your experience.”
+
+### 2026-06-20 — Simplify upload resume step
+- **Prompt:** Upload résumé — make resume simple
+- **Outcome:** Title is now “Upload resume”; body shortened to “PDF only. Upload once.”
+
+### 2026-06-20 — Shorter setup card descriptions
+- **Prompt:** Description text should be shorter
+- **Outcome:** Trimmed each setup step body to one short sentence in `MindooSetupSection`.
+
+### 2026-06-20 — Simpler setup card headlines
+- **Prompt:** Headlines should be easy and simple; context belongs in descriptions
+- **Outcome:** Shortened setup step titles to Choose model, Upload résumé, Connect Gmail; kept detailed body copy.
+
+### 2026-06-20 — Setup section copy refresh
+- **Prompt:** Update 3 setup blocks — model provider/API keys, resume formats, SMTP
+- **Outcome:** Reordered steps to match onboarding; refreshed titles and body copy in `MindooSetupSection`.
+
+### 2026-06-20 — Setup headline one line
+- **Prompt:** Make Three minutes to set up. After that, one click. into one line
+- **Outcome:** Removed `m-ch-20` width cap; added `.m-setup-heading` with `white-space: nowrap` on primary line.
+
+### 2026-06-20 — More setup top padding
+- **Prompt:** More top padding in Get started in minutes / Three minutes to set up section
+- **Outcome:** Increased `.m-setup` padding-top to `clamp(6rem, 12vw, 12rem)`.
+
+### 2026-06-20 — Space before setup section
+- **Prompt:** Increase space between BYOK feature row and Get started in minutes setup section
+- **Outcome:** Added `padding-bottom: clamp(4rem, 8vw, 8rem)` on `.m-feature-showcase`.
+
+### 2026-06-20 — More setup section top padding
+- **Prompt:** more (setup section top padding)
+- **Outcome:** Increased `.m-setup` padding-top to `clamp(4rem, 8vw, 8rem)`.
+
+### 2026-06-20 — Setup section top padding
+- **Prompt:** Add top padding for Get started in minutes / Three minutes to set up section
+- **Outcome:** Added `padding-top: clamp(2rem, 5vw, 4rem)` on `.m-setup`.
+
+### 2026-06-20 — Even more feature row spacing
+- **Prompt:** more (feature section gaps)
+- **Outcome:** Increased `.m-feature-showcase-inner` gap to `clamp(10rem, 18vw, 16rem)`.
+
+### 2026-06-20 — More feature row spacing
+- **Prompt:** more space (between three feature sections)
+- **Outcome:** Increased `.m-feature-showcase-inner` gap to `clamp(8rem, 14vw, 12rem)`.
+
+### 2026-06-20 — Feature row spacing
+- **Prompt:** More space between the three two-column feature sections (Chrome extension, tracking, privacy)
+- **Outcome:** Increased `.m-feature-showcase-inner` gap to `clamp(6rem, 11vw, 9rem)`; removed extra tracking-row margin for even spacing.
+
+### 2026-06-20 — Feature showcase top padding
+- **Prompt:** Add more top padding for Apply directly from LinkedIn section
+- **Outcome:** Added `padding-top: clamp(2rem, 5vw, 4rem)` on `.m-feature-showcase`.
+
+### 2026-06-20 — Problem section top padding
+- **Prompt:** Add more top padding for the problem section (Apply challenge headline)
+- **Outcome:** Added `padding-top: clamp(2rem, 5vw, 4rem)` on `.m-problem`.
+
+### 2026-06-20 — Interactive BYOK provider list
+- **Prompt:** Model list should be interactable — hover and check update on click, nothing else
+- **Outcome:** `ModelProviderVisual` uses local state; rows are buttons with hover/selected styles; trigger syncs on selection.
+
+### 2026-06-20 — Scale up BYOK model visual
+- **Prompt:** Make the visual slightly bigger
+- **Outcome:** Increased BYOK provider dropdown max-width, type, padding, and icon sizes (~15%).
+
+### 2026-06-20 — Merge BYOK model labels
+- **Prompt:** Merge chooseModel and modelProvider into one — choose your model provider
+- **Outcome:** Single label above the dropdown in `ModelProviderVisual`; removed separate heading.
+
+### 2026-06-20 — Gemini selected in BYOK visual
+- **Prompt:** make gemini checked
+- **Outcome:** Default selected provider in `ModelProviderVisual` is now Gemini (trigger + checkmark).
+
+### 2026-06-20 — BYOK check icon on right
+- **Prompt:** check icon on right
+- **Outcome:** Moved selected-provider checkmark to the right side of each dropdown row.
+
+### 2026-06-20 — Remove Coming soon from BYOK list
+- **Prompt:** remove the coming soon from the list
+- **Outcome:** Dropped Coming soon labels and disabled styling from `ModelProviderVisual` provider rows.
+
+### 2026-06-20 — BYOK model provider visual
+- **Prompt:** Your AI. Your data. Private by default — visual like model provider dropdown; remove background box border
+- **Outcome:** Added `ModelProviderVisual` (Choose Model / provider list with logos); BYOK row uses borderless transparent visual container like feed/track rows.
+
+### 2026-06-20 — Shorter feed pause time
+- **Prompt:** reduce the pause time
+- **Outcome:** Feed hold segments 16%→12%, scroll 4%→3%, cycle 20s→14s (~1.7s pause per card).
+
+### 2026-06-20 — Tracking row bottom spacing
+- **Prompt:** Increase the space between Manage and track every job application and next section
+- **Outcome:** Added extra `margin-bottom` on the tracking feature row via `:has(.m-feature-row-visual--track)`.
+
+### 2026-06-20 — LinkedIn post shadow clip fix
+- **Prompt:** Shadow of posts is cutting off / getting clipped
+- **Outcome:** Feed visual `overflow: visible`; window uses horizontal shadow-bleed padding so box-shadows render fully.
+
+### 2026-06-20 — Feed animation revert to pure CSS
+- **Prompt:** JS scroll made feed much worse
+- **Outcome:** Removed all JS animation/drift; restored CSS keyframe carousel with seamless 100%→0% loop via duplicate post set.
+
+### 2026-06-20 — LinkedIn post card styling match
+- **Prompt:** update corner radius and shadows of linkedin post visual's post as same as tracking graphic
+- **Outcome:** `.m-li-post` now uses `1rem` radius and same border/shadow tokens as `.m-iso-track-panel`.
+
+### 2026-06-20 — Tracking graphic nudge left (more)
+- **Prompt:** more (shift graphic left)
+- **Outcome:** Increased tracking visual `margin-left` to `-20%` desktop / `-8%` mobile.
+
+### 2026-06-20 — Tracking graphic nudge left
+- **Prompt:** send the graphic little left
+- **Outcome:** Increased negative `margin-left` on tracking table visual (`-14%` desktop, `-4%` mobile).
+
+### 2026-06-20 — Realistic tracking table data
+- **Prompt:** Use realistic data in the graphic; match is zero for everything
+- **Outcome:** Swapped mock rows for Stripe/Notion/Linear/etc. with varied match scores (72–91%), pipeline statuses, and timestamps.
+
+### 2026-06-20 — Tracking visual bleed outside container
+- **Prompt:** it's okay if the visual goes a little outside of the container
+- **Outcome:** Widened tracking table visual (~112–118%) with negative margin on flipped row; showcase/container overflow set to visible.
+
+### 2026-06-20 — Flat applications tracking visual
+- **Prompt:** remove isomeric view, keep it normal
+- **Outcome:** Removed 3D perspective/rotation from tracking table; flat front-facing panel with status popover overlay.
+
+### 2026-06-20 — Bigger isometric tracking visual
+- **Prompt:** make it bigger
+- **Outcome:** Scaled up isometric table — full column width, larger type/padding, `scale(1.08)`, taller scene min-heights.
+
+### 2026-06-20 — Seamless feed loop (JS scroll)
+- **Prompt:** Feed feels like it ends and restarts; Sarah jitter; easing worse
+- **Outcome:** Replaced CSS keyframe slideshow with JS rAF scroll — hold per card, ease between cards, invisible wrap via duplicate set.
+
+### 2026-06-20 — Isometric table faces right
+- **Prompt:** face it right
+- **Outcome:** Flipped tracking isometric to `rotateY(16deg)` and repositioned status popover for right-facing perspective.
+
+### 2026-06-20 — Isometric applications tracking visual
+- **Prompt:** Tracking section should show isometric UI like real dashboard (role, company, status, etc.)
+- **Outcome:** Added `ApplicationsIsometricVisual` with 3D-tilted applications table, status popover, and sample rows; wired into tracking feature row.
+
+### 2026-06-20 — Sarah Chen feed jitter fix v2
+- **Prompt:** Sarah Chen post still jitters when coming into view
+- **Outcome:** Drift keyed by `post.id` with smooth decay (no snap-to-zero on handoff); linear scroll segments; eager avatar load on first loop set.
+
+### 2026-06-20 — Like icon via Lucide
+- **Prompt:** Like icon on posts still broken
+- **Outcome:** Replaced custom thumbs-up SVG with `ThumbsUp` from `lucide-react` for action bar and reaction badge.
+
+### 2026-06-20 — DiceBear feed avatars
+- **Prompt:** Use https://www.dicebear.com/ for user avatars
+- **Outcome:** Feed post avatars now load from DiceBear `notionists` style API, seeded by author name.
+
+### 2026-06-20 — Fix feed like icon
+- **Prompt:** Like icon in posts is broken — replace it
+- **Outcome:** Replaced broken Like SVG and 👍 emoji with a shared `ThumbsUpIcon` for action bar and reaction badge.
+
+### 2026-06-20 — Realistic feed profile photos
+- **Prompt:** Use realistic profile pictures in LinkedIn feed posts
+- **Outcome:** Added local portrait avatars in `client/public/feed-avatars/` and wired them into feed post cards.
+
+### 2026-06-20 — Fix Sarah Chen feed jitter
+- **Prompt:** Sarah Chen post animation jitters each cycle
+- **Outcome:** Seamless 4-step loop duplicate; reset card drift on animation iteration; drift only on centered card.
+
+### 2026-06-20 — White feed edge fade
+- **Prompt:** Gradient should go full white to transparent so posts don't look cut off
+- **Outcome:** Replaced opacity mask with white `--m-bg` overlay gradients on feed window top/bottom.
+
+### 2026-06-20 — Softer LinkedIn feed peek fade
+- **Prompt:** Top/bottom gradient fade too strong — peeking posts not visible
+- **Outcome:** Shorter mask fade with 55% min visibility; removed JS opacity fade that doubled up on edges.
+
+### 2026-06-20 — LinkedIn post viewport ease
+- **Prompt:** Add ease-in when posts enter viewport and ease when leaving
+- **Outcome:** Per-post opacity/translate easing in `LinkedInFeedScroll`; softer scroll timing curve.
+
+### 2026-06-20 — Smooth LinkedIn feed card drift
+- **Prompt:** Left/right card drift feels jittery — add ease like the original Beside example
+- **Outcome:** Replaced discrete phase classes with continuous smoothstep drift + rAF exponential smoothing applied directly to card transforms.
+
+### 2026-06-20 — LinkedIn feed card horizontal drift
+- **Prompt:** Centered post should shift left on pause; shift right before scrolling up and out
+- **Outcome:** rAF phase tracking on feed cards with `is-centered` / `is-exiting` translateX; reduced-motion skips drift.
+
+### 2026-06-20 — LinkedIn feed content + peek-only fade
+- **Prompt:** Posts need more content; paused center post should have no gradient — fade only on peeking top/bottom posts
+- **Outcome:** Expanded post copy, taller cards (4-line clamp); replaced full-window fade overlays with window mask limited to peek zones.
+
+### 2026-06-20 — Lighter body text color
+- **Prompt:** Make problem lead and rest of body text slightly lighter
+- **Outcome:** Updated `--m-body` to `#525252` and `--m-body-secondary` to `#666666`; closing line stays `#0d0d0d`.
+
+### 2026-06-20 — Problem closing line black
+- **Prompt:** One Tap workflow line should use full black color
+- **Outcome:** Added `.m-problem-closing` with `#0d0d0d` on the final problem paragraph.
+
+### 2026-06-20 — Problem lead above tabs
+- **Prompt:** Bring first problem paragraph above the browser tabs visual
+- **Outcome:** Moved lead copy above `ProblemBrowserBar`; remaining paragraphs stay below.
+
+### 2026-06-20 — Swap cover letter and ChatGPT tabs
+- **Prompt:** Replace the position of SWE cover letter and ChatGPT OpenAI tab
+- **Outcome:** Swapped order of Google Docs and ChatGPT tabs in `ProblemBrowserBar`.
+
+### 2026-06-20 — Problem tabs only + real favicons
+- **Prompt:** Tabs only (no URL bar/mockup); use realistic favicons and tab data
+- **Outcome:** Stripped browser chrome to tab strip; tab titles match real job-search pages; favicons loaded per domain.
+
+### 2026-06-20 — White website background
+- **Prompt:** Change website background color to white only
+- **Outcome:** Landing tokens and app `--background` set to `#ffffff`; removed hero bg image/blue gradient overlay; neutral borders restored.
+
+### 2026-06-20 — LinkedIn feed visual box removed
+- **Prompt:** For "Apply directly from LinkedIn in one click", remove border and background from the HTML animation box
+- **Outcome:** `.m-feature-row-visual--feed` is now borderless/transparent; scroll fades use `var(--m-bg)`.
+
+### 2026-06-20 — Problem section browser tabs
+- **Prompt:** Design a browser bar with many open tabs (email, Notion, JD, LinkedIn, etc.) for the problem section
+- **Outcome:** Added `ProblemBrowserBar` with macOS-style crowded tab strip and wired it into `MindooProblemSection`.
+
+### 2026-06-20 — Section spacing 120px
+- **Prompt:** The space between each section should be 120 px
+- **Outcome:** Added `--m-section-gap: 120px` on `main` flex gap; removed conflicting per-section padding and setup spacer divs.
+
+### 2026-06-20 — Problem body full width
+- **Prompt:** Paragraph/description text should take full wrapper width like the heading
+- **Outcome:** Removed `36rem` and `44ch` max-width caps from `.m-problem-texts` and `.m-problem-p`.
+
+### 2026-06-20 — Problem heading width fix
+- **Prompt:** Problem headline still not breaking into two lines; parent wrapper fixed width
+- **Outcome:** Removed `36rem` cap from `.m-problem-content` heading area; stacked both heading lines as blocks; moved width limit to `.m-problem-texts` only.
+
+### 2026-06-20 — Problem heading line break
+- **Prompt:** Split problem headline into two lines — first sentence on line 1, second on line 2
+- **Outcome:** Stacked `SplitHeading` primary below tertiary; removed narrow `m-ch-22` cap on problem heading.
+
+### 2026-06-20 — Body text medium weight
+- **Prompt:** medium
+- **Outcome:** Changed `--m-body-text-weight` from `400` to `500`.
+
+### 2026-06-20 — Body text 15px regular
+- **Prompt:** make it 15px and regular
+- **Outcome:** Updated `--m-body-text-size` to `15px` and `--m-body-text-weight` to `400`.
+
+### 2026-06-20 — Fix body text size to 14px
+- **Prompt:** Body text rendered at 12px instead of 14px
+- **Outcome:** Changed `--m-body-text-size` from `0.875rem` to `1rem` (14px with html root at 14px).
+
+### 2026-06-20 — Unified landing body text class
+- **Prompt:** Make all body text use the same 14px Inter style as hero lead via one controllable class
+- **Outcome:** Added reusable `.m-body-text` and applied it across hero, problem, features, setup, pricing, FAQ, CTA, and footer body copy; removed conflicting per-section font-size overrides.
+
+### 2026-06-20 — Smooth hero image merge
+- **Prompt:** Make the hero image bottom blend into the website background with a linear gradient
+- **Outcome:** Extended and softened the hero background gradient in `mindoo.css` so the image fades into `--m-bg` without a hard edge.
+
+### 2026-06-20 — Hero background scroll fade
+- **Prompt:** Fade hero background image when leaving hero section; restore when scrolling back
+- **Outcome:** Fixed hero bg layer fades via `--hero-bg-opacity` driven by scroll position at the problem-section transition.
+
+### 2026-06-20 — Reduce hero padding
+- **Prompt:** Reduce the hero section top and stop padding a little bit.
+- **Outcome:** Tightened `.mh-hero-stack-wrap` top/bottom padding in `mindoo.css`.
+
+### 2026-06-20 — Landing container 70rem
+- **Prompt:** make it 70 rem (container width)
+- **Outcome:** Changed `--m-container` from `80rem` to `70rem` in `mindoo.css`.
+
+### 2026-06-20 — Remove hero badge
+- **Prompt:** Remove "Private beta · bring your own AI"
+- **Outcome:** Removed badge from `HeroHeadline.tsx`.
+
+### 2026-06-20 — Soft sky-blue background
+- **Prompt:** change the beige to something soft blue like sky
+- **Outcome:** Swapped beige tokens for soft sky blue (`#eff7fd` / `hsl(205 48% 95%)`) on landing and app backgrounds, with matching secondary surfaces and borders.
+
+### 2026-06-20 — Hero video below copy again
+- **Prompt:** Reposition the video at the same place where it was
+- **Outcome:** Moved video back below CTAs full-width; text stays at 55% max-width in stacked hero layout.
+
+### 2026-06-20 — Nav + hero landscape background
+- **Prompt:** Use provided image as background for nav and hero, attached to top
+- **Outcome:** Added `client/public/hero-bg.png` on `.mh-top-shell` with `background-position: top center`, cover sizing, and soft bottom fade into page bg.
+
+### 2026-06-20 — Hero lead line break
+- **Prompt:** “One Tap generates…” sentence should be on the second line
+- **Outcome:** Split hero lead into two explicit lines with block spans.
+
+### 2026-06-20 — Hero text column 55%
+- **Prompt:** make the 65% 55
+- **Outcome:** Hero grid updated to `55% / 45%` text and video columns.
+
+### 2026-06-20 — Hero video restored + 65% text visible
+- **Prompt:** Don't see layout changes; video is gone
+- **Outcome:** Restored demo video in right column (35%); text column uses explicit 65% grid with full-width copy (removed 42ch cap); video stacks below on mobile.
+
+### 2026-06-20 — Hero text column 65%
+- **Prompt:** Make hero text contents width from 50% to 65%
+- **Outcome:** Hero grid columns updated to `65fr / 35fr`.
+
+### 2026-06-20 — Warmer beige background
+- **Prompt:** I ask for beige color, not grey.
+- **Outcome:** Retuned site background to cream beige (`#f5f0e3` / `hsl(43 42% 93%)`) with warmer secondary surfaces and tan borders on landing + app tokens.
+
+### 2026-06-20 — Hero more top padding
+- **Prompt:** Add more top padding for hero section
+- **Outcome:** Increased hero `padding-top` from `clamp(4.5rem, 10vw, 7.5rem)` to `clamp(6rem, 14vw, 10rem)`.
+
+### 2026-06-20 — Hero two-column layout
+- **Prompt:** Hero text should take 50% container width — two columns, text left, empty right
+- **Outcome:** Hero uses 50/50 grid; copy in left column, empty right slot; removed hero video from layout.
+
+### 2026-06-20 — Hero rotate slot spacing fix
+- **Prompt:** Rotating words clipped / next word peeking; need proper spacing in carousel viewport
+- **Outcome:** Aligned `--rotate-step` with heading line-height, flex-centered word slots, taller viewport, `overflow: hidden` per word.
+
+### 2026-06-20 — Hero rotate seamless loop
+- **Prompt:** Rotation should loop continuously bottom-to-top without reversing when restarting
+- **Outcome:** Cloned first word at end of track; after scrolling to duplicate, instant reset to index 0 so apply→track→manage→improve→apply loops in one direction only.
+
+### 2026-06-20 — Button radius 12px
+- **Prompt:** Make button corner radius 12px (was 8px)
+- **Outcome:** Updated `--m-btn-radius` and app `Button` component to `12px`.
+
+### 2026-06-20 — Hero rotate one-step + heading color
+- **Prompt:** Rotating word should change one at a time (not jump 1→4); same color as heading not blue
+- **Outcome:** Fixed carousel transform to move one `1.05em` step per index; rotating word uses `color: inherit`.
+
+### 2026-06-20 — Hero dual CTAs + 8px button radius
+- **Prompt:** Hero: Get started + Get a demo; all buttons ~8px radius not pill-shaped
+- **Outcome:** Added hero action row; `--m-btn-radius: 0.5rem` on landing buttons; app `Button` uses `rounded-[8px]`.
+
+### 2026-06-20 — Subtle beige site background
+- **Prompt:** add a beige color background that is very subtle and soft to the whole website background
+- **Outcome:** Shifted global `--background` and landing `--m-bg` tokens to warm off-white (`#faf8f5` / `hsl(32 24% 97%)`); aligned borders, muted surfaces, and hero shell to the same palette.
+
+### 2026-06-20 — Hero rotating headline
+- **Prompt:** Two-line hero with rotating apply/track/manage/improve like x.ai
+- **Outcome:** `HeroHeadline` now shows “The fastest way to [word]” / “your job applications.” with vertical word carousel and reduced-motion fallback.
+
+### 2026-06-20 — Inter body + Vend Sans headings
+- **Prompt:** Rest of fonts apart from Vend Sans use Inter
+- **Outcome:** Loaded Inter; `--m-font` / `--font-sans` set to Inter; headings stay Vend Sans only.
+
+### 2026-06-20 — Hero top padding + smaller headline
+- **Prompt:** More hero top padding and headline a little smaller
+- **Outcome:** Top padding `clamp(4.5rem, 10vw, 7.5rem)`; headline `clamp(2rem, 4.25vw, 3.125rem)`.
+
+### 2026-06-20 — Smaller hero headline
+- **Prompt:** Make the hero section's headline a little smaller
+- **Outcome:** Reduced `--mh-h1` from `clamp(2.625rem, 5.5vw, 4.125rem)` to `clamp(2.25rem, 4.75vw, 3.5rem)`.
+
+### 2026-06-20 — More hero top padding
+- **Prompt:** Add top padding for the hero section
+- **Outcome:** Increased `.mh-hero-stack-wrap` top padding to `clamp(3.5rem, 8vw, 6rem)`.
+
+### 2026-06-20 — Vend Sans for headings
+- **Prompt:** For all headings, use Vend Sans
+- **Outcome:** Loaded Vend Sans from Google Fonts; applied to landing heading tokens and app h1–h6 via `--m-heading-font` / `--font-heading`.
+
+### 2026-06-20 — Hero in site container, tighter shell padding
+- **Prompt:** Hero in container; widen only via less wrapper padding, not wider max-width
+- **Outcome:** Hero uses `m-container` (80rem); `mh-top-shell` reduces horizontal padding for nav + hero vs rest of page.
+
+### 2026-06-20 — Hero top padding
+- **Prompt:** Add some top padding for the hero section
+- **Outcome:** Increased `.mh-hero-stack-wrap` top padding from `clamp(1.5rem, 4vw, 3rem)` to `clamp(2.5rem, 6vw, 4.5rem)`.
+
+### 2026-06-20 — Wider hero content
+- **Prompt:** Increase hero section width so content goes a little wider
+- **Outcome:** Hero container widened to 92rem with tighter side padding; intro max-width removed, lead widened to 72ch, h1 scale bumped slightly.
+
+### 2026-06-20 — System UI font everywhere
+- **Prompt:** Use system UI font for everything
+- **Outcome:** Removed web font loads; landing and app now use system-ui stack for body, headings, and buttons.
+
+### 2026-06-20 — Amigo-style heading font
+- **Prompt:** Use Amigo.ai hero heading font for landing headings
+- **Outcome:** Swapped Martina Plantijn for Playfair Display (Amigo’s Flecha fallback); updated heading tokens, hero h1, and CTA title with matching weight, tracking, and line-height.
+
+### 2026-06-20 — Minimal CTA card + one-line footer
+- **Prompt:** Footer one line only; bottom CTA like reference (card, lime button, short copy)
+- **Outcome:** Rebuilt `MindooCtaSection` as centered card with gradient + dashboard link; replaced footer with single-line © and links.
+
+### 2026-06-20 — CTA + footer below FAQ
+- **Prompt:** Add a CTA section below FAQ and footer
+- **Outcome:** Restored `MindooCtaSection` and `MindooFooter` on landing after FAQ; updated footer/nav links to current sections and real legal routes.
+
+### 2026-06-20 — Trim landing below FAQ
+- **Prompt:** Below FAQ, remove every section
+- **Outcome:** Removed Solution, Steps, Trust, and CTA sections from landing; updated nav links to Features/Pricing/FAQ and CTA scroll target to pricing.
+
+### 2026-06-20 — Setup section trust-style cards
+- **Prompt:** Update setup section like trust section — image, title, and paragraph per card
+- **Outcome:** Rebuilt `MindooSetupSection` with SplitHeading + three gradient visual cards matching `MindooTrustSection` layout.
+
+### 2026-06-20 — FAQ section below pricing
+- **Prompt:** Add FAQ below pricing — free/credit card, data privacy, supported models, etc.
+- **Outcome:** Added `MindooFaqSection` with eight accordion Q&As covering pricing, privacy, BYOK providers/models, Gmail, extension, and review mode.
+
+### 2026-06-20 — Global letter-spacing zero
+- **Prompt:** Make letter spacing of every text on the website 0
+- **Outcome:** Set `letter-spacing: 0` on body/headings in `index.css`, zeroed Tailwind tracking tokens, and reset all landing `mindoo.css` letter-spacing rules.
+
+### 2026-06-20 — Pricing section (two free plans)
+- **Prompt:** Below setup, pricing section — free to use, unlimited applications, 2 free plans
+- **Outcome:** Added `MindooPricingSection` with Private beta + Core cards (both Free), feature bullets, and get-started CTAs styled like reference.
+
+### 2026-06-20 — LinkedIn feed 3-card Beside layout
+- **Prompt:** Match Beside hero — 3 cards visible (peek top/center/bottom), gradient fade, not one-at-a-time
+- **Outcome:** Rebuilt feed viewport math, lead-card prepend for seamless loop, top/bottom gradient overlays, removed per-card opacity toggling.
+
+### 2026-06-20 — Chrome extension LinkedIn feed animation
+- **Prompt:** Beside-style scrolling/pausing card list for Chrome extension section; LinkedIn post replica with OneTap button on actions
+- **Outcome:** Added `LinkedInFeedScroll` with 4 dummy hiring posts, scroll-pause CSS animation, and OneTap CTA beside Like/Comment/Repost/Send; wired into extension row in `MindooFeatureShowcaseSection`.
+
+### 2026-06-20 — Setup section (3 cards)
+- **Prompt:** After feature rows, setup section with title + 3 horizontal cards: upload résumé, model provider, Gmail
+- **Outcome:** Added `MindooSetupSection` with centered “Three minutes to set up…” headline and three-column setup cards matching reference layout.
+
+### 2026-06-20 — Feature showcase bullet points
+- **Prompt:** Add three benefit bullet points below each feature row description (extension, tracking, BYOK)
+- **Outcome:** Each showcase row now lists three product-specific bullets under the body copy with styled dot markers.
+
+### 2026-06-20 — Feature showcase rows below problem
+- **Prompt:** Below problem section, 3 two-column rows (copy + visual): Chrome extension, application tracking, BYOK/privacy
+- **Outcome:** Added `MindooFeatureShowcaseSection` with alternating 2-col layout and mini UI visuals (extension, tracker, BYOK setup); wired into landing after problem section.
+
+### 2026-06-20 — Auto apply toggle copy
+- **Prompt:** Auto apply toggle needs a one-line descriptive label (Auto apply — let OneTap send from Gmail, etc.)
+- **Outcome:** `AutoApplyToggle` now shows “Auto apply — …” with mode-specific Gmail copy on one line; walkthrough text updated.
+
+### 2026-06-20 — Hero video full container width
+- **Prompt:** The video should take the full width of the container
+- **Outcome:** Moved video out of `mh-hero-intro` so it spans the full `mh-container` width instead of the narrower intro column.
+
+### 2026-06-20 — Hero badge font size
+- **Prompt:** Increase the font size of the text that says "Private Beta - Bring Your Own AI".
+- **Outcome:** Bumped `.mh-hero-badge` from `0.8125rem` to `0.9375rem`.
+
+### 2026-06-20 — Hero product demo video
+- **Prompt:** Use provided screen recording below “Get started for free” as part of hero
+- **Outcome:** Added `client/public/hero-demo.mov` (+ H.264 `hero-demo.mp4` for Chrome/Firefox) and autoplaying muted loop video in hero below the CTA with rounded frame and fade-in.
+
+### 2026-06-20 — Hero badge–heading spacing
+- **Prompt:** Increase the space between the heading and this element (badge pill)
+- **Outcome:** Increased `.mh-hero-headline` gap from `0.35rem` to `1.25rem`.
+
+### 2026-06-20 — Hero badge pill fixes
+- **Prompt:** Badge letter-spacing zero, auto width (not full-width), blue dot instead of green
+- **Outcome:** Badge uses `width: fit-content`, `letter-spacing: 0`, and brand-blue status dot.
+
+### 2026-06-20 — Hero CTA letter-spacing
+- **Prompt:** Make letter spacing in get started for free 0
+- **Outcome:** Set `letter-spacing: 0` on `.mh-hero-waitlist-trigger`.
+
+### 2026-06-20 — Hero CTA get started for free
+- **Prompt:** or get started for free
+- **Outcome:** Renamed hero CTA from “Try for free” to “Get started for free”.
+
+### 2026-06-20 — Hero CTA try for free
+- **Prompt:** Remove the waitlist button; say try for free
+- **Outcome:** Replaced hero waitlist email flow with a “Try for free” link to `/login`; removed `HeroWaitlistInput.tsx`.
+
+### 2026-06-20 — Wider hero content
+- **Prompt:** Make the hero section's content width wider
+- **Outcome:** Increased hero intro max-width to 68rem and lead copy to 62ch (from 52rem / 48ch).
+
+### 2026-06-20 — Smaller hero heading
+- **Prompt:** Hero section heading — make it smaller
+- **Outcome:** Reduced `--mh-h1` from `clamp(3.25rem, 8vw, 6.25rem)` to `clamp(2.5rem, 5vw, 3.75rem)`.
+
+### 2026-06-20 — Remove hero product mockup
+- **Prompt:** delete the html element as well
+- **Outcome:** Removed the hero demo block (`mh-hero-demo` / `ProductMockupFull`) and its CSS; hero is now copy + waitlist CTA only.
+
+### 2026-06-20 — Hero lead mentions extension
+- **Prompt:** Description should be easier to understand — paste JD, auto/review send, Chrome extension on LinkedIn
+- **Outcome:** Rewrote hero lead to cover paste-a-JD flow (draft → auto-send or review) and one-click LinkedIn apply via Chrome extension.
+
+### 2026-06-20 — Remove hero HTML animation
+- **Prompt:** remove the html animation from hero section
+- **Outcome:** Replaced `HeroApplyAnimation` with static `ProductMockupFull`; removed AutoApply toggle bar, `HeroApplyAnimation.tsx`, `useHeroApplyAnimation.ts`, and related `mh-anim-*` CSS.
+
+### 2026-06-18 — Hero copy reflects product
+- **Prompt:** Update hero copy to actual product — get hired faster, short OneTap description, one CTA, top pill like “bring your own AI”
+- **Outcome:** Added private-beta badge pill, headline “Get hired faster”, product-accurate lead (paste JD → personalized email from résumé via your Gmail + BYOK), removed secondary CTA.
+
+### 2026-06-18 — Paper-style landing hero
+- **Prompt:** Update the website hero section like paper.design
+- **Outcome:** Redesigned hero to Paper-style stacked layout — light shell, large lowercase headline (“Apply incredible”), two-line tagline, lead paragraph, dual CTAs (waitlist + “See how it works”), AutoApply toggle above full-width product demo below copy.
+
+### 2026-06-18 — Auto-apply loader placement
+- **Prompt:** Auto-apply processing loader appeared below JD input; should show centered in email preview panel like review mode
+- **Outcome:** Auto-apply mode now renders a right-column preview panel with centered `LoadingTimer` (preparing/sending states) instead of placing the loader under the job description textarea.
+
+### 2026-06-18 — User research script doc
+- **Prompt:** Save OneTap MVP user interview script + scorecard for repeatable user research sessions
+- **Outcome:** Added `docs/product/user-research-script.md` with pre-call brief, 7 core questions, live tasks, scorecard, synthesis template, and facilitation notes tailored to Apply/Applications/extension flows.
+
 ### 2026-06-18 — No-contact apply status / filter fix
 - **Prompt:** JD pasted without email logs app but default status filter hides it; should be ready to review/review
 - **Outcome:** Root cause: missing-contact applies correctly transition to `application_status=needs_review` but got no `tracker_status_id`, so the Status column showed the empty "Select status" placeholder and summary/review views missed them. Fixed by assigning `Email Ready` tracker status on needs_review (worker + backfill sync), inferring it in SSE cache patches, and rendering a "Needs review" label in the table instead of the tracker picker for those rows.
@@ -954,3 +1750,4 @@
 ### 2026-06-12 — Start local dev server
 - **Prompt:** start a local dev server
 - **Outcome:** Installed root deps, created `.env` from example, generated `ENCRYPTION_KEY` and `INTERNAL_API_KEY`, started `npm run dev` — blocked on missing `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`; Redis and Postgres not running locally.
+ome:** Installed root deps, created `.env` from example, generated `ENCRYPTION_KEY` and `INTERNAL_API_KEY`, started `npm run dev` — blocked on missing `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`; Redis and Postgres not running locally.

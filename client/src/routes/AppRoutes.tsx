@@ -3,6 +3,10 @@ import { RealtimeProvider } from "@/contexts/RealtimeProvider";
 import { Layout } from "@/components/layout";
 import { LandingPage } from "@/pages/landing";
 import { LoginPage } from "@/pages/login";
+import { SignupPage } from "@/pages/signup";
+import { PricingPage } from "@/pages/pricing";
+import { ForgotPasswordPage } from "@/pages/forgotPassword";
+import { ResetPasswordPage } from "@/pages/resetPassword";
 import { AuthCallbackPage } from "@/pages/authCallback";
 import { Dashboard } from "@/pages/dashboard";
 import { Applications } from "@/pages/applications";
@@ -13,6 +17,7 @@ import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { GuestRoute } from "@/routes/GuestRoute";
 import { OnboardingGuard } from "@/routes/OnboardingGuard";
 import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
+import { SubscriptionGuard } from "@/routes/SubscriptionGuard";
 import { SessionHandlers } from "@/auth/SessionHandlers";
 import { useAuth } from "@/auth/AuthContext";
 import { AdminPage } from "@/pages/admin";
@@ -40,30 +45,36 @@ export function AppRoutes() {
       <SessionHandlers />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/support" element={<SupportPage />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route
-            element={
-              <RealtimeProvider>
-                <Layout />
-              </RealtimeProvider>
-            }
-          >
-            <Route element={<OnboardingGuard />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/applications" element={<Applications />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route element={<SubscriptionGuard />}>
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route
+              element={
+                <RealtimeProvider>
+                  <Layout />
+                </RealtimeProvider>
+              }
+            >
+              <Route element={<OnboardingGuard />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/applications" element={<Applications />} />
+              </Route>
+              <Route path="/setup" element={<Setup />} />
+              <Route path="/settings/extension" element={<SettingsExtension />} />
+              {isAdmin && <Route path="/admin" element={<AdminPage />} />}
             </Route>
-            <Route path="/setup" element={<Setup />} />
-            <Route path="/settings/extension" element={<SettingsExtension />} />
-            {isAdmin && <Route path="/admin" element={<AdminPage />} />}
           </Route>
         </Route>
 

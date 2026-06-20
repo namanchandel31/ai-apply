@@ -13,15 +13,13 @@ function deriveOnboardingState(facts) {
   const hasEmailSetup = !!facts.hasEmailSetup;
 
   const onboardingRequired =
-    !hasVerifiedAiCredential || !hasValidResume || !hasEmailSetup;
+    !hasVerifiedAiCredential || !hasValidResume;
 
   let currentOnboardingStep = "ready";
   if (!hasVerifiedAiCredential) {
     currentOnboardingStep = "ai";
   } else if (!hasValidResume) {
     currentOnboardingStep = "resume";
-  } else if (!hasEmailSetup) {
-    currentOnboardingStep = "email";
   }
 
   return {

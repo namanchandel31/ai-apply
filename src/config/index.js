@@ -16,6 +16,7 @@ const product = require("./product.config");
 const realtime = require("./realtime.config");
 const runtime = require("./runtime.config");
 const cors = require("./cors.config");
+const billing = require("./billing.config");
 
 const config = Object.freeze({
   server,
@@ -32,6 +33,7 @@ const config = Object.freeze({
   realtime,
   runtime,
   cors,
+  billing,
 });
 
 module.exports = config;

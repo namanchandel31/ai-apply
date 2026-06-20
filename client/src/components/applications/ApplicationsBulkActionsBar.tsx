@@ -66,7 +66,7 @@ function BulkBarButton({
       variant="ghost"
       size="sm"
       className={cn(
-        "h-10 gap-2 rounded-lg px-3 text-base font-normal text-background hover:bg-white/10 hover:text-background",
+        "h-10 gap-2 px-3 text-base font-normal text-background hover:bg-white/10 hover:text-background",
         className
       )}
       {...props}

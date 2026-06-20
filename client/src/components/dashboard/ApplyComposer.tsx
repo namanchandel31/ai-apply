@@ -194,11 +194,11 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
       );
 
       if (isAutoMode) {
-        toast.success("Application sent — your email is going out automatically.", {
+        toast.success("Application sent. Your email is going out automatically.", {
           description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
         });
       } else {
-        toast.success("Application queued — we'll send your email in the background.", {
+        toast.success("Application queued. We'll send your email in the background.", {
           description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
         });
       }
@@ -345,18 +345,6 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
             <Label htmlFor="jd-text" className={SECTION_LABEL}>
               Job description
             </Label>
-            {isAutoMode && hasJdContent && generating && (
-              <span className={cn(PREVIEW_TEXT_SECONDARY, "flex items-center gap-1")}>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Preparing…
-              </span>
-            )}
-            {isAutoMode && sending && !generating && (
-              <span className={cn(PREVIEW_TEXT_SECONDARY, "flex items-center gap-1")}>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Sending…
-              </span>
-            )}
           </div>
           <Textarea
             id="jd-text"
@@ -372,20 +360,65 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
             disabled={busy}
             required
           />
-          {isAutoMode && (
-            <div className="space-y-2">
-              {generating && hasJdContent && (
-                <LoadingTimer label="Preparing your application email…" labelShimmer />
-              )}
-              {sending && <LoadingTimer label="Sending your application automatically…" />}
-              {!canApply && applyDisabledReason && (
-                <p className={PREVIEW_TEXT_SECONDARY}>{applyDisabledReason}</p>
-              )}
-            </div>
+          {isAutoMode && !canApply && applyDisabledReason && (
+            <p className={PREVIEW_TEXT_SECONDARY}>{applyDisabledReason}</p>
           )}
         </div>
 
-        {!isAutoMode && (
+        {isAutoMode ? (
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className={LABEL_ROW}>
+              <Label className={SECTION_LABEL}>Email preview</Label>
+              {hasJdContent && generating && (
+                <span className={cn(PREVIEW_TEXT_SECONDARY, "flex items-center gap-1")}>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Preparing…
+                </span>
+              )}
+              {hasJdContent && sending && !generating && (
+                <span className={cn(PREVIEW_TEXT_SECONDARY, "flex items-center gap-1")}>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Sending…
+                </span>
+              )}
+            </div>
+
+            <div className={cn(PANEL_HEIGHT, "flex w-full flex-col gap-3 overflow-hidden")}>
+              {!hasJdContent ? (
+                <div
+                  className={cn(
+                    "flex h-full flex-col items-center justify-center border border-dashed border-border bg-muted/10 px-6 text-center",
+                    APPLY_BOX_RADIUS
+                  )}
+                >
+                  <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
+                    Paste a job description. We'll prepare and send your application automatically
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "flex h-full flex-col items-center justify-center border border-dashed border-border bg-muted/50 px-4 py-6",
+                    APPLY_BOX_RADIUS
+                  )}
+                >
+                  {generating || !hasPreview ? (
+                    <LoadingTimer
+                      label="Preparing your application email…"
+                      labelShimmer
+                      className="max-w-sm"
+                    />
+                  ) : (
+                    <LoadingTimer
+                      label="Sending your application automatically…"
+                      className="max-w-sm"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
           <div className="flex min-w-0 flex-col gap-3">
             <div className={LABEL_ROW}>
               <Label htmlFor="email-subject" className={SECTION_LABEL}>

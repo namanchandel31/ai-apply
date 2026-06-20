@@ -28,6 +28,17 @@ async function computeHasValidResume(userId) {
 }
 
 async function buildSetupStatus(userId) {
+  const { rows: userRows } = await pool.query(
+    `SELECT subscription_status, subscription_tier
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  const subscriptionStatus = userRows[0]?.subscription_status ?? "inactive";
+  const subscriptionTier = userRows[0]?.subscription_tier ?? "free";
+  const hasActiveSubscription = subscriptionStatus === "active";
+
   const { rows: resumeRows } = await pool.query(
     `SELECT id, file_hash as "fileHash", file_name as "filename", uploaded_at as "uploadedAt"
      FROM resumes
@@ -61,6 +72,8 @@ async function buildSetupStatus(userId) {
   });
 
   return {
+    hasActiveSubscription,
+    subscriptionTier,
     hasResume,
     hasValidResume,
     hasEmailSetup,

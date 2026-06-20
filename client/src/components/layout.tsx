@@ -28,7 +28,7 @@ export function Layout() {
                 data-tour={item.to === "/applications" ? "applications-tab" : undefined}
                 className={({ isActive }) =>
                   cn(
-                    "inline-flex h-full items-center border-b-2 px-1 text-base whitespace-nowrap transition-[color,border-color] duration-[120ms]",
+                    "font-heading inline-flex h-full items-center border-b-2 px-1 text-base whitespace-nowrap transition-[color,border-color] duration-[120ms]",
                     isActive
                       ? "border-foreground font-medium text-foreground"
                       : "border-transparent font-normal text-muted-foreground hover:text-foreground"

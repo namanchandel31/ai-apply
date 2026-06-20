@@ -1,7 +1,7 @@
 const { pool } = require("../db");
 const { buildFullName, splitFullName } = require("../utils/deriveNameFromEmail");
 
-const USER_COLUMNS = `id, supabase_user_id, email, first_name, last_name, full_name, avatar_url, created_at, last_login_at, profile_customized_at, apply_mode, is_admin`;
+const USER_COLUMNS = `id, supabase_user_id, email, first_name, last_name, full_name, avatar_url, created_at, last_login_at, profile_customized_at, apply_mode, is_admin, subscription_tier, subscription_status, subscription_plan_id, subscription_activated_at, razorpay_last_order_id, razorpay_last_payment_id`;
 
 async function findBySupabaseUserId(supabaseUserId) {
   const { rows } = await pool.query(
@@ -170,6 +170,25 @@ async function touchUserLastLogin(userId) {
   await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [userId]);
 }
 
+async function setUserSubscriptionActive(
+  userId,
+  { subscriptionTier, planId, razorpayOrderId, razorpayPaymentId }
+) {
+  const { rows } = await pool.query(
+    `UPDATE users
+     SET subscription_tier = $2,
+         subscription_status = 'active',
+         subscription_plan_id = $3,
+         subscription_activated_at = NOW(),
+         razorpay_last_order_id = $4,
+         razorpay_last_payment_id = $5
+     WHERE id = $1
+     RETURNING ${USER_COLUMNS}`,
+    [userId, subscriptionTier, planId, razorpayOrderId, razorpayPaymentId]
+  );
+  return rows[0] || null;
+}
+
 /**
  * Fetch the user's defaults (resume).
  */
@@ -264,6 +283,7 @@ module.exports = {
   updateUserProfile,
   seedProfileFromEmail,
   touchUserLastLogin,
+  setUserSubscriptionActive,
   getUserDefaults,
   setUserDefaults,
   getEmailPreferenceLevels,
