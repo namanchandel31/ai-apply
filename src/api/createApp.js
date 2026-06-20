@@ -58,6 +58,7 @@ function createApp() {
   const orchestrationRoutes = require("../routes/orchestrationRoutes");
   const userRoutes = require("../routes/userRoutes");
   const aiRoutes = require("../routes/aiRoutes");
+  const billingRoutes = require("../routes/billingRoutes");
 
   if (!config.server.isProduction) {
     const { swaggerUi, swaggerSpec } = require("../docs/swagger");
@@ -82,6 +83,7 @@ function createApp() {
   app.use("/api", orchestrationRoutes);
   app.use("/api", readRateLimit, userRoutes);
   app.use("/api", aiRateLimit, aiRoutes);
+  app.use("/api", billingRoutes);
 
   // Admin-only (gated by users.is_admin via adminGuard inside the router).
   const modelCertificationRoutes = require("../routes/modelCertificationRoutes");

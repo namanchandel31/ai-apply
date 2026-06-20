@@ -4,7 +4,7 @@ import { SplitHeading } from "./shared";
 const FEATURES = [
   {
     name: "Apply agent",
-    desc: "Parses job descriptions, scores resume fit, and drafts outreach — automatically in the background.",
+    desc: "Parses job descriptions, scores resume fit, and drafts outreach automatically in the background.",
     cta: "See Apply",
     color: "#0059FF",
   },
@@ -16,7 +16,7 @@ const FEATURES = [
   },
   {
     name: "Gmail agent",
-    desc: "Sends from your own inbox so recruiters see your name — not a platform no-reply address.",
+    desc: "Sends from your own inbox so recruiters see your name, not a platform no-reply address.",
     cta: "See Gmail",
     color: "#E594C4",
   },
@@ -46,8 +46,8 @@ export function MindooFeaturesSection() {
             primary="Add automation as your search needs it."
           />
           <p data-reveal="" className="m-features-sub">
-            OneTap is the only apply platform that lets you run the full workflow — draft,
-            send, and track — inside one clean, governed system.
+            OneTap is the only apply platform that lets you run the full workflow (draft,
+            send, and track) inside one clean, governed system.
           </p>
         </div>
       </div>
@@ -70,7 +70,7 @@ export function MindooFeaturesSection() {
               <button
                 type="button"
                 className="m-btn m-btn-primary m-feature-cta"
-                onClick={() => mindooScrollTo("waitlist")}
+                onClick={() => mindooScrollTo("pricing")}
               >
                 {f.cta}
               </button>

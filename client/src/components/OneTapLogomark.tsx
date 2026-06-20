@@ -29,7 +29,7 @@ export function OneTapBrand({ className, logomarkClassName }: { className?: stri
   return (
     <div className={cn("flex shrink-0 items-center gap-2", className)}>
       <OneTapLogomark className={cn("h-8 w-auto", logomarkClassName)} />
-      <span className="text-lg font-semibold leading-none tracking-tight">OneTap</span>
+      <span className="font-heading text-lg font-semibold leading-none tracking-tight">OneTap</span>
     </div>
   );
 }

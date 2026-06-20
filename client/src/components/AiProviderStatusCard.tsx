@@ -278,7 +278,7 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
             <CardDescription>
               {usesOwnKey
                 ? `${sorted.length} credential(s) configured. Primary is tried first, then backups in order.`
-                : "No personal AI key — using server configuration when available."}
+                : "No personal AI key. Using server configuration when available."}
             </CardDescription>
           </div>
           <Badge variant="success" className="shrink-0">

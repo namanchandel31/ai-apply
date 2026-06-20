@@ -223,6 +223,8 @@ export type EmailPreferencesData = {
 };
 
 export type SetupStatusData = {
+  hasActiveSubscription?: boolean;
+  subscriptionTier?: string;
   hasResume: boolean;
   hasValidResume?: boolean;
   hasEmailSetup: boolean;
@@ -247,6 +249,8 @@ export type UserMe = {
   avatarUrl?: string | null;
   applyMode?: "auto_apply" | "review_apply";
   subscriptionTier: string;
+  subscriptionStatus?: "inactive" | "active";
+  subscriptionPlanId?: string | null;
   isAdmin?: boolean;
   flags: Record<string, unknown>;
   createdAt: string;
@@ -279,6 +283,40 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ applyMode }),
+    });
+  },
+
+  createBillingOrder(planId: "byok" | "onetap_llm") {
+    return request<{
+      success: boolean;
+      data: {
+        orderId: string;
+        amountPaise: number;
+        currency: string;
+        keyId: string;
+        plan: {
+          id: "byok" | "onetap_llm";
+          tier: string;
+          name: string;
+        };
+      };
+    }>("/api/billing/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId }),
+    });
+  },
+
+  verifyBillingPayment(body: {
+    planId: "byok" | "onetap_llm";
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }) {
+    return request<{ success: boolean; data: { user: UserMe } }>("/api/billing/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
   },
 

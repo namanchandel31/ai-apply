@@ -21,8 +21,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OneTapBrand } from "@/components/OneTapLogomark";
+import { ExtensionInstallPrompt } from "@/components/onboarding/ExtensionInstallPrompt";
 import { OnboardingConfetti } from "@/components/onboarding/OnboardingConfetti";
 import { ResumeDropzone } from "@/components/onboarding/ResumeDropzone";
+import {
+  clearEmailStepSkipped,
+  clearOnboardingExtensionPending,
+  hasDismissedExtensionPrompt,
+  hasEmailStepSkipped,
+  hasOnboardingExtensionPending,
+  markEmailStepSkipped,
+  markExtensionPromptDismissed,
+  markOnboardingExtensionPending,
+} from "@/lib/extensionPrompt";
 import { AiProviderOptionLabel } from "@/components/ai/AiProviderLogo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/auth/AuthContext";
@@ -30,7 +41,6 @@ import { getDisplayFirstName } from "@/lib/userDisplay";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
 import { getAiProviderApiKeyLink } from "@/lib/aiProviderApiKeyLinks";
 import {
-  DEFAULT_REMOTE_PROVIDER_ID,
   isProviderComingSoon,
   REMOTE_PROVIDERS,
   type RemoteProviderId,
@@ -140,7 +150,7 @@ export function Onboarding() {
   const { data: status, isLoading, refetch } = useSetupStatus();
   useActivationTracking(status, "onboarding");
 
-  const [provider, setProvider] = useState<RemoteProviderId>(DEFAULT_REMOTE_PROVIDER_ID);
+  const [provider, setProvider] = useState<RemoteProviderId | "">("");
   const [selectedModel, setSelectedModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [curatedModels, setCuratedModels] = useState<
@@ -150,15 +160,20 @@ export function Onboarding() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [resumeUi, setResumeUi] = useState<ResumeUiState>("idle");
   const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSkipped, setEmailSkipped] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  const [showExtensionPrompt, setShowExtensionPrompt] = useState(false);
   const celebrationStartedRef = useRef(false);
+  const extensionPromptTrackedRef = useRef(false);
+  const extensionStepStartedRef = useRef(false);
   const uploadStartedAt = useRef<number | null>(null);
   const startedRef = useRef(false);
 
   const hasVerifiedAi = !!status?.hasVerifiedAiCredential;
   const hasValidResume = !!status?.hasValidResume;
   const hasEmailSetup = !!status?.hasEmailSetup;
-  const isComplete = hasVerifiedAi && hasValidResume && hasEmailSetup;
+  const emailStepResolved = hasEmailSetup || emailSkipped || hasEmailStepSkipped();
+  const isComplete = hasVerifiedAi && hasValidResume && emailStepResolved;
   const parsingResume = !!status?.hasResume && !hasValidResume;
 
   const completedSteps: [boolean, boolean, boolean] = [
@@ -167,7 +182,13 @@ export function Onboarding() {
     hasEmailSetup,
   ];
   const completedCount = completedSteps.filter(Boolean).length;
-  const activeStep = !hasVerifiedAi ? 1 : !hasValidResume ? 2 : !hasEmailSetup ? 3 : 0;
+  const activeStep = !hasVerifiedAi
+    ? 1
+    : !hasValidResume
+      ? 2
+      : !emailStepResolved
+        ? 3
+        : 0;
   const remainingCount = 3 - completedCount;
 
   useResumeParsePolling(parsingResume);
@@ -185,6 +206,11 @@ export function Onboarding() {
   }, [isLoading, refreshUser]);
 
   useEffect(() => {
+    if (!provider || isProviderComingSoon(provider)) {
+      setCuratedModels([]);
+      return;
+    }
+
     let cancelled = false;
     api
       .getCuratedAiModels(provider)
@@ -223,12 +249,75 @@ export function Onboarding() {
     return () => clearInterval(tick);
   }, [parsingResume, status?.activeResume?.uploadedAt]);
 
+  const finishOnboarding = useCallback(() => {
+    clearOnboardingExtensionPending();
+    clearEmailStepSkipped();
+    markOnboardingWalkthroughPending();
+    trackOnboardingEvent("dashboard_entered");
+    navigate("/dashboard", { replace: true });
+  }, [navigate]);
+
+  const beginOnboardingCompletion = useCallback(() => {
+    if (celebrationStartedRef.current) return;
+    celebrationStartedRef.current = true;
+    markOnboardingExtensionPending();
+    trackOnboardingEvent("onboarding_completed");
+    setCelebrating(true);
+  }, []);
+
+  const continueAfterExtensionPrompt = useCallback(() => {
+    markExtensionPromptDismissed();
+    setShowExtensionPrompt(false);
+    finishOnboarding();
+  }, [finishOnboarding]);
+
+  const showExtensionStep = useCallback(() => {
+    if (extensionStepStartedRef.current) return;
+    extensionStepStartedRef.current = true;
+    setCelebrating(false);
+    const shouldShowExtension =
+      hasOnboardingExtensionPending() || !hasDismissedExtensionPrompt();
+    if (!shouldShowExtension) {
+      finishOnboarding();
+      return;
+    }
+    setShowExtensionPrompt(true);
+    if (!extensionPromptTrackedRef.current) {
+      extensionPromptTrackedRef.current = true;
+      trackOnboardingEvent("extension_prompt_shown");
+    }
+  }, [finishOnboarding]);
+
+  useEffect(() => {
+    if (!isLoading && hasEmailStepSkipped()) {
+      setEmailSkipped(true);
+    }
+  }, [isLoading]);
+
   useEffect(() => {
     if (!isComplete || celebrationStartedRef.current) return;
-    celebrationStartedRef.current = true;
-    setCelebrating(true);
-    trackOnboardingEvent("onboarding_completed");
-  }, [isComplete]);
+    beginOnboardingCompletion();
+  }, [isComplete, beginOnboardingCompletion]);
+
+  useEffect(() => {
+    if (isLoading || !hasVerifiedAi || !hasValidResume || !emailStepResolved) return;
+    if (!hasOnboardingExtensionPending() || showExtensionPrompt || celebrating) return;
+    if (extensionStepStartedRef.current) {
+      setShowExtensionPrompt(true);
+      return;
+    }
+    if (!celebrationStartedRef.current) {
+      beginOnboardingCompletion();
+    }
+  }, [
+    isLoading,
+    hasVerifiedAi,
+    hasValidResume,
+    emailStepResolved,
+    showExtensionPrompt,
+    celebrating,
+    beginOnboardingCompletion,
+  ]);
 
   useEffect(() => {
     if (hasValidResume && uploadStartedAt.current) {
@@ -241,21 +330,19 @@ export function Onboarding() {
     refetch();
   }, [queryClient, refetch]);
 
-  const finishOnboarding = useCallback(() => {
-    markOnboardingWalkthroughPending();
-    trackOnboardingEvent("dashboard_entered");
-    navigate("/dashboard", { replace: true });
-  }, [navigate]);
-
   useEffect(() => {
     if (!celebrating) return;
     const timer = window.setTimeout(() => {
-      finishOnboarding();
+      showExtensionStep();
     }, 3000);
     return () => window.clearTimeout(timer);
-  }, [celebrating, finishOnboarding]);
+  }, [celebrating, showExtensionStep]);
 
   const handleSaveAi = async () => {
+    if (!provider) {
+      toast.error("Select a model provider");
+      return;
+    }
     if (!selectedModel) {
       toast.error("Select a model from the dropdown");
       return;
@@ -300,12 +387,19 @@ export function Onboarding() {
     try {
       await api.uploadResume(file, "onboarding");
       setResumeUi("queued");
-      toast.success("Resume uploaded — parsing in progress");
+      toast.success("Resume uploaded. Parsing in progress");
       invalidateStatus();
     } catch (err) {
       setResumeUi("failed");
       toast.error(err instanceof Error ? err.message : "Upload failed");
     }
+  };
+
+  const handleSkipEmail = () => {
+    trackOnboardingEvent("email_setup_skipped");
+    markEmailStepSkipped();
+    markOnboardingExtensionPending();
+    setEmailSkipped(true);
   };
 
   const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -326,6 +420,8 @@ export function Onboarding() {
       await api.saveCredentials(String(fd.get("email")), password);
       toast.success("Gmail connected");
       trackOnboardingEvent("gmail_setup_clicked");
+      clearEmailStepSkipped();
+      markOnboardingExtensionPending();
       invalidateStatus();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save credentials");
@@ -348,15 +444,46 @@ export function Onboarding() {
   const welcomeDescription =
     remainingCount === 0
       ? "Almost ready to apply."
-      : remainingCount === 1
-        ? "One step left — then you can apply from Gmail."
-        : `${remainingCount} steps left — finish setup to apply from Gmail.`;
+      : activeStep === 3
+        ? "Optional — connect Gmail to send applications."
+        : remainingCount === 1
+          ? "One step left, then you can explore OneTap."
+          : `${remainingCount} steps left. Finish setup to get started.`;
+
+  if (showExtensionPrompt) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen items-center justify-center px-6 py-12">
+          <ExtensionInstallPrompt onContinue={continueAfterExtensionPrompt} />
+        </div>
+      </div>
+    );
+  }
+
+  if (isComplete) {
+    return (
+      <div className="min-h-screen bg-background">
+        {celebrating ? (
+          <>
+            <OnboardingConfetti active onComplete={showExtensionStep} />
+            <div className="pointer-events-none fixed inset-0 z-[9998] flex items-center justify-center bg-white/75">
+              <p className="text-xl font-semibold text-foreground">You&apos;re all set!</p>
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       {celebrating ? (
         <>
-          <OnboardingConfetti active onComplete={finishOnboarding} />
+          <OnboardingConfetti active onComplete={showExtensionStep} />
           <div className="pointer-events-none fixed inset-0 z-[9998] flex items-center justify-center bg-white/75">
             <p className="text-xl font-semibold text-foreground">You&apos;re all set!</p>
           </div>
@@ -388,17 +515,23 @@ export function Onboarding() {
                   <div className="mt-5 space-y-4">
                     <OnboardingField label="Model provider">
                       <Select
-                        value={provider}
+                        value={provider || undefined}
                         onValueChange={(value) => {
                           setProvider(value as RemoteProviderId);
                           setSelectedModel("");
                         }}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select your model provider" />
                         </SelectTrigger>
                         <SelectContent>
-                          {REMOTE_PROVIDERS.map((p) => {
+                          {[...REMOTE_PROVIDERS]
+                            .sort(
+                              (a, b) =>
+                                Number(isProviderComingSoon(a.id)) -
+                                Number(isProviderComingSoon(b.id)),
+                            )
+                            .map((p) => {
                             const comingSoon = isProviderComingSoon(p.id);
                             return (
                               <SelectItem
@@ -423,14 +556,16 @@ export function Onboarding() {
                       <Select
                         value={selectedModel || undefined}
                         onValueChange={setSelectedModel}
-                        disabled={curatedModels.length === 0}
+                        disabled={!provider || curatedModels.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue
                             placeholder={
-                              curatedModels.length > 0
-                                ? "Select model"
-                                : "No certified models for this provider yet."
+                              !provider
+                                ? "Select a provider first"
+                                : curatedModels.length > 0
+                                  ? "Select model"
+                                  : "No certified models for this provider yet."
                             }
                           />
                         </SelectTrigger>
@@ -503,6 +638,7 @@ export function Onboarding() {
                       className="w-full"
                       onClick={() => void handleSaveAi()}
                       disabled={
+                        !provider ||
                         !apiKey ||
                         !selectedModel ||
                         curatedModels.length === 0 ||
@@ -544,22 +680,30 @@ export function Onboarding() {
                 ) : null}
 
                 {activeStep === 3 ? (
-                  <form onSubmit={(e) => void handleEmailSubmit(e)} className="mt-5 space-y-4">
+                  <form onSubmit={(e) => void handleEmailSubmit(e)} className="mt-4 space-y-3">
                     <p className="text-base text-muted-foreground">
-                      Connect Gmail with an app password so applications send from your inbox. Create a
-                      new app on Google (e.g. OneTap),{" "}
-                      <a
-                        href={GMAIL_APP_PASSWORDS_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-0.5 font-medium text-foreground underline-offset-4 hover:underline"
-                      >
-                        get an app password
-                        <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                      </a>
-                      , and paste it below — we only send from this address and can&apos;t read your
-                      inbox.
+                      Emails send from your Gmail so recruiters hear from you — not a generic address. Required
+                      for Auto apply.
                     </p>
+
+                    <div className="rounded-[10px] border border-border bg-black/[0.02] p-4">
+                      <p className="text-base font-medium text-foreground">Generate a Gmail app password</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        This is a one-time 16-character code from Google — not your normal Gmail password. Opens Google
+                        Account settings; 2-Step Verification must be on.
+                      </p>
+                      <Button variant="outline" className="mt-3 w-full" asChild>
+                        <a
+                          href={GMAIL_APP_PASSWORDS_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Google App Passwords
+                          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                        </a>
+                      </Button>
+                    </div>
+
                     <OnboardingField label="Gmail address" htmlFor="onboarding-email">
                       <Input
                         id="onboarding-email"
@@ -579,10 +723,24 @@ export function Onboarding() {
                         autoComplete="off"
                       />
                     </OnboardingField>
-                    <Button type="submit" className="w-full" disabled={emailLoading}>
-                      {emailLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Connect Gmail
-                    </Button>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={handleSkipEmail}
+                      >
+                        Skip for now
+                      </Button>
+                      <Button type="submit" className="flex-1" disabled={emailLoading}>
+                        {emailLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Connect Gmail
+                      </Button>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">
+                      Add Gmail later in Setup when you&apos;re ready to send.
+                    </p>
                   </form>
                 ) : null}
                 </>

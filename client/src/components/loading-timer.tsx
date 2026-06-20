@@ -12,7 +12,7 @@ type LoadingTimerProps = {
 
 export function LoadingTimer({
   label,
-  description = "This may take up to 90 seconds",
+  description = "This may take up to 20 seconds",
   className,
   labelShimmer = false,
   labelShimmerDuration = 1,

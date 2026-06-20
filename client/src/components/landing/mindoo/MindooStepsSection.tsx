@@ -4,17 +4,17 @@ import { SplitHeading } from "./shared";
 const STEPS = [
   {
     title: "Before you apply.",
-    body: "Connect your AI key, upload your resume, and link Gmail once. OneTap learns your profile and send channel — ready for every role you paste.",
+    body: "Connect your AI key, upload your resume, and link Gmail once. OneTap learns your profile and send channel, ready for every role you paste.",
     visual: "setup" as const,
   },
   {
     title: "During the search.",
-    body: "Paste job descriptions as you find them. OneTap drafts tailored emails, calculates match scores, and queues sends — while you keep browsing listings.",
+    body: "Paste job descriptions as you find them. OneTap drafts tailored emails, calculates match scores, and queues sends while you keep browsing listings.",
     visual: "apply" as const,
   },
   {
     title: "After you send.",
-    body: "Track every application in one dashboard. Retry failed sends, add missing contacts, and see what's working — without spreadsheets or inbox archaeology.",
+    body: "Track every application in one dashboard. Retry failed sends, add missing contacts, and see what's working without spreadsheets or inbox archaeology.",
     visual: "track" as const,
   },
 ];

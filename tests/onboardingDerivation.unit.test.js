@@ -21,14 +21,15 @@ describe("deriveOnboardingState", () => {
     expect(r.currentOnboardingStep).toBe("resume");
   });
 
-  it("requires onboarding when email not connected", () => {
+  it("does not require onboarding when only email is missing", () => {
     const r = deriveOnboardingState({
       hasVerifiedAiCredential: true,
       hasValidResume: true,
       hasEmailSetup: false,
     });
-    expect(r.onboardingRequired).toBe(true);
-    expect(r.currentOnboardingStep).toBe("email");
+    expect(r.onboardingRequired).toBe(false);
+    expect(r.currentOnboardingStep).toBe("ready");
+    expect(r.hasEmailSetup).toBe(false);
   });
 
   it("is ready when AI, resume, and email are set", () => {

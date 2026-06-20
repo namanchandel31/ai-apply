@@ -19,8 +19,17 @@ export function storeAutoApplyEnabled(enabled: boolean): void {
 
 export function applyPageDescription(autoApplyEnabled: boolean): string {
   return autoApplyEnabled
-    ? "Paste a job description — we'll draft your email and send it automatically."
+    ? "Paste a job description. We'll draft your email and send it automatically."
     : "Paste a job description, preview your tailored email, and send.";
+}
+
+export const AUTO_APPLY_TOGGLE_COPY = {
+  on: "let OneTap send applications automatically from your Gmail",
+  off: "review each email before sending from your Gmail",
+} as const;
+
+export function autoApplyToggleDescription(enabled: boolean): string {
+  return enabled ? AUTO_APPLY_TOGGLE_COPY.on : AUTO_APPLY_TOGGLE_COPY.off;
 }
 
 export function toApplyMode(autoApplyEnabled: boolean): ApplyMode {

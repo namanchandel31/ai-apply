@@ -41,7 +41,7 @@ function sendExtensionMessage<T>(message: unknown): Promise<T> {
   }
   if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
     return Promise.reject(
-      new Error("Chrome extension API is unavailable — use Google Chrome with the extension installed")
+      new Error("Chrome extension API is unavailable. Use Google Chrome with the extension installed.")
     );
   }
 
@@ -50,7 +50,7 @@ function sendExtensionMessage<T>(message: unknown): Promise<T> {
       const lastError = chrome.runtime.lastError;
       if (lastError?.message) {
         if (/could not establish connection|receiving end does not exist/i.test(lastError.message)) {
-          reject(new Error("Extension not installed or disabled — load it from chrome://extensions"));
+          reject(new Error("Extension not installed or disabled. Load it from chrome://extensions"));
           return;
         }
         reject(new Error(lastError.message));
@@ -83,12 +83,12 @@ export async function connectExtension(): Promise<{ connectedAt: string; version
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session) {
-    throw new Error("Could not read session — try signing in again");
+    throw new Error("Could not read session. Try signing in again.");
   }
 
   const session = sessionData.session;
   if (!session.refresh_token) {
-    throw new Error("Session is missing refresh token — sign out and sign in again");
+    throw new Error("Session is missing refresh token. Sign out and sign in again.");
   }
 
   const apiBase = resolveApiBase();
