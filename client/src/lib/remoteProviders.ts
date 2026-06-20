@@ -10,20 +10,13 @@ export const REMOTE_PROVIDERS = [
 
 export type RemoteProviderId = (typeof REMOTE_PROVIDERS)[number]["id"];
 
-/** Shown in the provider list but not selectable yet in onboarding. */
-const COMING_SOON_PROVIDER_IDS = new Set<RemoteProviderId>([
-  "openrouter",
-  "anthropic",
-  "grok",
-  "nvidia",
-]);
+const AVAILABLE_PROVIDER_IDS = new Set<RemoteProviderId>(["gemini", "groq"]);
 
+/** Shown in the provider list but not selectable yet in onboarding. */
 export function isProviderComingSoon(providerId: string): boolean {
-  return COMING_SOON_PROVIDER_IDS.has(providerId as RemoteProviderId);
+  return !AVAILABLE_PROVIDER_IDS.has(providerId as RemoteProviderId);
 }
 
 export function isProviderAvailable(providerId: string): boolean {
-  return !isProviderComingSoon(providerId);
+  return AVAILABLE_PROVIDER_IDS.has(providerId as RemoteProviderId);
 }
-
-export const DEFAULT_REMOTE_PROVIDER_ID: RemoteProviderId = "openai";

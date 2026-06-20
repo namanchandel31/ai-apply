@@ -44,7 +44,7 @@ describe("buildSetupStatus onboarding fields", () => {
     expect(status.currentOnboardingStep).toBe("resume");
   });
 
-  it("marks email step when AI and resume ready but no SMTP", async () => {
+  it("is ready when AI and resume are set, even without SMTP", async () => {
     aiCredentialModel.getVerifiedCredentialForUser.mockResolvedValue({
       lastValidatedAt: new Date().toISOString(),
     });
@@ -60,8 +60,9 @@ describe("buildSetupStatus onboarding fields", () => {
     });
     const status = await buildSetupStatus("user-1");
     expect(status.hasValidResume).toBe(true);
-    expect(status.onboardingRequired).toBe(true);
-    expect(status.currentOnboardingStep).toBe("email");
+    expect(status.hasEmailSetup).toBe(false);
+    expect(status.onboardingRequired).toBe(false);
+    expect(status.currentOnboardingStep).toBe("ready");
   });
 });
 

@@ -27,7 +27,7 @@ function WaitlistSuccessState({ duplicate }: { duplicate: boolean }) {
       <p className="m-body-secondary">
         {duplicate
           ? "We already have your email. You're all set for early access when we launch."
-          : "We'll reach out when early access opens. No spam — just the launch update."}
+          : "We'll reach out when early access opens. No spam, just the launch update."}
       </p>
     </div>
   );

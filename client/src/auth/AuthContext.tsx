@@ -22,6 +22,8 @@ export type AuthUser = {
   avatarUrl?: string | null;
   applyMode?: "auto_apply" | "review_apply";
   subscriptionTier?: string;
+  subscriptionStatus?: "inactive" | "active";
+  subscriptionPlanId?: string | null;
   isAdmin?: boolean;
   flags?: Record<string, unknown>;
 };

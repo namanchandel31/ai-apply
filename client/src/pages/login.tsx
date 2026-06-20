@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { OneTapBrand } from "@/components/OneTapLogomark";
 
 const BENEFITS = [
@@ -36,10 +39,14 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
+    setGoogleLoading(true);
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
@@ -48,11 +55,34 @@ export function LoginPage() {
       });
       if (error) {
         toast.error(error.message);
-        setLoading(false);
+        setGoogleLoading(false);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
-      setLoading(false);
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleEmailSignIn = async () => {
+    if (!email.trim() || !password.trim()) {
+      toast.error("Enter your email and password");
+      return;
+    }
+    setEmailLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      navigate("/pricing", { replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign-in failed");
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -66,7 +96,7 @@ export function LoginPage() {
             Tailored job applications in one tap
           </h1>
           <p className="mt-3 text-base text-muted-foreground">
-            OneTap turns job descriptions into personalized outreach emails using your resume —
+            OneTap turns job descriptions into personalized outreach emails using your resume,
             then sends them from Gmail and tracks every reply.
           </p>
 
@@ -79,20 +109,64 @@ export function LoginPage() {
             ))}
           </ul>
 
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading}
-            className="mt-10 h-11 w-full rounded-[10px] border-input-border bg-white text-base font-medium hover:bg-black/[0.04]"
-            onClick={() => void handleGoogleSignIn()}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <GoogleIcon className="h-5 w-5" />
-            )}
-            Continue with Google
-          </Button>
+          <div className="mt-10 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login-email">Email</Label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="login-password">Password</Label>
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+              />
+            </div>
+            <Button
+              type="button"
+              disabled={emailLoading}
+              className="h-11 w-full text-base"
+              onClick={() => void handleEmailSignIn()}
+            >
+              {emailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Sign in with email
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={googleLoading}
+              className="h-11 w-full border-input-border bg-white text-base font-medium hover:bg-black/[0.04]"
+              onClick={() => void handleGoogleSignIn()}
+            >
+              {googleLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <GoogleIcon className="h-5 w-5" />
+              )}
+              Continue with Google
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              New to OneTap?{" "}
+              <Link to="/signup" className="font-medium text-primary hover:underline">
+                Create account
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

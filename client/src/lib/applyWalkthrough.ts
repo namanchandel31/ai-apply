@@ -13,7 +13,7 @@ export const APPLY_WALKTHROUGH_STEPS: ApplyWalkthroughStep[] = [
   {
     target: '[data-tour="auto-apply-toggle"]',
     title: "Choose your apply mode",
-    body: "Turn AutoApply on to send tailored applications automatically after you paste a job description.",
+    body: "Turn Auto apply on to let OneTap send tailored emails from your Gmail automatically after you paste a job description.",
     placement: "bottom",
   },
   {

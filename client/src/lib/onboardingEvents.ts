@@ -10,8 +10,12 @@ export type OnboardingEventName =
   | "resume_parsed"
   | "activation_completed"
   | "gmail_setup_clicked"
+  | "email_setup_skipped"
   | "dashboard_entered"
-  | "onboarding_abandoned";
+  | "onboarding_abandoned"
+  | "extension_prompt_shown"
+  | "extension_install_clicked"
+  | "extension_prompt_skipped";
 
 export type ActivationSource = "onboarding" | "setup";
 

@@ -30,7 +30,7 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
       );
       toast.success(
         deduplicated
-          ? "This resume is already on file — kept as your active resume"
+          ? "This resume is already on file, kept as your active resume"
           : "Resume parsed and saved"
       );
       if (fileInputRef.current) fileInputRef.current.value = "";

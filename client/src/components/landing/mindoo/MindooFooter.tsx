@@ -1,65 +1,33 @@
-import { OneTapBrand } from "@/components/OneTapLogomark";
+import { Link } from "react-router-dom";
 
-const FOOTER_NAV = [
-  { label: "Home", href: "/" },
-  { label: "Problem", href: "#problem" },
-  { label: "Solution", href: "#solution" },
-];
-
-const FOOTER_LEGAL = [
-  { label: "Privacy Policy", href: "#" },
-  { label: "Terms of Service", href: "#" },
-  { label: "Contact", href: "#" },
-];
+const FOOTER_LINKS = [
+  { label: "Privacy", href: "/privacy-policy" },
+  { label: "Support", href: "/support" },
+  { label: "Sign in", href: "/login" },
+] as const;
 
 export function MindooFooter() {
+  const year = new Date().getFullYear();
+
   return (
-    <section className="m-section m-footer-section">
-      <div className="m-padding-global m-footer-padding">
-        <div className="m-bg-box m-footer-wrapper">
-          <div className="m-footer-top">
-            <OneTapBrand />
-
-            <div className="m-footer-grid">
-              <div className="m-footer-group">
-                <p className="m-text-caption is-footer">navigation</p>
-                {FOOTER_NAV.map(({ label, href }) => (
-                  <a key={label} href={href} className="m-footer-link">
-                    {label}
-                  </a>
-                ))}
-              </div>
-
-              <div className="m-footer-group">
-                <p className="m-text-caption is-footer">legal</p>
-                {FOOTER_LEGAL.map(({ label, href }) => (
-                  <a key={label} href={href} className="m-footer-link">
-                    {label}
-                  </a>
-                ))}
-              </div>
-
-              <div className="m-footer-group">
-                <p className="m-text-caption is-footer">product</p>
-                <a href="#how-it-works" className="m-footer-link">
-                  How it works
-                </a>
-                <a href="#waitlist" className="m-footer-link">
-                  Waitlist
-                </a>
-                <a href="/login" className="m-footer-link">
-                  Sign in
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="m-footer-art" aria-hidden>
-            <div className="m-footer-cloud">☁</div>
-            <OneTapBrand className="m-footer-brand-float" />
-          </div>
+    <footer id="footer" className="m-footer-bar">
+      <div className="m-padding-global">
+        <div className="m-container">
+          <p className="m-footer-line m-body-text">
+            <span className="m-footer-copy">© {year} OneTap</span>
+            {FOOTER_LINKS.map((link) => (
+              <span key={link.href} className="m-footer-line-item">
+                <span className="m-footer-sep" aria-hidden>
+                  ·
+                </span>
+                <Link to={link.href} className="m-footer-line-link">
+                  {link.label}
+                </Link>
+              </span>
+            ))}
+          </p>
         </div>
       </div>
-    </section>
+    </footer>
   );
 }

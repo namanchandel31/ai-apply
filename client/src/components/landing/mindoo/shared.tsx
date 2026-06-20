@@ -44,8 +44,14 @@ export function SplitHeading({
 }) {
   return (
     <h2 data-reveal="" className={className}>
-      {tertiary ? <span className="m-title-tertiary">{tertiary} </span> : null}
-      {primary}
+      {tertiary ? (
+        <span className="m-split-heading-tertiary m-title-tertiary">{tertiary}</span>
+      ) : null}
+      {tertiary ? (
+        <span className="m-split-heading-primary">{primary}</span>
+      ) : (
+        primary
+      )}
     </h2>
   );
 }

@@ -5,7 +5,7 @@ const BENEFITS = [
   "Works with your Gmail inbox",
   "No tech expertise needed",
   "Built for real job applications",
-  "Your data stays yours — BYOK",
+  "Your data stays yours. BYOK",
   "Apply more without burning out",
 ];
 
@@ -22,7 +22,7 @@ export function MindooBenefitsSection() {
           <p data-reveal="" className="m-benefits-lead m-text-center">
             OneTap doesn&apos;t replace your judgment.
             <br />
-            It takes on the repeat work around applying — so you can focus on roles that
+            It takes on the repeat work around applying, so you can focus on roles that
             actually fit.
           </p>
 

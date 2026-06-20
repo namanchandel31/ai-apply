@@ -98,7 +98,7 @@ export function ModelCertificationPanel() {
         resumeFile: resumeFile ?? undefined,
       });
       setResult(res.data);
-      toast.success(`Certification complete — overall ${res.data.overallScore}`);
+      toast.success(`Certification complete. Overall ${res.data.overallScore}`);
       await loadMeta();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Certification failed");
@@ -217,7 +217,7 @@ export function ModelCertificationPanel() {
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Not stored — used only for this run"
+              placeholder="Not stored. Used only for this run"
             />
           </div>
 
@@ -260,7 +260,7 @@ export function ModelCertificationPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Promoted models — {providerLabel}</CardTitle>
+          <CardTitle className="text-base">Promoted models: {providerLabel}</CardTitle>
           <CardDescription>
             Certified models in the production dropdown for this provider.
           </CardDescription>

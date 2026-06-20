@@ -1,6 +1,6 @@
 import { OneTapLogomark } from "@/components/OneTapLogomark";
 
-type MiniVariant = "apply" | "track" | "extension" | "gmail";
+type MiniVariant = "apply" | "track" | "extension" | "gmail" | "byok";
 
 export function ProductMockupMini({ variant }: { variant: MiniVariant }) {
   if (variant === "track") {
@@ -54,6 +54,30 @@ export function ProductMockupMini({ variant }: { variant: MiniVariant }) {
     );
   }
 
+  if (variant === "byok") {
+    return (
+      <div className="m-mini-ui m-mini-byok">
+        <div className="m-mini-bar">
+          <OneTapLogomark className="h-3 w-3" />
+          <span>Setup</span>
+        </div>
+        <div className="m-mini-byok-body">
+          <p className="m-mini-label">AI provider</p>
+          <div className="m-mini-byok-field">
+            <span>Anthropic</span>
+            <span className="m-mini-byok-status">Connected</span>
+          </div>
+          <p className="m-mini-label">API key</p>
+          <div className="m-mini-byok-key">sk-ant-••••••••••••••••••••</div>
+          <div className="m-mini-byok-notes">
+            <span className="m-mini-byok-pill">Your key stays yours</span>
+            <span className="m-mini-byok-pill">Private by default</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (variant === "gmail") {
     return (
       <div className="m-mini-ui m-mini-gmail">
@@ -65,7 +89,7 @@ export function ProductMockupMini({ variant }: { variant: MiniVariant }) {
           <p className="m-mini-sub">To: hiring@stripe.com</p>
           <p className="m-mini-title">Applying for Senior Software Engineer</p>
           <p className="m-mini-gmail-snippet">
-            Hi Sarah — I came across the role and wanted to reach out directly...
+            Hi Sarah, I came across the role and wanted to reach out directly...
           </p>
         </div>
       </div>
@@ -81,7 +105,7 @@ export function ProductMockupMini({ variant }: { variant: MiniVariant }) {
       <div className="m-mini-apply">
         <p className="m-mini-label">Job description</p>
         <div className="m-mini-jd">
-          Senior Software Engineer @ Stripe — Payments Infrastructure team...
+          Senior Software Engineer @ Stripe, Payments Infrastructure team...
         </div>
         <p className="m-mini-label">Email preview</p>
         <div className="m-mini-email">

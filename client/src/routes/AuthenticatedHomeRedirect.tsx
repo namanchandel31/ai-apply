@@ -15,7 +15,13 @@ export function AuthenticatedHomeRedirect() {
   }
 
   const to =
-    !isError && status && !status.onboardingRequired ? "/dashboard" : "/onboarding";
+    !isError && status
+      ? !status.hasActiveSubscription
+        ? "/pricing"
+        : !status.onboardingRequired
+          ? "/dashboard"
+          : "/onboarding"
+      : "/pricing";
 
   return <Navigate to={to} replace />;
 }

@@ -86,7 +86,7 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded }: Props) {
           <p>
             We ask for this so OneTap can send job application emails{" "}
             <strong className="text-foreground">from your Gmail address</strong>. Recruiters see mail from you,
-            in your name—not from a generic platform address.
+            in your name, not from a generic platform address.
           </p>
           <p>
             Use a Google <strong className="text-foreground">app password</strong> (a one-time 16-character

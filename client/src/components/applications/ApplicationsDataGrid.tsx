@@ -140,7 +140,7 @@ function ApplicationTableRow({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-10 rounded-[10px] border-destructive/40 px-2.5 text-base font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="h-10 border-destructive/40 px-2.5 text-base font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
                         disabled={actionId === row.original.id || actionId === "bulk"}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -156,7 +156,7 @@ function ApplicationTableRow({
                         type="button"
                         size="sm"
                         variant="default"
-                        className="h-10 rounded-[10px] px-2.5 text-base font-normal"
+                        className="h-10 px-2.5 text-base font-normal"
                         disabled={actionId === row.original.id || actionId === "bulk"}
                         onClick={(e) => {
                           e.stopPropagation();

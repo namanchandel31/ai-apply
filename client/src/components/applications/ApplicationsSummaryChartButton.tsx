@@ -24,7 +24,7 @@ export function ApplicationsSummaryChartButton() {
     <>
       <Button
         variant="outline"
-        className="h-9 shrink-0 rounded-[10px] px-[14px] text-base font-normal"
+        className="h-9 shrink-0 px-[14px] text-base font-normal"
         onClick={() => setOpen(true)}
       >
         Summary
@@ -35,7 +35,7 @@ export function ApplicationsSummaryChartButton() {
           <DialogHeader>
             <DialogTitle>Job search summary</DialogTitle>
             <DialogDescription>
-              Flow of your applications by tracker status — email sent, interviews, offers, and
+              Flow of your applications by tracker status: email sent, interviews, offers, and
               more.
             </DialogDescription>
           </DialogHeader>

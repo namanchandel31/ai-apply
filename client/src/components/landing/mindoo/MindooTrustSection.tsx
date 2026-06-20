@@ -3,7 +3,7 @@ import { SplitHeading } from "./shared";
 const TRUST_CARDS = [
   {
     title: "Transparent by design.",
-    body: "No black boxes. Every draft, score, and send is visible before it goes out — full control over what recruiters see.",
+    body: "No black boxes. Every draft, score, and send is visible before it goes out, with full control over what recruiters see.",
     gradient: "linear-gradient(160deg, #dbeafe 0%, #eff6ff 100%)",
   },
   {
