@@ -48,12 +48,12 @@ const ROWS = [
 ] as const;
 
 const STATUS_OPTIONS = [
-  { label: "Email Ready", color: "blue" },
+  { label: "Email Ready", color: "blue", selected: false },
   { label: "Email Sent", color: "green", selected: true },
-  { label: "Screening", color: "yellow" },
-  { label: "Interviewing", color: "orange" },
-  { label: "Offer", color: "purple" },
-  { label: "Withdrawn", color: "brown" },
+  { label: "Screening", color: "yellow", selected: false },
+  { label: "Interviewing", color: "orange", selected: false },
+  { label: "Offer", color: "purple", selected: false },
+  { label: "Withdrawn", color: "brown", selected: false },
 ] as const;
 
 function StatusDot({ color }: { color: string }) {
