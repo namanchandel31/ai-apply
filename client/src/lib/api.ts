@@ -107,6 +107,27 @@ function dispatchAuthFailure(ctx: AuthErrorContext): void {
   handler?.(ctx);
 }
 
+/** Paywall context carried on a 402 QUOTA_EXCEEDED response (everything the UI needs). */
+export type QuotaExceededContext = {
+  feature?: string;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+  upgradeEligible?: boolean;
+};
+
+let quotaExceededHandler: ((ctx: QuotaExceededContext) => void) | null = null;
+
+export function setQuotaExceededHandler(
+  handler: ((ctx: QuotaExceededContext) => void) | null
+): void {
+  quotaExceededHandler = handler;
+}
+
+function dispatchQuotaExceeded(meta?: Record<string, unknown>): void {
+  quotaExceededHandler?.((meta ?? {}) as QuotaExceededContext);
+}
+
 async function tryRefreshSupabaseSession(): Promise<boolean> {
   const { data, error } = await supabase.auth.refreshSession();
   return !error && Boolean(data.session?.access_token);
@@ -140,6 +161,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
     if (res.status === 401 || res.status === 403) {
       dispatchAuthFailure(authCtx);
+    }
+
+    if (code === "QUOTA_EXCEEDED") {
+      dispatchQuotaExceeded(meta);
     }
 
     const err = new Error(message) as ApiError;
@@ -223,6 +248,20 @@ export type EmailPreferencesData = {
 };
 
 export type EntitlementMap = Record<string, boolean | number | string>;
+
+export type GmailStatus = {
+  connected: boolean;
+  provider: string;
+  configured: boolean;
+  email?: string;
+  status?: string;
+  healthStatus?: string;
+  scopes?: string[];
+  canSend?: boolean;
+  canRead?: boolean;
+  isDefault?: boolean;
+  lastUsedAt?: string | null;
+};
 
 export type SetupStatusData = {
   pricingEnabled?: boolean;
@@ -479,6 +518,32 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, appPassword }),
     });
+  },
+
+  gmail: {
+    /** Returns the Google consent URL. Default tier requests gmail.send only. */
+    connect(tier: "send" | "send_read" = "send", returnTo: "setup" | "onboarding" = "setup") {
+      const qs = new URLSearchParams({
+        tier,
+        returnTo,
+      });
+      return request<{ success: boolean; data: { authorizationUrl: string } }>(
+        `/api/integrations/gmail/connect?${qs.toString()}`,
+        { method: "GET" }
+      );
+    },
+    status() {
+      return request<{ success: boolean; data: GmailStatus }>(
+        "/api/integrations/gmail/status",
+        { method: "GET" }
+      );
+    },
+    disconnect() {
+      return request<{ success: boolean; data: { disconnected: boolean } }>(
+        "/api/integrations/gmail/disconnect",
+        { method: "POST" }
+      );
+    },
   },
 
   uploadResume(file: File, context: "onboarding" | "profile_update" = "profile_update") {
@@ -927,6 +992,13 @@ export const api = {
   adminCreateFeature(body: Partial<AdminFeature> & { key: string; displayName: string; type: string }) {
     return request<{ success: boolean; data: AdminFeature }>("/api/admin/features", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminUpdateFeature(id: string, body: Partial<Pick<AdminFeature, "displayName" | "description" | "defaultValue" | "category" | "isActive">>) {
+    return request<{ success: boolean; data: AdminFeature }>(`/api/admin/features/${id}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });

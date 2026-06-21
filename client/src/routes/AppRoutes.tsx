@@ -19,6 +19,7 @@ import { OnboardingGuard } from "@/routes/OnboardingGuard";
 import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 import { SubscriptionGuard } from "@/routes/SubscriptionGuard";
 import { SessionHandlers } from "@/auth/SessionHandlers";
+import { QuotaPaywall } from "@/components/QuotaPaywall";
 import { useAuth } from "@/auth/AuthContext";
 import { isPricingEnabled } from "@/lib/featureFlags";
 import { AdminPage } from "@/pages/admin";
@@ -51,6 +52,7 @@ export function AppRoutes() {
   return (
     <>
       <SessionHandlers />
+      <QuotaPaywall />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

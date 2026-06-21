@@ -1,6 +1,5 @@
 const { Worker, UnrecoverableError } = require("bullmq");
 const { pool } = require("../db");
-const nodemailer = require("nodemailer");
 const { getBullmqConnectionOptions } = require("../queues/connection");
 const { QUEUE_NAMES } = require("../constants/queues");
 const { attachWorkerLifecycle } = require("../queues/workerLifecycle");
@@ -15,7 +14,8 @@ const {
 } = require("../models/applicationJobModel");
 const { transitionJobState } = require("../services/transitionJobState");
 const { recordEvent } = require("../models/applicationEventModel");
-const { fetchSmtpCredentials } = require("../services/mailService");
+const mailDeliveryService = require("../services/email/mailDeliveryService");
+const quotaService = require("../services/quotaService");
 const { supabase } = require("../config/supabase");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
@@ -42,6 +42,7 @@ const { resolveResumeForAutoApply } = require("../services/resolveResumeForAutoA
 const processor = async (job) => {
   const { applicationId, userId, recipientEmail, dbJobId } = job.data;
   const reqId = job.id;
+  let quotaReserved = false;
 
   const application = await getApplicationById(applicationId, userId);
   if (!application) {
@@ -108,8 +109,6 @@ const processor = async (job) => {
       );
     }
 
-    const credentials = await fetchSmtpCredentials(userId);
-
     const resolvedResume = await resolveResumeForAutoApply(userId);
     const resumeStoragePath =
       resolvedResume.filePath || application.resume_snapshot_path || application.file_path;
@@ -143,22 +142,30 @@ const processor = async (job) => {
     const arrayBuffer = await data.arrayBuffer();
     fileBuffer = Buffer.from(arrayBuffer);
 
-    const { createTransportOptions } = require("../config/mail.config");
-    const transporter = nodemailer.createTransport(
-      createTransportOptions({ user: credentials.email, pass: credentials.password })
+    // Reserve the send credit immediately before the irreversible send. Atomic, so two
+    // concurrent sends can't overshoot; released in catch if this attempt doesn't deliver.
+    await quotaService.reserve(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
+    quotaReserved = true;
+
+    const sendResult = await mailDeliveryService.send(
+      userId,
+      {
+        to: recipientEmail,
+        subject: application.email_subject,
+        text: application.email_body,
+        attachments: [
+          { filename: "resume.pdf", content: fileBuffer, contentType: "application/pdf" },
+        ],
+      },
+      { reqId, applicationId }
     );
 
-    const smtpResult = await transporter.sendMail({
-      from: credentials.email,
-      to: recipientEmail,
-      subject: application.email_subject,
-      text: application.email_body,
-      attachments: [
-        { filename: "resume.pdf", content: fileBuffer, contentType: "application/pdf" },
-      ],
-    });
-
-    const sentRow = await markSentFromGenerated(applicationId, userId, smtpResult.messageId, pool);
+    const sentRow = await markSentFromGenerated(
+      applicationId,
+      userId,
+      sendResult.providerMessageId,
+      pool
+    );
     if (!sentRow) {
       const current = await getApplicationById(applicationId, userId);
       if (current?.application_status !== APPLICATION_STATUS.SENT) {
@@ -172,17 +179,42 @@ const processor = async (job) => {
       nextStatus: "completed",
     });
 
-    logInfo("application_sent", { reqId, applicationId, messageId: smtpResult.messageId });
+    logInfo("application_sent", {
+      reqId,
+      applicationId,
+      provider: sendResult.provider,
+      messageId: sendResult.providerMessageId,
+      threadId: sendResult.threadId,
+    });
     await recordEvent({
       applicationId,
       eventType: "email_sent",
       actorType: "worker",
       actorId: "send-application",
-      metadata: { messageId: smtpResult.messageId },
+      metadata: {
+        messageId: sendResult.providerMessageId,
+        provider: sendResult.provider,
+        threadId: sendResult.threadId,
+      },
     });
   } catch (rawErr) {
+    // This attempt reserved a credit but didn't deliver — give it back so a retry (or the
+    // user's allowance) isn't charged for mail that never went out.
+    if (quotaReserved) {
+      await quotaService.release(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
+    }
+
     let err = rawErr;
-    if (isSmtpAuthFailure(rawErr)) {
+    if (rawErr.code === "QUOTA_EXCEEDED") {
+      // Allowance spent before sending: terminal (a retry can't help) — surface a paywall
+      // reason on the application rather than an opaque send failure.
+      err = Object.assign(
+        new NonRetryableError(
+          "Send blocked: you've reached your plan limit for application sends. Upgrade to send more."
+        ),
+        { stage: "quota", code: "QUOTA_EXCEEDED" }
+      );
+    } else if (isSmtpAuthFailure(rawErr)) {
       err = Object.assign(
         new NonRetryableError(
           "Gmail rejected your app password — reconnect in Email Configuration with a new 16-character app password"

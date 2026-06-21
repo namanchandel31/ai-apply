@@ -4,11 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DetectionConfigPanel } from "@/components/admin/DetectionConfigPanel";
 import { ModelCertificationPanel } from "@/components/admin/ModelCertificationPanel";
 import { BillingSettingsPanel } from "@/components/admin/BillingSettingsPanel";
+import { TrialConfigPanel } from "@/components/admin/TrialConfigPanel";
 import { PlansPanel } from "@/components/admin/PlansPanel";
 import { CampaignsPanel } from "@/components/admin/CampaignsPanel";
 import { SubscriptionsPanel } from "@/components/admin/SubscriptionsPanel";
 
-const TABS = ["settings", "plans", "campaigns", "subscriptions", "detection", "models"] as const;
+const TABS = ["settings", "trial", "plans", "campaigns", "subscriptions", "detection", "models"] as const;
 type AdminTab = (typeof TABS)[number];
 
 function normalizeTab(value: string | null): AdminTab {
@@ -33,11 +34,12 @@ export function AdminPage() {
   return (
     <PageShell
       title="Admin console"
-      description="Manage subscriptions, plans, campaigns, paywall settings, the LinkedIn extension's detection rules, and the AI models offered to users."
+      description="Manage subscriptions, plans, campaigns, trial configuration, paywall settings, the LinkedIn extension's detection rules, and the AI models offered to users."
     >
       <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="trial">Trial</TabsTrigger>
           <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
@@ -46,6 +48,9 @@ export function AdminPage() {
         </TabsList>
         <TabsContent value="settings">
           <BillingSettingsPanel />
+        </TabsContent>
+        <TabsContent value="trial">
+          <TrialConfigPanel />
         </TabsContent>
         <TabsContent value="plans">
           <PlansPanel />

@@ -50,4 +50,41 @@ async function consume(userId, featureKey, periodType, n = 1, client = pool) {
   return Number(rows[0].usage_count);
 }
 
-module.exports = { computePeriodStart, getUsage, consume };
+/**
+ * Atomically increments only when the result stays within `limit`. Returns the new
+ * count on success, or null when the increment would exceed the limit (no check-then-act
+ * race — the guard lives in the single SQL statement).
+ */
+async function consumeIfWithinLimit(userId, featureKey, periodType, n, limit, client = pool) {
+  const periodStart = computePeriodStart(periodType);
+  const { rows } = await client.query(
+    `INSERT INTO usage_counters (user_id, feature_key, period_type, period_start, usage_count, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
+     ON CONFLICT (user_id, feature_key, period_type, period_start) DO UPDATE SET
+       usage_count = usage_counters.usage_count + EXCLUDED.usage_count,
+       updated_at = NOW()
+     WHERE usage_counters.usage_count + EXCLUDED.usage_count <= $6
+     RETURNING usage_count`,
+    [userId, featureKey, periodType, periodStart, n, limit]
+  );
+  return rows.length ? Number(rows[0].usage_count) : null;
+}
+
+/**
+ * Atomically decrements the current bucket, never going below zero. Used to release a
+ * reservation when a reserved-then-charged action fails after the credit was taken, so
+ * failed work doesn't permanently consume an allowance. Returns the resulting count.
+ */
+async function release(userId, featureKey, periodType, n = 1, client = pool) {
+  const periodStart = computePeriodStart(periodType);
+  const { rows } = await client.query(
+    `UPDATE usage_counters
+       SET usage_count = GREATEST(0, usage_count - $5), updated_at = NOW()
+     WHERE user_id = $1 AND feature_key = $2 AND period_type = $3 AND period_start = $4
+     RETURNING usage_count`,
+    [userId, featureKey, periodType, periodStart, n]
+  );
+  return rows.length ? Number(rows[0].usage_count) : 0;
+}
+
+module.exports = { computePeriodStart, getUsage, consume, consumeIfWithinLimit, release };

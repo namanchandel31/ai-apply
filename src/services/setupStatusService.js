@@ -59,6 +59,13 @@ async function buildSetupStatus(userId) {
     [userId]
   );
 
+  const { rows: gmailRows } = await pool.query(
+    `SELECT email_address AS email FROM email_accounts
+     WHERE user_id = $1 AND provider = 'gmail' AND status = 'connected' AND can_send = TRUE
+     LIMIT 1`,
+    [userId]
+  );
+
   const aiChainRows = await aiCredentialModel.listByUser(userId);
   const primaryAi = aiChainRows.find((r) => r.priority === 0) || null;
 
@@ -67,7 +74,7 @@ async function buildSetupStatus(userId) {
   const hasValidResume = await computeHasValidResume(userId);
 
   const hasResume = resumeRows.length > 0;
-  const hasEmailSetup = credRows.length > 0;
+  const hasEmailSetup = credRows.length > 0 || gmailRows.length > 0;
   const hasAiSetup = aiChainRows.length > 0 || !!config.ai.openaiApiKey;
 
   const onboarding = await onboardingService.resolveOnboarding(userId, {
@@ -94,7 +101,7 @@ async function buildSetupStatus(userId) {
     onboardingRequired: onboarding.onboardingRequired,
     currentOnboardingStep: onboarding.currentOnboardingStep,
     activeResume: hasResume ? resumeRows[0] : null,
-    email: hasEmailSetup ? credRows[0].email : null,
+    email: hasEmailSetup ? credRows[0]?.email ?? gmailRows[0]?.email : null,
     activeAiProvider: primaryAi,
     aiCredentialChain: aiChainRows,
   };

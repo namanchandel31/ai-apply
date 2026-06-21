@@ -115,6 +115,19 @@ function validateStartup() {
       "[config] CORS_ORIGIN is not set — all browser origins are reflected. Set to your Vercel URL(s) for production."
     );
   }
+
+  // Gmail OAuth is optional (SMTP app-password sending still works without it),
+  // but a partial config is a deployment mistake — warn loudly.
+  const googleId = str("GOOGLE_CLIENT_ID", null);
+  const googleSecret = str("GOOGLE_CLIENT_SECRET", null);
+  const googleRedirect = str("GOOGLE_OAUTH_REDIRECT_URI", null);
+  const anyGoogle = googleId || googleSecret || googleRedirect;
+  if (anyGoogle && !(googleId && googleSecret && googleRedirect)) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[config] Partial Gmail OAuth config — set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_OAUTH_REDIRECT_URI together. Gmail Connect will be disabled until all three are present."
+    );
+  }
 }
 
 module.exports = {

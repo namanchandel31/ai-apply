@@ -4,6 +4,8 @@ const { logInfo, logError } = require("../utils/logger");
 const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
 const { buildLogContext } = require("../utils/buildLogContext");
+const quotaService = require("../services/quotaService");
+const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
 const sendApplicationController = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
@@ -92,6 +94,18 @@ const sendApplicationController = async (req, res) => {
       });
     }
 
+    // Fast paywall feedback before queueing. Advisory only: the send worker performs the
+    // authoritative atomic reserve right before delivery, so this can't overshoot.
+    const quota = await quotaService.check(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
+    if (!quota.allowed) {
+      return sendQuotaExceeded(res, {
+        feature: quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT,
+        limit: quota.limit,
+        used: quota.used,
+        remaining: quota.remaining,
+      });
+    }
+
     const result = await sendApplication(applicationId, userId, recipientEmail, meta);
 
     if (result.alreadyProcessing) {
@@ -118,6 +132,10 @@ const sendApplicationController = async (req, res) => {
       message: "Application sent successfully",
     });
   } catch (err) {
+    if (isQuotaError(err)) {
+      return sendQuotaExceeded(res, err);
+    }
+
     logError("send_application_error", err, meta);
 
     if (err.stage === "validation") {

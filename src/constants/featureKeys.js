@@ -21,6 +21,15 @@ const FEATURE_KEYS = Object.freeze({
   DAILY_AUTO_APPLY_LIMIT: "daily_auto_apply_limit",
   PRIORITY_PROCESSING: "priority_processing",
   SUPPORT_LEVEL: "support_level",
+  // Provider-neutral metered allowances. These are NOT trial-specific: the same
+  // keys back free trials today and will back paid tiers, campaigns, enterprise
+  // plans, and promotional credits tomorrow — only the resolved limit changes per
+  // plan (feature_definitions default + plan_entitlements override). Never hardcode
+  // the numbers in application code.
+  QUOTA_RESUMES_PARSED: "quota_resumes_parsed",
+  QUOTA_JDS_PARSED: "quota_jds_parsed",
+  QUOTA_EMAILS_GENERATED: "quota_emails_generated",
+  QUOTA_APPLICATIONS_SENT: "quota_applications_sent",
 });
 
 const FEATURE_TYPES = Object.freeze(["boolean", "number", "string", "enum", "json"]);
@@ -38,6 +47,9 @@ function isValidFeatureKey(key) {
  */
 function periodTypeForFeatureKey(key) {
   if (typeof key !== "string") return null;
+  // quota_* allowances are lifetime (one-time) buckets. A future periodic quota
+  // would use the period-prefixed keys below (e.g. monthly_*) instead.
+  if (key.startsWith("quota_")) return "lifetime";
   if (key.startsWith("daily_")) return "daily";
   if (key.startsWith("weekly_")) return "weekly";
   if (key.startsWith("monthly_")) return "monthly";

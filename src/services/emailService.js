@@ -21,6 +21,7 @@ const {
 const { sanitizeEmailOutput } = require("../utils/emailSanitize");
 const { initialEmailFeedbackSignals } = require("./emailFeedbackService");
 const { wordCount } = require("../utils/emailTextUtils");
+const quotaService = require("./quotaService");
 
 const RAW_OUTPUT_MAX_CHARS = 5_000;
 
@@ -208,8 +209,17 @@ const generateApplicationEmail = async (context, logMeta = {}, options = {}) => 
   let retryCount = 0;
   let rewriteGuidanceApplied = false;
   let critiqueSummary = null;
+  let quotaReserved = false;
 
   try {
+    // Reserve the credit before any LLM generation. The admin model-certification path is
+    // not a real user email, so it is exempt. Atomic reserve → no overshoot; released below
+    // if generation fails so a failed attempt doesn't burn an allowance.
+    if (!options.certificationMode) {
+      await quotaService.reserve(userId, quotaService.QUOTA_FEATURE_KEYS.EMAIL_GENERATED);
+      quotaReserved = true;
+    }
+
     const userPrompt = buildEmailUserPrompt({
       candidate: context.candidate,
       job: context.job,
@@ -322,6 +332,12 @@ const generateApplicationEmail = async (context, logMeta = {}, options = {}) => 
     }
     return result;
   } catch (err) {
+    if (err.code === "QUOTA_EXCEEDED") {
+      throw err;
+    }
+    if (quotaReserved) {
+      await quotaService.release(userId, quotaService.QUOTA_FEATURE_KEYS.EMAIL_GENERATED);
+    }
     logError("email_generation_failed", err, logMeta);
     throw err;
   }

@@ -179,6 +179,36 @@ async function expireElapsed() {
   return count;
 }
 
+/**
+ * When trial_mode is "time", grant a one-time auto trial to brand-new users so they
+ * receive N days of plan access without entering a campaign code. No-ops in usage mode
+ * or when trials/paywall are off, or when the user already has subscription history.
+ */
+async function ensureAutoTimeTrial(userId) {
+  const settingsService = require("./settingsService");
+  const trialMode = await settingsService.getTrialMode();
+  if (trialMode !== "time") return null;
+  if (!(await settingsService.isPaywallEnabled())) return null;
+  if (!(await settingsService.get("trials_enabled"))) return null;
+
+  const live = await subscriptionModel.getLiveSubscription(userId);
+  if (live) return live;
+
+  if (await subscriptionModel.hasSubscriptionHistory(userId)) return null;
+
+  const planSlug = String((await settingsService.get("default_trial_plan_slug")) || "byok");
+  const plan = await planModel.getPlanBySlug(planSlug);
+  if (!plan) return null;
+
+  const trialDays = Number((await settingsService.get("default_trial_days")) || 7);
+  const subscription = await grantTrial(
+    { userId, planId: plan.id, trialDays, campaignId: null },
+    pool
+  );
+  logInfo("AUTO_TIME_TRIAL_GRANTED", { userId, planId: plan.id, trialDays, planSlug });
+  return subscription;
+}
+
 module.exports = {
   addDays,
   grantAccessPeriod,
@@ -187,4 +217,5 @@ module.exports = {
   switchPlan,
   cancel,
   expireElapsed,
+  ensureAutoTimeTrial,
 };

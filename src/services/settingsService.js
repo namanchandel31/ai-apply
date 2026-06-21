@@ -15,6 +15,8 @@ const PAYWALL_TRIGGERS = Object.freeze([
   "before_first_apply",
 ]);
 
+const TRIAL_MODES = Object.freeze(["usage", "time"]);
+
 const DEFAULTS = Object.freeze({
   paywall_enabled: false,
   trials_enabled: true,
@@ -23,6 +25,9 @@ const DEFAULTS = Object.freeze({
   paywall_trigger: "after_plan_selection",
   grace_days: 0,
   subscriptions_enabled: false,
+  trial_mode: "usage",
+  default_trial_days: 7,
+  default_trial_plan_slug: "byok",
 });
 
 const CACHE_TTL_MS = 30_000;
@@ -69,6 +74,12 @@ async function get(key) {
   return settings[key];
 }
 
+async function getTrialMode() {
+  const settings = await loadSettings();
+  const mode = settings.trial_mode;
+  return TRIAL_MODES.includes(mode) ? mode : DEFAULTS.trial_mode;
+}
+
 async function getPublicSettings() {
   const settings = await loadSettings();
   return {
@@ -78,6 +89,7 @@ async function getPublicSettings() {
     checkoutEnabled: Boolean(settings.checkout_enabled),
     registrationEnabled: Boolean(settings.registration_enabled),
     graceDays: Number(settings.grace_days) || 0,
+    trialMode: await getTrialMode(),
   };
 }
 
@@ -88,6 +100,19 @@ async function updateSetting(key, value, updatedBy = null) {
     err.code = "INVALID_SETTING";
     throw err;
   }
+  if (key === "trial_mode" && !TRIAL_MODES.includes(value)) {
+    const err = new Error(`Invalid trial_mode. Allowed: ${TRIAL_MODES.join(", ")}`);
+    err.code = "INVALID_SETTING";
+    throw err;
+  }
+  if (key === "default_trial_days") {
+    const days = Number(value);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      const err = new Error("default_trial_days must be between 1 and 365");
+      err.code = "INVALID_SETTING";
+      throw err;
+    }
+  }
   const result = await settingsModel.upsertSetting(key, value, updatedBy);
   invalidate();
   return result;
@@ -95,10 +120,12 @@ async function updateSetting(key, value, updatedBy = null) {
 
 module.exports = {
   PAYWALL_TRIGGERS,
+  TRIAL_MODES,
   DEFAULTS,
   invalidate,
   isPaywallEnabled,
   getPaywallTrigger,
+  getTrialMode,
   get,
   getPublicSettings,
   updateSetting,

@@ -15,13 +15,36 @@ function isSmtpAuthFailure(err) {
 }
 
 /**
+ * Gmail OAuth auth failures — a revoked/expired grant (invalid_grant) or a missing
+ * refresh token. Retrying will not help; the user must reconnect their account.
+ */
+function isGmailAuthFailure(err) {
+  if (!err) return false;
+  if (err.code === "EMAIL_REAUTH_REQUIRED") return true;
+  if (err.name === "ReauthRequiredError") return true;
+  const fromData = err?.response?.data?.error;
+  return /invalid_grant/i.test(`${err.message || ""} ${fromData || ""}`);
+}
+
+/**
+ * Gmail API rate limiting / quota — transient; let BullMQ retry with backoff.
+ */
+function isGmailRateLimited(err) {
+  const status = err?.code || err?.response?.status;
+  const reason = err?.response?.data?.error?.errors?.[0]?.reason;
+  return status === 429 || reason === "rateLimitExceeded" || reason === "userRateLimitExceeded";
+}
+
+/**
  * True when the error must not consume BullMQ retry attempts.
  */
 function isNonRetryableApplicationError(err) {
   if (!err) return false;
   if (err instanceof UnrecoverableError || err instanceof NonRetryableError) return true;
   if (err.name === "UnrecoverableError" || err.name === "NonRetryableError") return true;
+  if (err.name === "ReauthRequiredError") return true;
   if (isSmtpAuthFailure(err)) return true;
+  if (isGmailAuthFailure(err)) return true;
   return false;
 }
 
@@ -78,6 +101,8 @@ async function finalizeBullMqJobFailure(job, err, opts = {}) {
 
 module.exports = {
   isSmtpAuthFailure,
+  isGmailAuthFailure,
+  isGmailRateLimited,
   isNonRetryableApplicationError,
   willBullMqRetry,
   finalizeBullMqJobFailure,

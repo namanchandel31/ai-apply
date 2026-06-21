@@ -24,6 +24,8 @@ const { JDSchema } = require("../schemas/jdSchema");
 const { createResumeWithParsedData } = require("../models/resumeModel");
 const { createJDWithParsedData } = require("../models/jdModel");
 const { saveFailedParse } = require("../models/failedParseModel");
+const quotaService = require("./quotaService");
+const { QUOTA_FEATURE_KEYS } = quotaService;
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -108,6 +110,7 @@ const processResumeJob = async ({
 
   const jobPromise = (async () => {
     let sanitizedRaw = null;
+    let quotaReserved = false;
 
     try {
       logInfo("PDF_EXTRACTION_STARTED", { reqId, jobId, fileHash });
@@ -185,6 +188,11 @@ const processResumeJob = async ({
       if (cleanedText.length < 50) {
         throw new NonRetryableError("Resume content too weak to parse");
       }
+
+      // Reserve the credit immediately before the (expensive) LLM parse. Atomic, so
+      // concurrent uploads can't overshoot; released below if the parse then fails.
+      await quotaService.reserve(userId, QUOTA_FEATURE_KEYS.RESUME_PARSED);
+      quotaReserved = true;
 
       const data = await withRetry(async (attempt) => {
         try {
@@ -299,7 +307,17 @@ const processResumeJob = async ({
         data,
       };
     } catch (err) {
+      // A spent allowance is a paywall signal, not a parse failure: don't release
+      // (nothing was reserved) and don't persist a bogus failed-parse record.
+      if (err.code === "QUOTA_EXCEEDED") {
+        throw err;
+      }
+
       logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash, source: "resume" });
+
+      if (quotaReserved) {
+        await quotaService.release(userId, QUOTA_FEATURE_KEYS.RESUME_PARSED);
+      }
 
       if (sanitizedRaw) {
         await persistFailedParse(fileHash, "resume", sanitizedRaw, err, { reqId, jobId, stage: "fallback" });
@@ -328,8 +346,13 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
 
   const jobPromise = (async () => {
     const cleanedText = sanitizeTextForLlm(text, MAX_LLM_INPUT_CHARS);
+    let quotaReserved = false;
 
     try {
+      // Reserve the credit before the LLM parse begins (atomic; released on failure).
+      await quotaService.reserve(userId, QUOTA_FEATURE_KEYS.JD_PARSED);
+      quotaReserved = true;
+
       const data = await withRetry(async (attempt) => {
         try {
           const cached = getCache(fileHash);
@@ -392,7 +415,16 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
         data,
       };
     } catch (err) {
+      if (err.code === "QUOTA_EXCEEDED") {
+        throw err;
+      }
+
       logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash, source: "jd" });
+
+      if (quotaReserved) {
+        await quotaService.release(userId, QUOTA_FEATURE_KEYS.JD_PARSED);
+      }
+
       await persistFailedParse(fileHash, "jd", cleanedText, err, { reqId, jobId, stage: "fallback" });
       throw err;
     } finally {

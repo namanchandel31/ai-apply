@@ -107,6 +107,14 @@ async function listAll({ limit = 100, offset = 0 } = {}) {
   return rows.map(mapRow);
 }
 
+async function hasSubscriptionHistory(userId, client = pool) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM user_subscriptions WHERE user_id = $1 LIMIT 1`,
+    [userId]
+  );
+  return rows.length > 0;
+}
+
 module.exports = {
   getLiveSubscription,
   getById,
@@ -114,4 +122,5 @@ module.exports = {
   updateSubscription,
   expireElapsed,
   listAll,
+  hasSubscriptionHistory,
 };

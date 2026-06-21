@@ -1,5 +1,6 @@
 const usageCounterModel = require("../models/usageCounterModel");
 const entitlementService = require("./entitlementService");
+const settingsService = require("./settingsService");
 const { periodTypeForFeatureKey } = require("../constants/featureKeys");
 
 /**
@@ -25,6 +26,10 @@ function isUnlimited(limit) {
 async function getLimit(userId, featureKey) {
   const ent = await entitlementService.getEntitlement(userId);
   if (!ent.paywallEnabled) return -1;
+  // Time-based trials use access windows, not action quotas.
+  if (featureKey.startsWith("quota_") && (await settingsService.getTrialMode()) === "time") {
+    return -1;
+  }
   return ent.entitlements[featureKey];
 }
 
@@ -45,8 +50,9 @@ async function consume(userId, featureKey, n = 1, { period } = {}) {
 }
 
 /**
- * Atomically check then consume. Throws QUOTA_EXCEEDED when over the limit, so
- * the counter never increments past the cap.
+ * Atomically increments only if it stays within the limit, otherwise throws
+ * QUOTA_EXCEEDED. A single conditional UPDATE replaces the old check-then-act, so
+ * concurrent callers can never overshoot the cap.
  */
 async function enforceQuota(userId, featureKey, n = 1, { period } = {}) {
   const limit = await getLimit(userId, featureKey);
@@ -55,26 +61,48 @@ async function enforceQuota(userId, featureKey, n = 1, { period } = {}) {
     const used = await usageCounterModel.consume(userId, featureKey, periodType, n);
     return { allowed: true, unlimited: true, used };
   }
-  const current = await usageCounterModel.getUsage(userId, featureKey, periodType);
-  if (current + n > Number(limit)) {
+  const numericLimit = Number(limit);
+  const used = await usageCounterModel.consumeIfWithinLimit(
+    userId,
+    featureKey,
+    periodType,
+    n,
+    numericLimit
+  );
+  if (used === null) {
+    const current = await usageCounterModel.getUsage(userId, featureKey, periodType);
     const err = new Error(`Quota exceeded for ${featureKey}`);
     err.code = "QUOTA_EXCEEDED";
     err.feature = featureKey;
-    err.limit = Number(limit);
+    err.limit = numericLimit;
     err.used = current;
+    err.remaining = Math.max(0, numericLimit - current);
+    // Reaching this branch implies a finite limit, which only happens when the paywall
+    // is on — so an upgrade to a higher plan would lift the cap.
+    err.upgradeEligible = true;
     throw err;
   }
-  const used = await usageCounterModel.consume(userId, featureKey, periodType, n);
-  return { allowed: true, unlimited: false, used, limit: Number(limit) };
+  return { allowed: true, unlimited: false, used, limit: numericLimit };
+}
+
+/**
+ * Compensating decrement for a previously reserved credit (see enforceQuota). Floors at
+ * zero so a double release can't drive the counter negative.
+ */
+async function release(userId, featureKey, n = 1, { period } = {}) {
+  const periodType = resolvePeriod(featureKey, period);
+  return usageCounterModel.release(userId, featureKey, periodType, n);
 }
 
 /** Usage snapshot for all numeric catalog features the user has limits on. */
 async function getUsageSummary(userId) {
   const entitlement = await entitlementService.getEntitlement(userId);
   const paywallEnabled = entitlement.paywallEnabled;
+  const trialMode = await settingsService.getTrialMode();
   const summary = {};
   for (const [key, raw] of Object.entries(entitlement.entitlements)) {
     if (typeof raw !== "number") continue;
+    if (key.startsWith("quota_") && trialMode === "time") continue;
     const value = paywallEnabled ? raw : -1;
     const periodType = resolvePeriod(key);
     if (isUnlimited(value)) {
@@ -87,4 +115,4 @@ async function getUsageSummary(userId) {
   return summary;
 }
 
-module.exports = { checkQuota, consume, enforceQuota, getUsageSummary, isUnlimited };
+module.exports = { checkQuota, consume, enforceQuota, release, getUsageSummary, isUnlimited };

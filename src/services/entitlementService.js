@@ -1,5 +1,6 @@
 const settingsService = require("./settingsService");
 const subscriptionModel = require("../models/subscriptionModel");
+const subscriptionService = require("./subscriptionService");
 const planModel = require("../models/planModel");
 
 /**
@@ -9,6 +10,12 @@ const planModel = require("../models/planModel");
  */
 async function getEntitlement(userId) {
   const paywallEnabled = await settingsService.isPaywallEnabled();
+
+  // Time-trial mode: lazily grant a one-time access period for brand-new users.
+  if (paywallEnabled && userId) {
+    await subscriptionService.ensureAutoTimeTrial(userId);
+  }
+
   const live = await subscriptionModel.getLiveSubscription(userId);
 
   // When the paywall is off, everyone is entitled. Use the live plan's map if

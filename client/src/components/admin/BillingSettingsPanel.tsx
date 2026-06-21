@@ -20,7 +20,7 @@ type Settings = Record<string, unknown>;
 const TOGGLES: Array<{ key: string; label: string; help: string }> = [
   { key: "paywall_enabled", label: "Paywall enabled", help: "Require an active plan to use the product." },
   { key: "subscriptions_enabled", label: "Subscriptions enabled", help: "Master switch for the subscription system." },
-  { key: "trials_enabled", label: "Trials enabled", help: "Allow campaign-driven free trials." },
+  { key: "trials_enabled", label: "Trials enabled", help: "Allow trials (usage metering or auto time trials, depending on Trial tab mode)." },
   { key: "checkout_enabled", label: "Checkout enabled", help: "Allow new paid checkouts." },
   { key: "registration_enabled", label: "New user registration", help: "Allow new signups." },
 ];
