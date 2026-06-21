@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
+import { isPricingEnabled } from "@/lib/featureFlags";
 
 /** Waits for setup status, then routes to onboarding or dashboard (no dashboard flash). */
 export function AuthenticatedHomeRedirect() {
@@ -21,7 +22,9 @@ export function AuthenticatedHomeRedirect() {
         : !status.onboardingRequired
           ? "/dashboard"
           : "/onboarding"
-      : "/pricing";
+      : isPricingEnabled
+        ? "/pricing"
+        : "/onboarding";
 
   return <Navigate to={to} replace />;
 }

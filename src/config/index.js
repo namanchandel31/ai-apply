@@ -9,6 +9,7 @@ const queue = require("./queue.config");
 const ai = require("./ai.config");
 const auth = require("./auth.config");
 const supabaseAuth = require("./supabaseAuth.config");
+const google = require("./google.config");
 const mail = require("./mail.config");
 const logging = require("./logging.config");
 const storage = require("./storage.config");
@@ -26,6 +27,7 @@ const config = Object.freeze({
   ai,
   auth,
   supabaseAuth,
+  google,
   mail,
   logging,
   storage,

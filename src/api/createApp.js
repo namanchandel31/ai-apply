@@ -37,6 +37,16 @@ function createApp() {
   );
 
   app.use(cors(config.cors.buildCorsMiddlewareOptions()));
+
+  // Razorpay webhook needs the raw body for signature verification, so it must
+  // be mounted BEFORE the global JSON body parser.
+  const { razorpayWebhookController } = require("../controllers/billingWebhookController");
+  app.post(
+    "/api/billing/webhook",
+    express.raw({ type: "application/json" }),
+    razorpayWebhookController
+  );
+
   app.use(express.json());
 
   const {
@@ -51,6 +61,7 @@ function createApp() {
   const jdRoutes = require("../routes/jdRoutes");
   const applyRoutes = require("../routes/applyRoutes");
   const credentialRoutes = require("../routes/credentialRoutes");
+  const gmailIntegrationRoutes = require("../routes/gmailIntegrationRoutes");
   const sendRoutes = require("../routes/sendRoutes");
   const autoApplyRoutes = require("../routes/autoApplyRoutes");
   const applicationRoutes = require("../routes/applicationRoutes");
@@ -77,6 +88,7 @@ function createApp() {
   app.use("/api/apply", applyRateLimit, applyRoutes);
   app.use("/api", applyRateLimit, sendRoutes);
   app.use("/api", credentialRoutes);
+  app.use("/api", gmailIntegrationRoutes);
   app.use("/api", autoApplyRateLimit, autoApplyRoutes);
   app.use("/api", readRateLimit, applicationRoutes);
   app.use("/api", realtimeRoutes);
@@ -84,6 +96,9 @@ function createApp() {
   app.use("/api", readRateLimit, userRoutes);
   app.use("/api", aiRateLimit, aiRoutes);
   app.use("/api", billingRoutes);
+
+  const adminBillingRoutes = require("../routes/adminBillingRoutes");
+  app.use("/api", adminBillingRoutes);
 
   // Admin-only (gated by users.is_admin via adminGuard inside the router).
   const modelCertificationRoutes = require("../routes/modelCertificationRoutes");

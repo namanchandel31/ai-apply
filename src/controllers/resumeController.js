@@ -7,6 +7,7 @@ const { logInfo, logError } = require("../utils/logger");
 const { supabase } = require("../config/supabase");
 const { error: sendError, ok, ERROR_CODES } = require("../utils/response");
 const { userHasVerifiedAiCredential } = require("../services/setupStatusService");
+const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
 async function respondWithDuplicateResume(res, {
   reqId,
@@ -199,6 +200,10 @@ const uploadResumeController = async (req, res) => {
     });
 
   } catch (err) {
+    if (isQuotaError(err)) {
+      return sendQuotaExceeded(res, err);
+    }
+
     let status = 500;
     let message = 'Failed to process resume due to internal error.';
 

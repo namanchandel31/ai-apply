@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type ApiError } from "@/lib/api";
@@ -24,6 +24,7 @@ import { OneTapBrand } from "@/components/OneTapLogomark";
 import { ExtensionInstallPrompt } from "@/components/onboarding/ExtensionInstallPrompt";
 import { OnboardingConfetti } from "@/components/onboarding/OnboardingConfetti";
 import { ResumeDropzone } from "@/components/onboarding/ResumeDropzone";
+import { EmailStatusCard } from "@/components/EmailStatusCard";
 import {
   clearEmailStepSkipped,
   clearOnboardingExtensionPending,
@@ -45,8 +46,6 @@ import {
   REMOTE_PROVIDERS,
   type RemoteProviderId,
 } from "@/lib/remoteProviders";
-
-const GMAIL_APP_PASSWORDS_URL = "https://myaccount.google.com/apppasswords";
 
 const STEPS = [
   { id: 1, label: "Choose Model" },
@@ -159,7 +158,6 @@ export function Onboarding() {
   const [aiUi, setAiUi] = useState<AiUiState>("idle");
   const [aiError, setAiError] = useState<string | null>(null);
   const [resumeUi, setResumeUi] = useState<ResumeUiState>("idle");
-  const [emailLoading, setEmailLoading] = useState(false);
   const [emailSkipped, setEmailSkipped] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
   const [showExtensionPrompt, setShowExtensionPrompt] = useState(false);
@@ -400,34 +398,6 @@ export function Onboarding() {
     markEmailStepSkipped();
     markOnboardingExtensionPending();
     setEmailSkipped(true);
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!hasValidResume) {
-      toast.error("Upload and parse your resume first");
-      return;
-    }
-    setEmailLoading(true);
-    const fd = new FormData(e.currentTarget);
-    const password = String(fd.get("appPassword")).replace(/\s+/g, "");
-    if (password.length !== 16) {
-      toast.error("App password must be exactly 16 characters");
-      setEmailLoading(false);
-      return;
-    }
-    try {
-      await api.saveCredentials(String(fd.get("email")), password);
-      toast.success("Gmail connected");
-      trackOnboardingEvent("gmail_setup_clicked");
-      clearEmailStepSkipped();
-      markOnboardingExtensionPending();
-      invalidateStatus();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save credentials");
-    } finally {
-      setEmailLoading(false);
-    }
   };
 
   if (isLoading) {
@@ -680,68 +650,28 @@ export function Onboarding() {
                 ) : null}
 
                 {activeStep === 3 ? (
-                  <form onSubmit={(e) => void handleEmailSubmit(e)} className="mt-4 space-y-3">
+                  <div className="mt-4 space-y-4">
                     <p className="text-base text-muted-foreground">
-                      Emails send from your Gmail so recruiters hear from you — not a generic address. Required
-                      for Auto apply.
+                      Connect Gmail so OneTap can send applications from your address. OAuth is
+                      recommended; app password is available under Advanced.
                     </p>
-
-                    <div className="rounded-[10px] border border-border bg-black/[0.02] p-4">
-                      <p className="text-base font-medium text-foreground">Generate a Gmail app password</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        This is a one-time 16-character code from Google — not your normal Gmail password. Opens Google
-                        Account settings; 2-Step Verification must be on.
-                      </p>
-                      <Button variant="outline" className="mt-3 w-full" asChild>
-                        <a
-                          href={GMAIL_APP_PASSWORDS_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open Google App Passwords
-                          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                        </a>
-                      </Button>
-                    </div>
-
-                    <OnboardingField label="Gmail address" htmlFor="onboarding-email">
-                      <Input
-                        id="onboarding-email"
-                        name="email"
-                        type="email"
-                        defaultValue={status?.email ?? user?.email ?? ""}
-                        required
-                      />
-                    </OnboardingField>
-                    <OnboardingField label="App password" htmlFor="onboarding-app-password">
-                      <Input
-                        id="onboarding-app-password"
-                        name="appPassword"
-                        type="password"
-                        placeholder="xxxx xxxx xxxx xxxx"
-                        required
-                        autoComplete="off"
-                      />
-                    </OnboardingField>
-
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={handleSkipEmail}
-                      >
-                        Skip for now
-                      </Button>
-                      <Button type="submit" className="flex-1" disabled={emailLoading}>
-                        {emailLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Connect Gmail
-                      </Button>
-                    </div>
+                    <EmailStatusCard
+                      email={status?.email}
+                      onUpdate={() => {
+                        clearEmailStepSkipped();
+                        markOnboardingExtensionPending();
+                        invalidateStatus();
+                        trackOnboardingEvent("gmail_setup_clicked");
+                      }}
+                      oauthReturnTo="onboarding"
+                    />
+                    <Button type="button" variant="outline" className="w-full" onClick={handleSkipEmail}>
+                      Skip for now
+                    </Button>
                     <p className="text-center text-xs text-muted-foreground">
-                      Add Gmail later in Setup when you&apos;re ready to send.
+                      You can connect Gmail later in Setup when you&apos;re ready to send.
                     </p>
-                  </form>
+                  </div>
                 ) : null}
                 </>
               ) : null}

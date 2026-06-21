@@ -3,6 +3,7 @@ const { ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
 const { logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
+const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
 const previewEmailController = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
@@ -36,6 +37,10 @@ const previewEmailController = async (req, res) => {
       data: result,
     });
   } catch (err) {
+    if (isQuotaError(err)) {
+      return sendQuotaExceeded(res, err);
+    }
+
     logError(
       "PREVIEW_EMAIL_CONTROLLER_ERROR",
       err,

@@ -19,10 +19,19 @@ import { OnboardingGuard } from "@/routes/OnboardingGuard";
 import { AuthenticatedHomeRedirect } from "@/routes/AuthenticatedHomeRedirect";
 import { SubscriptionGuard } from "@/routes/SubscriptionGuard";
 import { SessionHandlers } from "@/auth/SessionHandlers";
+import { QuotaPaywall } from "@/components/QuotaPaywall";
 import { useAuth } from "@/auth/AuthContext";
+import { isPricingEnabled } from "@/lib/featureFlags";
 import { AdminPage } from "@/pages/admin";
 import { PrivacyPolicyPage } from "@/pages/privacyPolicy";
 import { SupportPage } from "@/pages/support";
+
+function PricingRoute() {
+  if (!isPricingEnabled) {
+    return <AuthenticatedHomeRedirect />;
+  }
+  return <PricingPage />;
+}
 
 function CatchAllRedirect() {
   const { session, isResolved } = useAuth();
@@ -43,6 +52,7 @@ export function AppRoutes() {
   return (
     <>
       <SessionHandlers />
+      <QuotaPaywall />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -57,7 +67,7 @@ export function AppRoutes() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/pricing" element={<PricingRoute />} />
           <Route element={<SubscriptionGuard />}>
             <Route path="/onboarding" element={<Onboarding />} />
             <Route

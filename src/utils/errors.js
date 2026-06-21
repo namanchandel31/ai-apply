@@ -27,4 +27,17 @@ class NotFoundError extends Error {
   }
 }
 
-module.exports = { RetryableError, NonRetryableError, NotFoundError };
+/**
+ * Raised when a connected OAuth email account can no longer be used (refresh token
+ * revoked/expired). Non-retryable — the user must reconnect their account.
+ */
+class ReauthRequiredError extends NonRetryableError {
+  constructor(message = "Email account must be reconnected") {
+    super(message);
+    this.name = "ReauthRequiredError";
+    this.code = "EMAIL_REAUTH_REQUIRED";
+    this.stage = "oauth";
+  }
+}
+
+module.exports = { RetryableError, NonRetryableError, NotFoundError, ReauthRequiredError };

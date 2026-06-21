@@ -9,6 +9,10 @@ jest.mock("../src/models/aiCredentialModel", () => ({
   listByUser: jest.fn(),
   getVerifiedCredentialForUser: jest.fn(),
 }));
+jest.mock("../src/config", () => ({
+  product: { pricingEnabled: true },
+  ai: { openaiApiKey: null },
+}));
 
 const { pool } = require("../src/db");
 const aiCredentialModel = require("../src/models/aiCredentialModel");
@@ -20,11 +24,23 @@ describe("buildSetupStatus onboarding fields", () => {
     aiCredentialModel.listByUser.mockResolvedValue([]);
     aiCredentialModel.getVerifiedCredentialForUser.mockResolvedValue(null);
     pool.query.mockImplementation(async (sql) => {
+      if (sql.includes("FROM users")) {
+        return { rows: [{ subscription_status: "inactive", subscription_tier: "free" }] };
+      }
       if (sql.includes("FROM resumes")) return { rows: [] };
       if (sql.includes("user_email_credentials")) return { rows: [] };
       if (sql.includes("parsed_resumes")) return { rows: [] };
       return { rows: [] };
     });
+  });
+
+  it("treats inactive users as subscribed when pricing is disabled", async () => {
+    const config = require("../src/config");
+    config.product.pricingEnabled = false;
+    const status = await buildSetupStatus("user-1");
+    expect(status.pricingEnabled).toBe(false);
+    expect(status.hasActiveSubscription).toBe(true);
+    config.product.pricingEnabled = true;
   });
 
   it("marks onboarding required when AI not verified", async () => {

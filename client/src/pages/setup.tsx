@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { EmailStatusCard } from "@/components/EmailStatusCard";
+import { TrialUsageProgress } from "@/components/TrialUsageProgress";
 import { EmailPreferencesCard } from "@/components/EmailPreferencesCard";
 import { ResumeStatusCard } from "@/components/ResumeStatusCard";
 import { AiProviderStatusCard } from "@/components/AiProviderStatusCard";
@@ -96,11 +97,14 @@ export function Setup() {
         )}
 
         {activeTab === "email" && (
-          <EmailStatusCard
-            email={status?.email}
-            onUpdate={handleUpdate}
-            defaultExpanded={expandEmail}
-          />
+          <div className="space-y-6">
+            <EmailStatusCard
+              email={status?.email}
+              onUpdate={handleUpdate}
+              defaultExpanded={expandEmail}
+            />
+            <TrialUsageProgress />
+          </div>
         )}
 
         {activeTab === "style" && <EmailPreferencesCard />}

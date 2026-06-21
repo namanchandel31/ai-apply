@@ -21,10 +21,12 @@ const plans = Object.freeze({
 
 const razorpayKeyId = str("RAZORPAY_KEY_ID", "");
 const razorpayKeySecret = str("RAZORPAY_KEY_SECRET", "");
+const razorpayWebhookSecret = str("RAZORPAY_WEBHOOK_SECRET", "");
 
 module.exports = Object.freeze({
   razorpayKeyId,
   razorpayKeySecret,
+  razorpayWebhookSecret,
   currency,
   plans,
   isEnabled: Boolean(razorpayKeyId && razorpayKeySecret),

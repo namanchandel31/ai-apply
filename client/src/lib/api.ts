@@ -107,6 +107,27 @@ function dispatchAuthFailure(ctx: AuthErrorContext): void {
   handler?.(ctx);
 }
 
+/** Paywall context carried on a 402 QUOTA_EXCEEDED response (everything the UI needs). */
+export type QuotaExceededContext = {
+  feature?: string;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+  upgradeEligible?: boolean;
+};
+
+let quotaExceededHandler: ((ctx: QuotaExceededContext) => void) | null = null;
+
+export function setQuotaExceededHandler(
+  handler: ((ctx: QuotaExceededContext) => void) | null
+): void {
+  quotaExceededHandler = handler;
+}
+
+function dispatchQuotaExceeded(meta?: Record<string, unknown>): void {
+  quotaExceededHandler?.((meta ?? {}) as QuotaExceededContext);
+}
+
 async function tryRefreshSupabaseSession(): Promise<boolean> {
   const { data, error } = await supabase.auth.refreshSession();
   return !error && Boolean(data.session?.access_token);
@@ -140,6 +161,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
     if (res.status === 401 || res.status === 403) {
       dispatchAuthFailure(authCtx);
+    }
+
+    if (code === "QUOTA_EXCEEDED") {
+      dispatchQuotaExceeded(meta);
     }
 
     const err = new Error(message) as ApiError;
@@ -222,9 +247,30 @@ export type EmailPreferencesData = {
   structureMode: string;
 };
 
+export type EntitlementMap = Record<string, boolean | number | string>;
+
+export type GmailStatus = {
+  connected: boolean;
+  provider: string;
+  configured: boolean;
+  email?: string;
+  status?: string;
+  healthStatus?: string;
+  scopes?: string[];
+  canSend?: boolean;
+  canRead?: boolean;
+  isDefault?: boolean;
+  lastUsedAt?: string | null;
+};
+
 export type SetupStatusData = {
+  pricingEnabled?: boolean;
   hasActiveSubscription?: boolean;
   subscriptionTier?: string;
+  planSlug?: string | null;
+  entitlements?: EntitlementMap;
+  accessEndsAt?: string | null;
+  subscriptionState?: string;
   hasResume: boolean;
   hasValidResume?: boolean;
   hasEmailSetup: boolean;
@@ -233,11 +279,77 @@ export type SetupStatusData = {
   hasValidUserAiCredential?: boolean;
   credentialLastValidatedAt?: string | null;
   onboardingRequired?: boolean;
-  currentOnboardingStep?: "ai" | "resume" | "ready";
+  currentOnboardingStep?: "ai" | "resume" | "email" | "profile" | "preferences" | "ready";
   activeResume?: { id: string; filename: string; uploadedAt: string; fileHash: string } | null;
   email?: string | null;
   activeAiProvider?: AiCredentialSummary | null;
   aiCredentialChain?: AiCredentialSummary[];
+};
+
+export type PricingPricePoint = {
+  id: string;
+  label?: string | null;
+  durationDays: number;
+  amountPaise: number;
+  currency: string;
+};
+
+export type PricingCampaign = {
+  id: string;
+  name: string;
+  type: "trial" | "discount" | "early_access";
+  code?: string | null;
+  trialDays?: number | null;
+  discountType?: "percent" | "fixed" | null;
+  discountAmount?: number | null;
+};
+
+export type PricingPlan = {
+  slug: string;
+  displayName: string;
+  description?: string | null;
+  popular: boolean;
+  sortOrder: number;
+  pricePoints: PricingPricePoint[];
+  features: Array<{ label: string; included: boolean }>;
+  campaigns: PricingCampaign[];
+};
+
+export type PricingResponse = {
+  paywall: {
+    paywallEnabled: boolean;
+    paywallTrigger: "after_plan_selection" | "after_onboarding" | "before_first_apply";
+    trialsEnabled: boolean;
+    checkoutEnabled: boolean;
+    registrationEnabled: boolean;
+    graceDays: number;
+  };
+  plans: PricingPlan[];
+};
+
+export type UsageSummary = Record<
+  string,
+  { limit: number; used: number; remaining: number; periodType: string; unlimited: boolean }
+>;
+
+export type SubscriptionStatusData = {
+  entitled: boolean;
+  paywallEnabled: boolean;
+  planSlug: string | null;
+  status: string;
+  accessEndsAt: string | null;
+  entitlements: EntitlementMap;
+  usage: UsageSummary;
+  paywallTrigger: "after_plan_selection" | "after_onboarding" | "before_first_apply";
+  nextPaywallAction: "access" | "first_apply" | null;
+};
+
+export type PlanComparison = {
+  direction: "upgrade" | "downgrade" | "lateral";
+  gains: Array<{ key: string; label: string }>;
+  losses: Array<{ key: string; label: string }>;
+  limit_changes: Array<{ feature: string; label: string; old: number; new: number; direction: "increase" | "decrease" }>;
+  changes: Array<{ key: string; label: string; old: unknown; new: unknown }>;
 };
 
 export type UserMe = {
@@ -286,7 +398,11 @@ export const api = {
     });
   },
 
-  createBillingOrder(planId: "byok" | "onetap_llm") {
+  getPricing() {
+    return request<{ success: boolean; data: PricingResponse }>("/api/pricing", { method: "GET" });
+  },
+
+  createCheckout(body: { planSlug: string; pricePointId?: string; campaignCode?: string }) {
     return request<{
       success: boolean;
       data: {
@@ -294,26 +410,54 @@ export const api = {
         amountPaise: number;
         currency: string;
         keyId: string;
-        plan: {
-          id: "byok" | "onetap_llm";
-          tier: string;
-          name: string;
-        };
+        plan: { slug: string; displayName: string };
       };
-    }>("/api/billing/create-order", {
+    }>("/api/checkout/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify(body),
     });
   },
 
   verifyBillingPayment(body: {
-    planId: "byok" | "onetap_llm";
     razorpayOrderId: string;
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
     return request<{ success: boolean; data: { user: UserMe } }>("/api/billing/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  getSubscriptionStatus() {
+    return request<{ success: boolean; data: SubscriptionStatusData }>("/api/subscription/status", {
+      method: "GET",
+    });
+  },
+
+  cancelSubscription(immediate = false) {
+    return request<{ success: boolean; data: unknown }>("/api/subscription/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ immediate }),
+    });
+  },
+
+  getUsage() {
+    return request<{ success: boolean; data: UsageSummary }>("/api/usage", { method: "GET" });
+  },
+
+  comparePlans(toSlug: string) {
+    return request<{ success: boolean; data: PlanComparison }>(
+      `/api/plans/compare?to=${encodeURIComponent(toSlug)}`,
+      { method: "GET" }
+    );
+  },
+
+  claimTrial(body: { campaignCode: string; planSlug: string }) {
+    return request<{ success: boolean; data: { entitlement: unknown } }>("/api/trials/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -374,6 +518,32 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, appPassword }),
     });
+  },
+
+  gmail: {
+    /** Returns the Google consent URL. Default tier requests gmail.send only. */
+    connect(tier: "send" | "send_read" = "send", returnTo: "setup" | "onboarding" = "setup") {
+      const qs = new URLSearchParams({
+        tier,
+        returnTo,
+      });
+      return request<{ success: boolean; data: { authorizationUrl: string } }>(
+        `/api/integrations/gmail/connect?${qs.toString()}`,
+        { method: "GET" }
+      );
+    },
+    status() {
+      return request<{ success: boolean; data: GmailStatus }>(
+        "/api/integrations/gmail/status",
+        { method: "GET" }
+      );
+    },
+    disconnect() {
+      return request<{ success: boolean; data: { disconnected: boolean } }>(
+        "/api/integrations/gmail/disconnect",
+        { method: "POST" }
+      );
+    },
   },
 
   uploadResume(file: File, context: "onboarding" | "profile_update" = "profile_update") {
@@ -804,6 +974,180 @@ export const api = {
       data: TrackerStatusSummary;
     }>("/api/applications/tracker-status-summary", { method: "GET" });
   },
+
+  // ---------- Admin: subscription system ----------
+  adminGetSettings() {
+    return request<{ success: boolean; data: Record<string, unknown> }>("/api/admin/settings", { method: "GET" });
+  },
+  adminUpdateSettings(updates: Record<string, unknown>) {
+    return request<{ success: boolean; data: Record<string, unknown> }>("/api/admin/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+  },
+  adminListFeatures() {
+    return request<{ success: boolean; data: AdminFeature[] }>("/api/admin/features", { method: "GET" });
+  },
+  adminCreateFeature(body: Partial<AdminFeature> & { key: string; displayName: string; type: string }) {
+    return request<{ success: boolean; data: AdminFeature }>("/api/admin/features", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminUpdateFeature(id: string, body: Partial<Pick<AdminFeature, "displayName" | "description" | "defaultValue" | "category" | "isActive">>) {
+    return request<{ success: boolean; data: AdminFeature }>(`/api/admin/features/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminListPlans() {
+    return request<{ success: boolean; data: AdminPlan[] }>("/api/admin/plans", { method: "GET" });
+  },
+  adminCreatePlan(body: { slug: string; displayName: string; description?: string; tier?: string }) {
+    return request<{ success: boolean; data: AdminPlan }>("/api/admin/plans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminUpdatePlan(id: string, body: Record<string, unknown>) {
+    return request<{ success: boolean; data: AdminPlan }>(`/api/admin/plans/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminUpdatePlanEntitlements(id: string, entitlements: Array<{ featureKey: string; value: unknown }>) {
+    return request<{ success: boolean; data: unknown }>(`/api/admin/plans/${id}/entitlements`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entitlements }),
+    });
+  },
+  adminCreatePricePoint(id: string, body: { label?: string; durationDays: number; amountPaise: number; currency?: string }) {
+    return request<{ success: boolean; data: unknown }>(`/api/admin/plans/${id}/price-points`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminListCampaigns() {
+    return request<{ success: boolean; data: AdminCampaign[] }>("/api/admin/campaigns", { method: "GET" });
+  },
+  adminCreateCampaign(body: Record<string, unknown>) {
+    return request<{ success: boolean; data: AdminCampaign }>("/api/admin/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminUpdateCampaign(id: string, body: Record<string, unknown>) {
+    return request<{ success: boolean; data: AdminCampaign }>(`/api/admin/campaigns/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminListSubscriptions(limit = 100, offset = 0) {
+    return request<{ success: boolean; data: AdminSubscription[] }>(
+      `/api/admin/subscriptions?limit=${limit}&offset=${offset}`,
+      { method: "GET" }
+    );
+  },
+  adminSubscriptionAction(userId: string, action: string, body: Record<string, unknown>) {
+    return request<{ success: boolean; data: unknown }>(
+      `/api/admin/subscriptions/${userId}/${action}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+  },
+  adminListPayments(limit = 100, offset = 0) {
+    return request<{ success: boolean; data: AdminPayment[] }>(
+      `/api/admin/payments?limit=${limit}&offset=${offset}`,
+      { method: "GET" }
+    );
+  },
+};
+
+export type AdminFeature = {
+  id: string;
+  key: string;
+  displayName: string;
+  description?: string | null;
+  type: "boolean" | "number" | "string" | "enum" | "json";
+  defaultValue?: unknown;
+  enumOptions?: string[] | null;
+  category?: string | null;
+  isActive: boolean;
+};
+
+export type AdminPlanEntitlement = {
+  id: string;
+  featureId: string;
+  key: string;
+  type: string;
+  displayName: string;
+  value: unknown;
+};
+
+export type AdminPlan = {
+  id: string;
+  slug: string;
+  displayName: string;
+  description?: string | null;
+  tier?: string | null;
+  isActive: boolean;
+  isArchived: boolean;
+  sortOrder: number;
+  popular: boolean;
+  pricePoints?: Array<{ id: string; label?: string | null; durationDays: number; amountPaise: number; currency: string; isActive: boolean }>;
+  features?: Array<{ id: string; label: string; included: boolean; sortOrder: number }>;
+  entitlements?: AdminPlanEntitlement[];
+  onboarding?: string[] | null;
+};
+
+export type AdminCampaign = {
+  id: string;
+  name: string;
+  code?: string | null;
+  type: "trial" | "discount" | "early_access";
+  enabled: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  userLimit?: number | null;
+  claimedCount: number;
+  trialDays?: number | null;
+  discountType?: "percent" | "fixed" | null;
+  discountAmount?: number | null;
+  applicablePlanIds: string[];
+  priority: number;
+};
+
+export type AdminSubscription = {
+  id: string;
+  userId: string;
+  planId: string;
+  status: string;
+  source: string;
+  accessStartsAt: string;
+  accessEndsAt: string | null;
+  createdAt: string;
+};
+
+export type AdminPayment = {
+  id: string;
+  user_id: string;
+  amount_paise: number;
+  currency: string;
+  status: string;
+  razorpay_payment_id?: string | null;
+  created_at: string;
 };
 
 export type JdEnrichmentState = "pending" | "complete";

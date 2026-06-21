@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePostAuthPath } from "@/lib/postAuthDestination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -78,7 +79,7 @@ export function LoginPage() {
         toast.error(error.message);
         return;
       }
-      navigate("/pricing", { replace: true });
+      navigate(await resolvePostAuthPath(), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {

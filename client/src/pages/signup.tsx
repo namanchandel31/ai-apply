@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePostAuthPath } from "@/lib/postAuthDestination";
+import { isPricingEnabled } from "@/lib/featureFlags";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,8 +46,12 @@ export function SignupPage() {
         navigate("/login", { replace: true });
         return;
       }
-      toast.success("Account created. Choose your plan to continue.");
-      navigate("/pricing", { replace: true });
+      toast.success(
+        isPricingEnabled
+          ? "Account created. Choose your plan to continue."
+          : "Account created. Let's finish setup."
+      );
+      navigate(await resolvePostAuthPath(), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-up failed");
     } finally {

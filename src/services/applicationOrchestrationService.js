@@ -7,6 +7,7 @@ const { createJob } = require("../models/applicationJobModel");
 const { recordEvent } = require("../models/applicationEventModel");
 const { enqueueProcessApplicationJob } = require("../queues/processApplicationQueue");
 const { resolveResumeForAutoApply } = require("./resolveResumeForAutoApply");
+const mailDeliveryService = require("./email/mailDeliveryService");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
@@ -22,14 +23,15 @@ async function startAutoApply(userId, jobDescriptionText, reqId, options = {}) {
 
   const resolved = await resolveResumeForAutoApply(userId, options.resumeId);
 
-  const { rows: credRows } = await pool.query(
-    `SELECT 1 FROM user_email_credentials WHERE user_id = $1`,
-    [userId]
-  );
-  if (!credRows.length) {
-    const err = new Error("No SMTP credentials saved.");
-    err.code = "NO_CREDENTIALS";
-    throw err;
+  try {
+    await mailDeliveryService.resolveSendingAccount(userId);
+  } catch (err) {
+    const noCreds = err.code === "NO_CREDENTIALS";
+    const err2 = new Error(
+      noCreds ? "Connect Gmail or save an app password before auto apply." : err.message
+    );
+    err2.code = noCreds ? "NO_CREDENTIALS" : err.code || "EMAIL_NOT_CONFIGURED";
+    throw err2;
   }
 
   const applicationId = crypto.randomUUID();

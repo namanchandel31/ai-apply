@@ -3,6 +3,8 @@ const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
 const { logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
+const quotaService = require("../services/quotaService");
+const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
 const autoApplyController = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
@@ -72,6 +74,25 @@ const autoApplyController = async (req, res) => {
       }
     }
 
+    // Auto-apply will consume an application send, plus an AI email generation unless the
+    // caller supplied the copy. Pre-gate before creating/queueing the application so an
+    // out-of-credit user gets an immediate paywall instead of a queued job that fails in the
+    // worker. The worker still does the authoritative atomic reserve at the point of use.
+    const QK = quotaService.QUOTA_FEATURE_KEYS;
+    const preChecks = [QK.APPLICATION_SENT];
+    if (!hasCustomEmail) preChecks.push(QK.EMAIL_GENERATED);
+    for (const featureKey of preChecks) {
+      const quota = await quotaService.check(userId, featureKey);
+      if (!quota.allowed) {
+        return sendQuotaExceeded(res, {
+          feature: featureKey,
+          limit: quota.limit,
+          used: quota.used,
+          remaining: quota.remaining,
+        });
+      }
+    }
+
     const result = await startAutoApply(userId, jobDescription, reqId, {
       resumeId: bodyResumeId,
       emailSubject: hasCustomEmail ? trimmedSubject : undefined,
@@ -94,6 +115,10 @@ const autoApplyController = async (req, res) => {
       jobId: result.jobId,
     });
   } catch (err) {
+    if (isQuotaError(err)) {
+      return sendQuotaExceeded(res, err);
+    }
+
     logError(
       "AUTO_APPLY_CONTROLLER_ERROR",
       err,

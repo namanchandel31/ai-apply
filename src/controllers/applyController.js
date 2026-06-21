@@ -3,6 +3,7 @@ const { logInfo, logError } = require("../utils/logger");
 const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
 const { buildLogContext } = require("../utils/buildLogContext");
+const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
 const processApplication = async (req, res) => {
   const reqId = req.requestId || "UNKNOWN";
@@ -34,6 +35,10 @@ const processApplication = async (req, res) => {
     const options = result.idempotent ? { idempotent: true } : {};
     return ok(res, result, options);
   } catch (err) {
+    if (isQuotaError(err)) {
+      return sendQuotaExceeded(res, err);
+    }
+
     logError(
       "APPLICATION_PROCESSING_FAILED",
       err,

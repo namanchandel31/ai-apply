@@ -1,8 +1,10 @@
+const config = require("../config");
 const { pool } = require("../db");
 const { getUserDefaults } = require("../models/userModel");
 const { getResumeById } = require("../models/resumeModel");
 const aiCredentialModel = require("../models/aiCredentialModel");
-const { deriveOnboardingState } = require("./onboardingDerivation");
+const entitlementService = require("./entitlementService");
+const onboardingService = require("./onboardingService");
 
 async function computeHasValidResume(userId) {
   const { rows: resumeRows } = await pool.query(
@@ -35,9 +37,13 @@ async function buildSetupStatus(userId) {
      LIMIT 1`,
     [userId]
   );
-  const subscriptionStatus = userRows[0]?.subscription_status ?? "inactive";
   const subscriptionTier = userRows[0]?.subscription_tier ?? "free";
-  const hasActiveSubscription = subscriptionStatus === "active";
+
+  // Entitlement is the single source of truth. It folds in the ENV kill-switch,
+  // the DB paywall_enabled setting, and the user's live access period.
+  const entitlement = await entitlementService.getEntitlement(userId);
+  const pricingEnabled = entitlement.paywallEnabled;
+  const hasActiveSubscription = entitlement.entitled;
 
   const { rows: resumeRows } = await pool.query(
     `SELECT id, file_hash as "fileHash", file_name as "filename", uploaded_at as "uploadedAt"
@@ -53,6 +59,13 @@ async function buildSetupStatus(userId) {
     [userId]
   );
 
+  const { rows: gmailRows } = await pool.query(
+    `SELECT email_address AS email FROM email_accounts
+     WHERE user_id = $1 AND provider = 'gmail' AND status = 'connected' AND can_send = TRUE
+     LIMIT 1`,
+    [userId]
+  );
+
   const aiChainRows = await aiCredentialModel.listByUser(userId);
   const primaryAi = aiChainRows.find((r) => r.priority === 0) || null;
 
@@ -61,19 +74,23 @@ async function buildSetupStatus(userId) {
   const hasValidResume = await computeHasValidResume(userId);
 
   const hasResume = resumeRows.length > 0;
-  const hasEmailSetup = credRows.length > 0;
-  const hasAiSetup =
-    aiChainRows.length > 0 || !!require("../config").ai.openaiApiKey;
+  const hasEmailSetup = credRows.length > 0 || gmailRows.length > 0;
+  const hasAiSetup = aiChainRows.length > 0 || !!config.ai.openaiApiKey;
 
-  const onboarding = deriveOnboardingState({
+  const onboarding = await onboardingService.resolveOnboarding(userId, {
     hasVerifiedAiCredential,
     hasValidResume,
     hasEmailSetup,
   });
 
   return {
+    pricingEnabled,
     hasActiveSubscription,
     subscriptionTier,
+    planSlug: entitlement.planSlug,
+    entitlements: entitlement.entitlements,
+    accessEndsAt: entitlement.accessEndsAt,
+    subscriptionState: entitlement.status,
     hasResume,
     hasValidResume,
     hasEmailSetup,
@@ -84,7 +101,7 @@ async function buildSetupStatus(userId) {
     onboardingRequired: onboarding.onboardingRequired,
     currentOnboardingStep: onboarding.currentOnboardingStep,
     activeResume: hasResume ? resumeRows[0] : null,
-    email: hasEmailSetup ? credRows[0].email : null,
+    email: hasEmailSetup ? credRows[0]?.email ?? gmailRows[0]?.email : null,
     activeAiProvider: primaryAi,
     aiCredentialChain: aiChainRows,
   };

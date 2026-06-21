@@ -16,7 +16,15 @@ jest.mock('../src/config/supabase', () => ({
 // Mock encryption utility for tests
 jest.mock('../src/utils/encryption', () => ({
   encrypt: jest.fn((text) => `encrypted_${text}`),
-  decrypt: jest.fn((encrypted) => encrypted.replace('encrypted_', ''))
+  decrypt: jest.fn((encrypted) => encrypted.replace('encrypted_', '')),
+  encryptSecret: jest.fn((text) => (text == null ? null : `gcm_${text}`)),
+  decryptSecret: jest.fn((encrypted) =>
+    encrypted == null
+      ? null
+      : String(encrypted).startsWith('gcm_')
+        ? String(encrypted).slice(4)
+        : String(encrypted).replace('encrypted_', '')
+  ),
 }));
 
 // Set test environment variables
