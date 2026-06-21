@@ -4,6 +4,7 @@ const { processApplication } = require("../controllers/applyController");
 const { listApplicationsLegacyController } = require("../controllers/applicationController");
 const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
+const { requirePaidAccess } = require("../middlewares/entitlementMiddleware");
 
 /**
  * @openapi
@@ -54,7 +55,13 @@ const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post("/", supabaseAuthMiddleware, applyRateLimit, processApplication);
+router.post(
+  "/",
+  supabaseAuthMiddleware,
+  applyRateLimit,
+  requirePaidAccess("first_apply"),
+  processApplication
+);
 
 /**
  * @openapi

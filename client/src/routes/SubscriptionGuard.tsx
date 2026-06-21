@@ -1,9 +1,14 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
+import { isPricingEnabled } from "@/lib/featureFlags";
 
 export function SubscriptionGuard() {
   const { data: status, isLoading } = useSetupStatus();
+
+  if (!isPricingEnabled) {
+    return <Outlet />;
+  }
 
   if (isLoading) {
     return (

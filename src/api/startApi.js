@@ -14,11 +14,13 @@ async function startApiRuntime() {
   const { startSseGateway } = require("../realtime/sseGateway");
   const { startSseZombieReaper } = require("../realtime/sseZombieReaper");
   const { startPostCommitSweep } = require("../realtime/postCommitPublishQueue");
+  const { startSubscriptionExpiryJob } = require("../jobs/subscriptionExpiry.job");
 
   registerRuntimeOwnership({ role: "api", sseGatewayOwner: true });
   startSseGateway();
   startSseZombieReaper();
   startPostCommitSweep();
+  startSubscriptionExpiryJob();
   apiRuntimeStarted = true;
 
   logInfo("API_RUNTIME_STARTED", {
