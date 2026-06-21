@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type ApiError } from "@/lib/api";
