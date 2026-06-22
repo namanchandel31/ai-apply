@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthContext";
 import { api } from "@/lib/api";
+import { notifyExtensionApplyModeSync } from "@/lib/extensionBridge";
 import { isApplyMode, readStoredAutoApplyEnabled, storeAutoApplyEnabled } from "@/lib/applyMode";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ export function useAutoApply() {
       try {
         await api.patchApplyMode(applyMode);
         await refreshUser();
+        void notifyExtensionApplyModeSync();
       } catch (err) {
         setEnabledState(!enabled);
         storeAutoApplyEnabled(!enabled);

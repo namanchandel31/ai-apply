@@ -1,3 +1,14 @@
+import {
+  friendlyApplyError,
+  isAutoApplyMode,
+  isSetupCompleteFromStatus,
+  linkedInButtonTitle,
+  linkedInSuccessLabel,
+  linkedInSuccessTitle,
+  setupIssuesFromStatus,
+} from "../../shared/applyModeCopy.js";
+import { DEFAULT_WEB_BASE } from "../../config/app.config.js";
+
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const CONFIG_TTL_MS = 60 * 60 * 1000;
 const SCAN_DEBOUNCE_MS = 400;
@@ -69,25 +80,37 @@ async function isConnected() {
   }
 }
 
-async function isSetupComplete() {
+async function getSetupStatus() {
   const { cachedPopupStatus } = await chrome.storage.local.get("cachedPopupStatus");
   if (cachedPopupStatus?.setup) {
-    const s = cachedPopupStatus.setup;
-    return Boolean(s.hasValidResume && s.hasEmailSetup && s.hasVerifiedAiCredential);
+    return cachedPopupStatus.setup;
   }
   try {
     const status = await bgRequest("POPUP_STATUS");
-    const s = status.setup;
-    return Boolean(s?.hasValidResume && s?.hasEmailSetup && s?.hasVerifiedAiCredential);
+    return status.setup || null;
   } catch {
     try {
-      const status = await bgRequest("SETUP_STATUS");
-      return Boolean(
-        status.hasValidResume && status.hasEmailSetup && status.hasVerifiedAiCredential
-      );
+      return await bgRequest("SETUP_STATUS");
     } catch {
-      return false;
+      return null;
     }
+  }
+}
+
+async function isSetupComplete() {
+  return isSetupCompleteFromStatus(await getSetupStatus());
+}
+
+async function getApplyMode() {
+  const { cachedPopupStatus } = await chrome.storage.local.get("cachedPopupStatus");
+  if (cachedPopupStatus?.applyMode) {
+    return cachedPopupStatus.applyMode;
+  }
+  try {
+    const status = await bgRequest("POPUP_STATUS");
+    return status.applyMode ?? "review_apply";
+  } catch {
+    return "review_apply";
   }
 }
 
@@ -198,6 +221,13 @@ function ensureStyles() {
 .onetap-ico.is-success .ot-check{opacity:1;animation:ot-draw-check .3s ease .42s forwards;}
 .onetap-ico.is-error{animation:ot-shake .4s ease;}
 .onetap-ico.is-error .ot-mark{fill:#dc2626;}
+.onetap-ico.is-error + .onetap-label,.onetap-action.is-error .onetap-label{color:#dc2626!important;}
+.onetap-label.is-subtle{font-size:12px!important;}
+#onetap-linkedin-banner{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:2147483646;display:flex;align-items:center;gap:10px;max-width:min(560px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;background:#1e293b;color:#f8fafc;font:500 13px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.28);}
+#onetap-linkedin-banner a{color:#93c5fd;text-decoration:none;font-weight:600;white-space:nowrap;}
+#onetap-linkedin-banner a:hover{text-decoration:underline;}
+#onetap-linkedin-banner button{margin-left:auto;padding:4px 10px;border:1px solid rgba(248,250,252,.25);border-radius:8px;background:transparent;color:#f8fafc;font:inherit;font-weight:600;cursor:pointer;}
+#onetap-linkedin-banner button:hover{background:rgba(248,250,252,.08);}
 @keyframes ot-spin{to{transform:rotate(360deg);}}
 @keyframes ot-draw-ring{from{stroke-dashoffset:145;}to{stroke-dashoffset:0;}}
 @keyframes ot-draw-check{from{stroke-dashoffset:40;}to{stroke-dashoffset:0;}}
@@ -215,15 +245,96 @@ const ICON_SVG = `
     </svg>
   `;
 
+function updateButtonIdleState(btn, autoApply) {
+  if (btn.dataset.onetapAdded) return;
+  const label = btn.querySelector(".onetap-label");
+  const title = linkedInButtonTitle(autoApply);
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+  btn.classList.remove("is-error");
+  if (label) {
+    label.textContent = "OneTap";
+    label.classList.remove("is-subtle");
+  }
+}
+
+async function refreshButtonApplyModeHints() {
+  const autoApply = isAutoApplyMode(await getApplyMode());
+  document.querySelectorAll("[data-onetap-btn]").forEach((btn) => {
+    updateButtonIdleState(btn, autoApply);
+  });
+}
+
+const LINKEDIN_BANNER_ID = "onetap-linkedin-banner";
+const WEB_BASE = DEFAULT_WEB_BASE.replace(/\/$/, "");
+
+function removeLinkedInBanner() {
+  document.getElementById(LINKEDIN_BANNER_ID)?.remove();
+}
+
+function showLinkedInBanner(message, actionLabel, actionPath) {
+  removeLinkedInBanner();
+  const banner = document.createElement("div");
+  banner.id = LINKEDIN_BANNER_ID;
+  banner.setAttribute("role", "status");
+
+  const text = document.createElement("span");
+  text.textContent = message;
+  banner.appendChild(text);
+
+  if (actionLabel && actionPath) {
+    const link = document.createElement("a");
+    link.href = `${WEB_BASE}${actionPath}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = actionLabel;
+    banner.appendChild(link);
+  }
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.textContent = "Dismiss";
+  dismiss.addEventListener("click", () => banner.remove());
+  banner.appendChild(dismiss);
+
+  document.documentElement.appendChild(banner);
+}
+
+async function refreshLinkedInBanner() {
+  const connected = await isConnected();
+  if (!connected) {
+    showLinkedInBanner(
+      "Connect OneTap to add jobs from LinkedIn.",
+      "Connect extension",
+      "/settings/extension"
+    );
+    return;
+  }
+
+  const setup = await getSetupStatus();
+  if (!isSetupCompleteFromStatus(setup)) {
+    const issues = setupIssuesFromStatus(setup);
+    showLinkedInBanner(
+      `Finish setup to apply: ${issues.map((issue) => issue.label).join(", ")}.`,
+      "Complete setup",
+      "/setup"
+    );
+    return;
+  }
+
+  removeLinkedInBanner();
+}
+
 // Standalone circular button — fallback used only when the post's action bar
 // can't be located (e.g. detail views without a Like/Comment/Repost/Send row).
-function createStandaloneButton() {
+function createStandaloneButton(autoApply) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.dataset.onetapBtn = "1";
   btn.className = "onetap-standalone";
-  btn.setAttribute("aria-label", "Add to OneTap");
-  btn.title = "Add to OneTap";
+  const title = linkedInButtonTitle(autoApply);
+  btn.setAttribute("aria-label", title);
+  btn.title = title;
   btn.innerHTML = ICON_SVG;
   return btn;
 }
@@ -281,7 +392,7 @@ function findActionBarInfo(container) {
 // Clone a sibling action item for exact layout parity, then swap its contents
 // for the OneTap icon + label. Only the blue circular icon hints at the brand;
 // everything else (size, padding, hover) is inherited from LinkedIn.
-function createActionButton(item) {
+function createActionButton(item, autoApply) {
   const wrapper = item.cloneNode(true);
   wrapper.removeAttribute("id");
   wrapper.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
@@ -297,15 +408,16 @@ function createActionButton(item) {
   btn.setAttribute("type", "button");
   btn.dataset.onetapBtn = "1";
   btn.classList.add("onetap-action");
-  btn.setAttribute("aria-label", "Add to OneTap");
-  btn.title = "Add to OneTap";
+  const title = linkedInButtonTitle(autoApply);
+  btn.setAttribute("aria-label", title);
+  btn.title = title;
   btn.removeAttribute("aria-pressed");
   btn.innerHTML = `${ICON_SVG}<span class="onetap-label">OneTap</span>`;
 
   return { wrapper, btn };
 }
 
-function injectButton(container, text, permalink, config) {
+async function injectButton(container, text, permalink, config) {
   if (container.querySelector("[data-onetap-btn]")) return;
 
   const { score, email } = scorePost(text, config);
@@ -313,10 +425,11 @@ function injectButton(container, text, permalink, config) {
 
   ensureStyles();
 
+  const autoApply = isAutoApplyMode(await getApplyMode());
   let btn = null;
   const barInfo = findActionBarInfo(container);
   if (barInfo) {
-    const built = createActionButton(barInfo.item);
+    const built = createActionButton(barInfo.item, autoApply);
     if (built) {
       barInfo.bar.appendChild(built.wrapper);
       btn = built.btn;
@@ -327,7 +440,7 @@ function injectButton(container, text, permalink, config) {
     const row = document.createElement("div");
     row.dataset.onetapRow = "1";
     row.style.cssText = "padding:2px 6px 6px;";
-    btn = createStandaloneButton();
+    btn = createStandaloneButton(autoApply);
     row.appendChild(btn);
     container.appendChild(row);
   }
@@ -346,7 +459,10 @@ function wireButton(btn, text, permalink, email) {
     const ico = btn.querySelector(".onetap-ico");
     const label = btn.querySelector(".onetap-label");
     ico.classList.remove("is-error");
+    btn.classList.remove("is-error");
     ico.classList.add("is-loading");
+
+    const autoApply = isAutoApplyMode(await getApplyMode());
 
     try {
       await bgRequest("AUTO_APPLY", {
@@ -358,17 +474,32 @@ function wireButton(btn, text, permalink, email) {
       });
       ico.classList.remove("is-loading");
       ico.classList.add("is-success");
-      if (label) label.textContent = "Added";
-      btn.title = "Added to OneTap";
-      btn.setAttribute("aria-label", "Added to OneTap");
+      btn.dataset.onetapAdded = "1";
+      if (label) {
+        label.textContent = linkedInSuccessLabel(autoApply);
+        label.classList.add("is-subtle");
+      }
+      const successTitle = linkedInSuccessTitle(autoApply);
+      btn.title = successTitle;
+      btn.setAttribute("aria-label", successTitle);
     } catch (err) {
       ico.classList.remove("is-loading");
       ico.classList.add("is-error");
+      btn.classList.add("is-error");
       btn.disabled = false;
       delete btn.dataset.busy;
-      if (label) label.textContent = "OneTap";
-      btn.title = err instanceof Error ? err.message : "Failed — tap to retry";
-      window.setTimeout(() => ico.classList.remove("is-error"), 600);
+      const message = friendlyApplyError(err instanceof Error ? err.message : "Failed");
+      if (label) {
+        label.textContent = "Retry";
+        label.classList.add("is-subtle");
+      }
+      btn.title = message;
+      btn.setAttribute("aria-label", message);
+      window.setTimeout(() => {
+        ico.classList.remove("is-error");
+        btn.classList.remove("is-error");
+        updateButtonIdleState(btn, autoApply);
+      }, 2500);
       console.error("[OneTap]", err);
     }
   });
@@ -380,7 +511,7 @@ function scanFeed(config) {
     const text = extractPostText(container);
     if (!text) return;
     const permalink = extractPermalink(container);
-    injectButton(container, text, permalink, config);
+    void injectButton(container, text, permalink, config);
   });
 }
 
@@ -396,6 +527,8 @@ let observer = null;
 async function init() {
   if (initialized) return;
 
+  await refreshLinkedInBanner();
+
   if (!(await isConnected())) {
     console.info("[OneTap] Not connected — connect via OneTap Settings");
     return;
@@ -408,6 +541,7 @@ async function init() {
   const config = await getCachedConfig();
   initialized = true;
   scanFeed(config);
+  void refreshButtonApplyModeHints();
 
   if (!observer) {
     observer = new MutationObserver(() => scheduleScan(config));
@@ -418,9 +552,18 @@ async function init() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (changes.accessToken || changes.cachedPopupStatus) {
+  if (changes.accessToken) {
     initialized = false;
     init().catch((err) => console.error("[OneTap] re-init failed", err));
+    return;
+  }
+  if (changes.cachedPopupStatus) {
+    void refreshLinkedInBanner();
+    void refreshButtonApplyModeHints();
+    if (!initialized && isSetupCompleteFromStatus(changes.cachedPopupStatus.newValue?.setup)) {
+      initialized = false;
+      init().catch((err) => console.error("[OneTap] re-init failed", err));
+    }
   }
 });
 

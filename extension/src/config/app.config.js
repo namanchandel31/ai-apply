@@ -20,7 +20,7 @@ const ENVIRONMENT = "development";
 
 const ENVIRONMENTS = {
   development: {
-    apiBase: "http://localhost:5000",
+    apiBase: "http://localhost:5001",
     // Website origin (Vite dev server) the popup opens for dashboard / settings.
     webBase: "http://localhost:5173",
   },

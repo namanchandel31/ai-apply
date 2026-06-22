@@ -3,45 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <title>OneTap</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        if (params.get("embedded") === "1" || window.parent !== window) {
+          document.documentElement.dataset.embedded = "1";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
     <div class="shell">
       <header class="header">
-        <svg class="logo" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M20 44C31.0457 44 40 35.0457 40 24C40 12.9543 31.0457 4 20 4C8.95428 4 0 12.9543 0 24C0 35.0457 8.95428 44 20 44ZM26.2393 13.3168C26.543 12.2381 25.4961 11.6001 24.54 12.2813L11.1931 21.7896C10.1562 22.5283 10.3193 24 11.4381 24H14.9527V23.9728H21.8025L16.2212 25.9421L13.7607 34.6832C13.457 35.762 14.5038 36.3999 15.46 35.7187L28.8069 26.2105C29.8438 25.4718 29.6806 24 28.5619 24H23.2321L26.2393 13.3168Z"
-            fill="currentColor"
-          />
-        </svg>
-        <span class="wordmark">OneTap</span>
+        <div class="header-brand">
+          <svg class="logo" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M20 44C31.0457 44 40 35.0457 40 24C40 12.9543 31.0457 4 20 4C8.95428 4 0 12.9543 0 24C0 35.0457 8.95428 44 20 44ZM26.2393 13.3168C26.543 12.2381 25.4961 11.6001 24.54 12.2813L11.1931 21.7896C10.1562 22.5283 10.3193 24 11.4381 24H14.9527V23.9728H21.8025L16.2212 25.9421L13.7607 34.6832C13.457 35.762 14.5038 36.3999 15.46 35.7187L28.8069 26.2105C29.8438 25.4718 29.6806 24 28.5619 24H23.2321L26.2393 13.3168Z"
+              fill="currentColor"
+            />
+          </svg>
+          <span class="wordmark">OneTap</span>
+        </div>
+        <button id="close-panel" type="button" class="close-btn" aria-label="Close OneTap">
+          <svg class="close-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M8 8l8 8M16 8l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
       </header>
 
       <div id="view-loading" class="view">
         <p class="muted">Checking connection…</p>
       </div>
 
-      <div id="view-disconnected" class="view" hidden>
-        <p class="lead">Connect this extension to your OneTap account.</p>
-        <button id="open-settings" type="button" class="btn btn-primary">Open settings</button>
-      </div>
-
-      <div id="view-connected" class="view" hidden>
-        <div class="status-row">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span class="status-text">Connected</span>
-        </div>
-
-        <div class="plan-card">
-          <p class="plan-label">Current plan</p>
-          <p id="plan-name" class="plan-name">Loading…</p>
-        </div>
-
+      <div id="view-main" class="view" hidden>
         <div class="toggle-card">
           <p class="toggle-title">Auto apply</p>
-          <p class="toggle-hint">Send applications automatically without reviewing each draft.</p>
+          <p id="toggle-hint" class="toggle-hint">
+            Review each email in Applications before sending from your Gmail.
+          </p>
           <button
             id="auto-toggle"
             type="button"
@@ -57,8 +59,23 @@
           </button>
         </div>
 
-        <button id="disconnect" type="button" class="btn btn-ghost">Disconnect</button>
+        <div class="popup-divider" aria-hidden="true"></div>
+
+        <button id="open-applications" type="button" class="btn btn-secondary">
+          Open Applications
+        </button>
+
         <p id="error" class="error-text" hidden></p>
+
+        <div id="connection-footer" class="connection-footer">
+          <button id="connect-extension" type="button" class="btn btn-primary" hidden>
+            Connect extension
+          </button>
+          <div id="connection-status" class="status-row" hidden>
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-text">Connected</span>
+          </div>
+        </div>
       </div>
     </div>
     <script type="module" src="./popup.js"></script>
