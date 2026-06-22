@@ -8,7 +8,6 @@ import {
   connectExtension,
   getExtensionInstallState,
 } from "@/lib/extensionBridge";
-
 import { CHROME_EXTENSION_URL } from "@/lib/extensionPrompt";
 
 export function SettingsExtension() {
