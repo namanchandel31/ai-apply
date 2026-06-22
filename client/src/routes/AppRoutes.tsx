@@ -25,6 +25,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { isPricingEnabled } from "@/lib/featureFlags";
 import { AdminPage } from "@/pages/admin";
 import { PrivacyPolicyPage } from "@/pages/privacyPolicy";
+import { TermsOfServicePage } from "@/pages/termsOfService";
 import { SupportPage } from "@/pages/support";
 
 function PricingRoute() {
@@ -58,6 +59,7 @@ export function AppRoutes() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
         <Route path="/support" element={<SupportPage />} />
 
         <Route element={<GuestRoute />}>
