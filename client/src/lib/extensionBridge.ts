@@ -65,6 +65,46 @@ export function isExtensionIdConfigured(): boolean {
   return Boolean(getExtensionId());
 }
 
+export type ExtensionInstallState = {
+  configured: boolean;
+  installed: boolean;
+  version: string | null;
+  accountConnected: boolean;
+  connectedAt: string | null;
+};
+
+export async function getExtensionInstallState(): Promise<ExtensionInstallState> {
+  const configured = isExtensionIdConfigured();
+  if (!configured) {
+    return {
+      configured: false,
+      installed: false,
+      version: null,
+      accountConnected: false,
+      connectedAt: null,
+    };
+  }
+
+  try {
+    const ping = await pingExtension();
+    return {
+      configured: true,
+      installed: true,
+      version: ping.version || null,
+      accountConnected: ping.connected,
+      connectedAt: ping.connectedAt,
+    };
+  } catch {
+    return {
+      configured: true,
+      installed: false,
+      version: null,
+      accountConnected: false,
+      connectedAt: null,
+    };
+  }
+}
+
 export async function pingExtension(): Promise<ExtensionPingResult> {
   const response = await sendExtensionMessage<{ ok?: boolean; data?: ExtensionPingResult; error?: string }>({
     type: "ONETAP_PING",
