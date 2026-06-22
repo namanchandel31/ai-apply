@@ -68,7 +68,6 @@ export function SettingsExtension() {
     setConnectError(null);
     try {
       await connectExtension();
-      clearOnboardingExtensionPending();
       toast.success("Extension connected");
       await refreshStatus();
     } catch (err) {
