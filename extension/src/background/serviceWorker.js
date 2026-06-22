@@ -4,6 +4,7 @@
 
 import {
   DEFAULT_API_BASE,
+  DEFAULT_WEB_BASE,
   REFRESH_ALARM_MINUTES,
   SUPABASE_ANON_KEY,
   SUPABASE_URL,
@@ -270,6 +271,21 @@ export async function fetchPopupStatusFromApi() {
   return fetchPopupStatus();
 }
 
+export async function patchApplyMode(applyMode) {
+  const res = await apiFetch("/api/user/apply-mode", {
+    method: "PATCH",
+    body: JSON.stringify({ applyMode }),
+  });
+  await fetchPopupStatus();
+  return res.data;
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason !== "install") return;
+  const webBase = DEFAULT_WEB_BASE.replace(/\/$/, "");
+  chrome.tabs.create({ url: `${webBase}/settings/extension` });
+});
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== REFRESH_ALARM_NAME) return;
   refreshAccessTokenIfNeeded().catch(() => {
@@ -284,6 +300,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     AUTO_APPLY: () => submitAutoApply(message.payload),
     APPLY_MODE: () => fetchApplyMode(),
     POPUP_STATUS: () => fetchPopupStatus(),
+    SET_APPLY_MODE: () => patchApplyMode(message.applyMode),
     ONETAP_PING: () => getConnectionStatus(),
     ONETAP_DISCONNECT: () => handleDisconnect(),
   };

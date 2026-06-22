@@ -9,6 +9,7 @@ import {
   isExtensionIdConfigured,
   pingExtension,
 } from "@/lib/extensionBridge";
+import { clearOnboardingExtensionPending } from "@/lib/extensionPrompt";
 
 type ExtensionStatus = {
   connected: boolean;
@@ -61,6 +62,7 @@ export function SettingsExtension() {
     setConnecting(true);
     try {
       await connectExtension();
+      clearOnboardingExtensionPending();
       toast.success("Extension connected");
       await refreshStatus();
     } catch (err) {

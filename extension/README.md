@@ -67,22 +67,22 @@ If you don't see buttons:
 Production origins:
 
 - **API (backend):** `https://ai-apply-jwan.onrender.com` (Render)
-- **Website (frontend):** `https://onetap-ai-apply.vercel.app` (Vercel)
+- **Website (frontend):** `https://onetapjob.com`
 
 ### Pre-deploy checklist (things to take care of)
 
 1. **Environment switch** — set `ENVIRONMENT = "production"` in
    [`src/config/app.config.js`](src/config/app.config.js). That selects the
-   production `apiBase` (Render) and `webBase` (Vercel).
+   production `apiBase` (Render) and `webBase` (`https://onetapjob.com`).
 2. **API origin** — `ENVIRONMENTS.production.apiBase` is only a fallback used before
    the first connect; the live value comes from the website connect handshake, so
-   the website's `VITE_API_URL` (on Vercel) must point at the same Render origin.
+   the website's `VITE_API_URL` must point at the same Render origin.
 3. **`manifest.json` `host_permissions`** — must include the API origin
    (`https://ai-apply-jwan.onrender.com/*`) so the extension can call the API. For a
    Web Store submission, remove the `http://localhost:*` testing entries.
 4. **`manifest.json` `externally_connectable.matches`** — restricts which sites can
    message the extension. Keep the production website origin
-   (`https://onetap-ai-apply.vercel.app/*`); drop `http://localhost:*` for the store
+   (`https://onetapjob.com/*`); drop `http://localhost:*` for the store
    build.
 5. **Supabase** — confirm `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `app.config.js`
    match the production Supabase project (token refresh uses these).

@@ -2,7 +2,7 @@ import { Check, ExternalLink, Puzzle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OneTapBrand } from "@/components/OneTapLogomark";
 import { LinkedInApplyVisual } from "@/components/onboarding/LinkedInApplyVisual";
-import { CHROME_EXTENSION_URL } from "@/lib/extensionPrompt";
+import { CHROME_EXTENSION_URL, markOnboardingExtensionPending } from "@/lib/extensionPrompt";
 import { trackOnboardingEvent } from "@/lib/onboardingEvents";
 import "@/styles/mindoo.css";
 
@@ -21,6 +21,7 @@ type Props = {
 export function ExtensionInstallPrompt({ onContinue, embedded = false }: Props) {
   const handleInstall = () => {
     trackOnboardingEvent("extension_install_clicked");
+    markOnboardingExtensionPending();
     window.open(CHROME_EXTENSION_URL, "_blank", "noopener,noreferrer");
   };
 

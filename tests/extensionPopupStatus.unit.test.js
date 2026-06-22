@@ -23,6 +23,11 @@ describe("extensionPopupStatusService", () => {
       hasVerifiedAiCredential: false,
       hasResume: true,
       hasAiSetup: true,
+      planSlug: "byok",
+      hasActiveSubscription: true,
+      subscriptionState: "active",
+      canUseManagedAi: false,
+      pricingEnabled: true,
     });
     getUserById.mockResolvedValue({ apply_mode: "auto_apply" });
 
@@ -35,6 +40,10 @@ describe("extensionPopupStatusService", () => {
         hasVerifiedAiCredential: false,
       },
       applyMode: "auto_apply",
+      plan: {
+        slug: "byok",
+        label: "Bring your own AI",
+      },
     });
     expect(buildSetupStatus).toHaveBeenCalledWith("user-1");
     expect(getUserById).toHaveBeenCalledWith("user-1");
@@ -45,11 +54,13 @@ describe("extensionPopupStatusService", () => {
       hasValidResume: false,
       hasEmailSetup: false,
       hasVerifiedAiCredential: false,
+      pricingEnabled: true,
     });
     getUserById.mockResolvedValue(null);
 
     const result = await buildExtensionPopupStatus("user-2");
 
     expect(result.applyMode).toBe("review_apply");
+    expect(result.plan.label).toBe("Free trial");
   });
 });

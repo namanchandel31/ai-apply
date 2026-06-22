@@ -16,7 +16,7 @@ const ENVIRONMENTS = {
   },
   production: {
     apiBase: "https://ai-apply-jwan.onrender.com",
-    webBase: "https://onetap-ai-apply.vercel.app",
+    webBase: "https://onetapjob.com",
   },
 };
 
