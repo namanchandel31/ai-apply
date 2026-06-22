@@ -1,5 +1,149 @@
 ## Log (newest first)
 
+### 2026-06-22 — Tab-return install detection + waiting UI
+- **Prompt:** Page froze after opening Web Store; proceed when user returns to tab, show install progress, and open connect tab only on detected install.
+- **Outcome:** Replaced interval polling with visibilitychange/focus detection (with short SW wake retries). On return: ping → if installed open connect tab + complete onboarding (confetti); if not detected, still continue so page never freezes. Added "Waiting for installation…" button state + manual "Already installed? Continue" fallback. New event extension_installed_detected.
+
+### 2026-06-22 — Detect install before connect page
+- **Prompt:** Don’t open connect page immediately; open it only after extension install is detected.
+- **Outcome:** Install now opens only Chrome Web Store, then polls extension availability and opens `/settings/extension` + completes onboarding once detected.
+
+### 2026-06-22 — Extension install advances onboarding
+- **Prompt:** After clicking Install Chrome Extension, don’t leave onboarding stuck; continue flow and open connect page.
+- **Outcome:** Install now opens Chrome Web Store + Settings Extension connect page and triggers onboarding completion (confetti then dashboard).
+
+### 2026-06-20 — Consistent onboarding step spacing
+- **Prompt:** Equal heading, description, and content spacing across all three onboarding steps.
+- **Outcome:** Shared layout classes in onboardingFlow; resume, email, and embedded extension use space-y-4 sections with matching headline/description spacing.
+
+### 2026-06-20 — Extension step description copy
+- **Prompt:** Change extension subheading to "Apply directly from LinkedIn posts in one click."
+- **Outcome:** Updated embedded ExtensionInstallPrompt description.
+
+### 2026-06-20 — Onboarding card heading size (xl)
+- **Prompt:** Bump card headings more.
+- **Outcome:** Step card h2 headings increased from text-lg to text-xl.
+
+### 2026-06-20 — Onboarding card heading size
+- **Prompt:** Bump font size for step card headings (resume, Gmail, extension) above body copy.
+- **Outcome:** Card h2 headings use text-lg font-semibold instead of text-base font-medium.
+
+### 2026-06-20 — Remove duplicate extension skip/footer
+- **Prompt:** Remove skip button and footer copy below Install Chrome Extension in embedded onboarding (duplicate of bottom skip section).
+- **Outcome:** Embedded ExtensionInstallPrompt shows only the install button; skip + reassurance remain in onboarding card footer.
+
+### 2026-06-20 — Install Chrome Extension button label
+- **Prompt:** Rename "Add to Chrome" to "Install Chrome Extension".
+- **Outcome:** Updated ExtensionInstallPrompt primary button label.
+
+### 2026-06-20 — Extension step font sizes
+- **Prompt:** Match extension step body copy font size to skip reassurance text (text-base).
+- **Outcome:** Updated embedded ExtensionInstallPrompt description, benefits, and footer from text-sm/text-xs to text-base.
+
+### 2026-06-20 — Onboarding step indicator labels
+- **Prompt:** Step 2 → Connect Gmail, step 3 → Install Extension in step indicator.
+- **Outcome:** Updated ONBOARDING_STEPS labels in onboardingFlow.
+
+### 2026-06-20 — Get Started for Free CTA label
+- **Prompt:** Change website Get Started buttons to Get Started for Free.
+- **Outcome:** Updated hero and nav CTA button labels.
+
+### 2026-06-20 — Gmail skip copy wording tweak
+- **Prompt:** Update skip reassurance to connect Gmail later from Settings wording.
+- **Outcome:** Applied revised skip reassurance copy on email step.
+
+### 2026-06-20 — Skip reassurance font size
+- **Prompt:** Match skip reassurance font size to Gmail step body copy.
+- **Outcome:** Changed skip copy from text-sm to text-base.
+
+### 2026-06-20 — Gmail skip reassurance copy update
+- **Prompt:** Update skip reassurance to optional Gmail / connect later from Settings wording.
+- **Outcome:** Replaced email-step skip copy with user-provided message.
+
+### 2026-06-20 — Skip reassurance copy near Gmail step
+- **Prompt:** Add assurance copy near Skip explaining why Gmail is needed for auto-apply and that setup can wait.
+- **Outcome:** Step-specific reassurance text above Skip for now on email and extension steps.
+
+### 2026-06-20 — Remove duplicate email skip button
+- **Prompt:** Remove Skip for now button below app password on Gmail step.
+- **Outcome:** Dropped email-step skip button and helper text; bottom Skip for now remains.
+
+### 2026-06-20 — Explore dashboard → Skip for now
+- **Prompt:** Replace Explore Dashboard button with Skip for now.
+- **Outcome:** Renamed secondary onboarding action button label.
+
+### 2026-06-20 — Compact Gmail connect UI in onboarding
+- **Prompt:** Remove Email Configuration card copy; show only Connect Gmail and App Password outline buttons.
+- **Outcome:** Added EmailStatusCard compact variant for onboarding with two action buttons only.
+
+### 2026-06-20 — Gmail welcome copy: Link → Connect
+- **Prompt:** Change "Link the Gmail account…" to "Connect the Gmail account…"
+- **Outcome:** Updated email step welcome subtitle wording.
+
+### 2026-06-20 — Wider onboarding layout
+- **Prompt:** Make the onboarding box wider for all three steps.
+- **Outcome:** Increased onboarding container from max-w-lg to max-w-xl.
+
+### 2026-06-20 — Gmail permission copy wording
+- **Prompt:** Change permission line to "We request a send-only permission and cannot read your inbox."
+- **Outcome:** Updated second paragraph wording; kept send-only phrase highlighted.
+
+### 2026-06-20 — Gmail permission copy as second paragraph
+- **Prompt:** Split send-only permission line into its own paragraph.
+- **Outcome:** Gmail step now has two paragraphs: connect copy, then highlighted permission note.
+
+### 2026-06-20 — Shorten Gmail privacy copy
+- **Prompt:** Update Gmail step body to end at "we cannot read your inbox."
+- **Outcome:** Trimmed permission copy; kept send-only phrase highlighted.
+
+### 2026-06-20 — Highlight send-only permission line
+- **Prompt:** Highlight "We request a send-only permission" in Gmail onboarding copy.
+- **Outcome:** Emphasized that phrase with foreground font-medium styling.
+
+### 2026-06-20 — Gmail step copy tweak
+- **Prompt:** Update Gmail step body to "Gmail Account" / "own email address" wording.
+- **Outcome:** Applied exact send-only permission copy user provided.
+
+### 2026-06-20 — Gmail step send-only permission copy
+- **Prompt:** Replace Gmail step body with send-only permission messaging.
+- **Outcome:** Updated email step description to explain send-only access and inbox privacy.
+
+### 2026-06-20 — Clearer Gmail onboarding copy
+- **Prompt:** Second step (Gmail) copy is vague; make it simple and action-focused.
+- **Outcome:** Rewrote welcome line, headline, body, and skip note for the email connection step.
+
+### 2026-06-20 — Hide resume parsing status in onboarding
+- **Prompt:** Remove "Still reading your resume in the background" and similar parsing copy from step 2.
+- **Outcome:** Removed all user-facing resume parsing banners, stalled warnings, and background-processing notes; upload toast is now "Resume uploaded".
+
+### 2026-06-20 — Remove resume dropzone hint copy
+- **Prompt:** Remove "We extract skills and experience to personalize emails" from upload step.
+- **Outcome:** Resume dropzone uses default PDF format hint only.
+
+### 2026-06-20 — Extension step indicator not pre-completed
+- **Prompt:** Step 3 (Extension) shows green before user reaches it; should look like other steps.
+- **Outcome:** Step indicator marks extension complete only when onboarding flow is actually complete, not from stale localStorage dismiss.
+
+### 2026-06-20 — Remove OneTap AI onboarding callout
+- **Prompt:** Remove "You're on OneTap AI…" callout from resume upload step.
+- **Outcome:** Dropped managed-AI banner from onboarding resume step.
+
+### 2026-06-20 — Tighter resume step headline spacing
+- **Prompt:** Reduce space between resume headline and body copy in onboarding.
+- **Outcome:** Grouped headline + description with `mt-1.5` gap instead of separate `mt-5` block.
+
+### 2026-06-20 — Onboarding layout order
+- **Prompt:** Adjust position of description below welcome and step indicator.
+- **Outcome:** Reordered onboarding header to Welcome → steps (1–3) → step description → action card.
+
+### 2026-06-20 — Onboarding resume step copy
+- **Prompt:** Resume upload onboarding copy is weak (e.g. "Two steps left"); redo with value-focused messaging.
+- **Outcome:** Rewrote welcome, step headlines, and resume upload intro to explain why the resume matters instead of counting steps.
+
+### 2026-06-20 — Get Started links to signup
+- **Prompt:** Get Started on website should go to signup (Continue with Google), not scroll to pricing.
+- **Outcome:** Hero and nav Get started CTAs now route to `/signup` instead of `#pricing`.
+
 ### 2026-06-20 — Commit and push current branch
 - **Prompt:** git push and commit
 - **Outcome:** Started git status/diff/log checks, then staged, committed, and pushed current branch changes.
