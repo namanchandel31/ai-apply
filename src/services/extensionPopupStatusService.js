@@ -36,6 +36,8 @@ async function buildExtensionPopupStatus(userId) {
     setup: {
       hasValidResume: setup.hasValidResume,
       hasEmailSetup: setup.hasEmailSetup,
+      hasAiSetup: setup.hasAiSetup,
+      canUseManagedAi: setup.canUseManagedAi,
       hasVerifiedAiCredential: setup.hasVerifiedAiCredential,
     },
     applyMode: user?.apply_mode ?? "review_apply",

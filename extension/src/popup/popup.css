@@ -63,6 +63,18 @@ body {
   width: 100%;
 }
 
+#connected-content[hidden],
+#disconnected-message[hidden] {
+  display: none !important;
+}
+
+.connect-message {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
 .connection-footer {
   margin-top: 14px;
 }

@@ -3,14 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>OneTap</title>
-    <script>
-      (function () {
-        var params = new URLSearchParams(location.search);
-        if (params.get("embedded") === "1" || window.parent !== window) {
-          document.documentElement.dataset.embedded = "1";
-        }
-      })();
-    </script>
+    <script src="./popup-embedded.js"></script>
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
@@ -39,31 +32,37 @@
       </div>
 
       <div id="view-main" class="view" hidden>
-        <div class="toggle-card">
-          <p class="toggle-title">Auto apply</p>
-          <p id="toggle-hint" class="toggle-hint">
-            Review each email in Applications before sending from your Gmail.
-          </p>
-          <button
-            id="auto-toggle"
-            type="button"
-            class="warp-toggle"
-            role="switch"
-            aria-checked="false"
-            aria-label="Toggle auto apply"
-          >
-            <span class="warp-track">
-              <span class="warp-thumb"></span>
-            </span>
-            <span id="toggle-label" class="warp-label">Off</span>
+        <p id="disconnected-message" class="connect-message" hidden>
+          Please connect this extension with OneTap by opening OneTap and connecting it.
+        </p>
+
+        <div id="connected-content">
+          <div class="toggle-card">
+            <p class="toggle-title">Auto apply</p>
+            <p id="toggle-hint" class="toggle-hint">
+              Review each email in Applications before sending from your Gmail.
+            </p>
+            <button
+              id="auto-toggle"
+              type="button"
+              class="warp-toggle"
+              role="switch"
+              aria-checked="false"
+              aria-label="Toggle auto apply"
+            >
+              <span class="warp-track">
+                <span class="warp-thumb"></span>
+              </span>
+              <span id="toggle-label" class="warp-label">Off</span>
+            </button>
+          </div>
+
+          <div class="popup-divider" aria-hidden="true"></div>
+
+          <button id="open-applications" type="button" class="btn btn-secondary">
+            Open Applications
           </button>
         </div>
-
-        <div class="popup-divider" aria-hidden="true"></div>
-
-        <button id="open-applications" type="button" class="btn btn-secondary">
-          Open Applications
-        </button>
 
         <p id="error" class="error-text" hidden></p>
 

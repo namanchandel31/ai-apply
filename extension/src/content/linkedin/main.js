@@ -1,16 +1,37 @@
-import {
-  friendlyApplyError,
-  isAutoApplyMode,
-  isSetupCompleteFromStatus,
-  linkedInButtonTitle,
-  linkedInSuccessLabel,
-  linkedInSuccessTitle,
-  setupIssuesFromStatus,
-} from "../../shared/applyModeCopy.js";
-import { DEFAULT_WEB_BASE } from "../../config/app.config.js";
+/**
+ * MV3 content scripts cannot use static `import` — load extension modules dynamically.
+ */
+(async function oneTapLinkedInMain() {
+  let friendlyApplyError;
+  let isAutoApplyMode;
+  let isSetupCompleteFromStatus;
+  let linkedInButtonTitle;
+  let linkedInSuccessLabel;
+  let linkedInSuccessTitle;
+  let setupIssuesFromStatus;
+  let WEB_BASE;
 
-const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const CONFIG_TTL_MS = 60 * 60 * 1000;
+  try {
+    const [applyModeCopy, appConfig] = await Promise.all([
+      import(chrome.runtime.getURL("src/shared/applyModeCopy.js")),
+      import(chrome.runtime.getURL("src/config/app.config.js")),
+    ]);
+    ({
+      friendlyApplyError,
+      isAutoApplyMode,
+      isSetupCompleteFromStatus,
+      linkedInButtonTitle,
+      linkedInSuccessLabel,
+      linkedInSuccessTitle,
+      setupIssuesFromStatus,
+    } = applyModeCopy);
+    WEB_BASE = appConfig.DEFAULT_WEB_BASE.replace(/\/$/, "");
+  } catch (err) {
+    console.error("[OneTap] Failed to load extension modules", err);
+    return;
+  }
+
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;const CONFIG_TTL_MS = 60 * 60 * 1000;
 const SCAN_DEBOUNCE_MS = 400;
 const MIN_POST_TEXT_LEN = 40;
 
@@ -53,6 +74,34 @@ function scorePost(text, config) {
   return { score, email: validEmail || null };
 }
 
+const DEFAULT_DETECTION_CONFIG = {
+  hiringKeywords: [
+    "hiring",
+    "we're hiring",
+    "open role",
+    "open position",
+    "job opening",
+    "now hiring",
+    "join our team",
+    "looking for",
+  ],
+  applyKeywords: [
+    "apply",
+    "application",
+    "resume",
+    "cv",
+    "send your resume",
+    "dm me",
+    "email me",
+    "reach out",
+  ],
+  blockedEmailPrefixes: ["noreply", "no-reply", "donotreply", "mailer-daemon"],
+  scoreEmail: 50,
+  scoreHiringKeyword: 30,
+  scoreApplyKeyword: 20,
+  threshold: 70,
+};
+
 async function getCachedConfig() {
   const stored = await chrome.storage.local.get(["detectionConfig", "detectionConfigFetchedAt"]);
   if (
@@ -62,12 +111,17 @@ async function getCachedConfig() {
   ) {
     return stored.detectionConfig;
   }
-  const config = await bgRequest("DETECTION_CONFIG");
-  await chrome.storage.local.set({
-    detectionConfig: config,
-    detectionConfigFetchedAt: Date.now(),
-  });
-  return config;
+  try {
+    const config = await bgRequest("DETECTION_CONFIG");
+    await chrome.storage.local.set({
+      detectionConfig: config,
+      detectionConfigFetchedAt: Date.now(),
+    });
+    return config;
+  } catch (err) {
+    console.warn("[OneTap] detection config fetch failed — using defaults", err);
+    return DEFAULT_DETECTION_CONFIG;
+  }
 }
 
 async function isConnected() {
@@ -82,9 +136,14 @@ async function isConnected() {
 
 async function getSetupStatus() {
   const { cachedPopupStatus } = await chrome.storage.local.get("cachedPopupStatus");
-  if (cachedPopupStatus?.setup) {
-    return cachedPopupStatus.setup;
+  const cached = cachedPopupStatus?.setup;
+  const cacheLooksCurrent =
+    cached &&
+    ("hasAiSetup" in cached || "canUseManagedAi" in cached);
+  if (cacheLooksCurrent && isSetupCompleteFromStatus(cached)) {
+    return cached;
   }
+
   try {
     const status = await bgRequest("POPUP_STATUS");
     return status.setup || null;
@@ -92,7 +151,7 @@ async function getSetupStatus() {
     try {
       return await bgRequest("SETUP_STATUS");
     } catch {
-      return null;
+      return cached || null;
     }
   }
 }
@@ -138,6 +197,7 @@ function findPostContainer(emailEl) {
 }
 
 function collectPostRoots() {
+  if (!document.body) return [];
   const anchors = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
   let textNode;
@@ -266,7 +326,6 @@ async function refreshButtonApplyModeHints() {
 }
 
 const LINKEDIN_BANNER_ID = "onetap-linkedin-banner";
-const WEB_BASE = DEFAULT_WEB_BASE.replace(/\/$/, "");
 
 function removeLinkedInBanner() {
   document.getElementById(LINKEDIN_BANNER_ID)?.remove();
@@ -538,12 +597,18 @@ async function init() {
     return;
   }
 
-  const config = await getCachedConfig();
+  let config;
+  try {
+    config = await getCachedConfig();
+  } catch (err) {
+    console.error("[OneTap] Could not load detection config", err);
+    config = DEFAULT_DETECTION_CONFIG;
+  }
   initialized = true;
   scanFeed(config);
   void refreshButtonApplyModeHints();
 
-  if (!observer) {
+  if (!observer && document.body) {
     observer = new MutationObserver(() => scheduleScan(config));
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("scroll", () => scheduleScan(config), { passive: true });
@@ -568,3 +633,5 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 init().catch((err) => console.error("[OneTap] init failed", err));
+
+})().catch((err) => console.error("[OneTap] bootstrap failed", err));
