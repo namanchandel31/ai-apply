@@ -2,6 +2,8 @@
 
 Load unpacked in Chrome: `chrome://extensions` → Developer mode → Load unpacked → select this `extension/` folder.
 
+After code changes, click **Reload** on the extension card. Click the toolbar icon from a normal web page (LinkedIn, localhost) — the UI opens as a floating panel with **16px** rounded corners. On `chrome://` pages it falls back to a small popup window.
+
 ## Configuration
 
 ### 1. Supabase (for token refresh)

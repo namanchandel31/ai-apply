@@ -23,6 +23,12 @@ function getExtensionId(): string | null {
   return id?.trim() || null;
 }
 
+function extensionNotReachableError(extensionId: string): Error {
+  return new Error(
+    `No OneTap extension found for ID "${extensionId}". Open chrome://extensions, enable OneTap, and confirm its ID matches VITE_ONETAP_EXTENSION_ID in client/.env. For local development, use Load unpacked from the extension/ folder (not the Chrome Web Store build), copy that extension ID into client/.env, then restart the dev server.`
+  );
+}
+
 function resolveApiBase(): string {
   const fromEnv = import.meta.env.VITE_API_URL as string | undefined;
   if (fromEnv?.trim()) {
@@ -50,7 +56,7 @@ function sendExtensionMessage<T>(message: unknown): Promise<T> {
       const lastError = chrome.runtime.lastError;
       if (lastError?.message) {
         if (/could not establish connection|receiving end does not exist/i.test(lastError.message)) {
-          reject(new Error("Extension not installed or disabled. Load it from chrome://extensions"));
+          reject(extensionNotReachableError(extensionId));
           return;
         }
         reject(new Error(lastError.message));
@@ -59,6 +65,10 @@ function sendExtensionMessage<T>(message: unknown): Promise<T> {
       resolve(response as T);
     });
   });
+}
+
+export function getConfiguredExtensionId(): string | null {
+  return getExtensionId();
 }
 
 export function isExtensionIdConfigured(): boolean {
@@ -167,6 +177,16 @@ export async function disconnectExtension(): Promise<void> {
     await sendExtensionMessage<{ ok?: boolean }>({ type: "ONETAP_DISCONNECT" });
   } catch {
     // Best-effort during logout — extension may be uninstalled
+  }
+}
+
+/** Best-effort: refresh extension cache after dashboard apply-mode change. */
+export async function notifyExtensionApplyModeSync(): Promise<void> {
+  if (!isExtensionIdConfigured()) return;
+  try {
+    await sendExtensionMessage<{ ok?: boolean }>({ type: "ONETAP_APPLY_MODE_SYNC" });
+  } catch {
+    // Extension may be uninstalled or on another browser profile
   }
 }
 

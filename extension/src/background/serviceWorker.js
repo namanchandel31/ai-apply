@@ -332,5 +332,61 @@ chrome.runtime.onMessageExternal.addListener((message, _sender, sendResponse) =>
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
+  if (type === "ONETAP_APPLY_MODE_SYNC") {
+    fetchPopupStatus()
+      .then((data) => sendResponse({ ok: true, data }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
   return false;
+});
+
+const INJECTED_POPUP_SCRIPT = "src/popup/injectPopup.js";
+
+function isInjectableTabUrl(url) {
+  if (!url) return false;
+  return (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("file://")
+  );
+}
+
+async function openInjectedPopup(tab) {
+  if (!tab?.id || !isInjectableTabUrl(tab.url)) {
+    await chrome.windows.create({
+      url: chrome.runtime.getURL("src/popup/popup.html"),
+      type: "popup",
+      width: 336,
+      height: 480,
+      focused: true,
+    });
+    return;
+  }
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "ONETAP_OPEN_PANEL" });
+    return;
+  } catch {
+    // Controller not injected yet on this page — inject once, then it opens.
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: [INJECTED_POPUP_SCRIPT],
+    });
+  } catch {
+    await chrome.windows.create({
+      url: chrome.runtime.getURL("src/popup/popup.html"),
+      type: "popup",
+      width: 336,
+      height: 480,
+      focused: true,
+    });
+  }
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  void openInjectedPopup(tab);
 });

@@ -17,24 +17,25 @@
   --brand: hsl(221 83% 53%);
   --success: hsl(163 55% 32%);
   --radius: 12px;
-  --popup-radius: 16px;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  border-radius: var(--popup-radius);
-  overflow: hidden;
 }
 
 html {
+  margin: 0;
+  padding: 0;
   background: var(--background);
 }
 
+html[data-embedded="1"],
+html[data-embedded="1"] body {
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 body {
+  margin: 0;
+  padding: 0;
   width: 320px;
-  min-height: 200px;
   background: var(--background);
   color: var(--foreground);
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -44,27 +45,50 @@ body {
 }
 
 .shell {
+  width: 100%;
   padding: 16px;
-  border-radius: var(--popup-radius);
+  flex: 0 0 auto;
 }
 
-.shell:has(#view-disconnected:not([hidden])),
 .shell:has(#view-loading:not([hidden])) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 220px;
   text-align: center;
 }
 
-.shell:has(#view-disconnected:not([hidden])) .header,
-.shell:has(#view-loading:not([hidden])) .header {
-  justify-content: center;
-  margin-bottom: 20px;
+#view-main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
-#view-disconnected,
+.connection-footer {
+  margin-top: 14px;
+}
+
+#connect-extension[hidden],
+#connection-status[hidden] {
+  display: none !important;
+}
+
+.connection-footer .status-row {
+  margin-top: 0;
+}
+
+#connect-extension {
+  margin-top: 0;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
 #view-loading {
   display: flex;
   flex-direction: column;
@@ -73,19 +97,45 @@ body {
   text-align: center;
 }
 
-#view-disconnected .lead {
-  max-width: 240px;
-}
-
-#view-disconnected .btn {
-  max-width: 280px;
-}
-
 .header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.close-btn:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.close-icon {
+  width: 32px;
+  height: 32px;
 }
 
 .logo {
@@ -118,13 +168,6 @@ body {
   color: var(--muted-foreground);
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
 .status-dot {
   width: 8px;
   height: 8px;
@@ -139,35 +182,8 @@ body {
   color: var(--foreground);
 }
 
-.plan-card {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--background);
-  margin-bottom: 12px;
-}
-
-.plan-label {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted-foreground);
-}
-
-.plan-name {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
 .toggle-card {
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--muted);
+  padding: 0;
   margin-bottom: 12px;
 }
 
@@ -180,7 +196,7 @@ body {
 
 .toggle-hint {
   margin: 0 0 14px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted-foreground);
 }
 
@@ -203,7 +219,8 @@ body {
 
 .warp-track {
   position: relative;
-  flex: 1;
+  flex: 0 0 108px;
+  width: 108px;
   height: 52px;
   border-radius: 999px;
   background: hsl(0 0% 82%);
@@ -276,17 +293,23 @@ body {
   opacity: 0.92;
 }
 
-.btn-ghost {
-  margin-top: 4px;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-weight: 500;
-  font-size: 13px;
-  min-height: 32px;
+.popup-divider {
+  width: 100%;
+  height: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0 20px;
 }
 
-.btn-ghost:hover:not(:disabled) {
+.btn-secondary {
+  background: #ffffff;
   color: var(--foreground);
+  border: 1px solid var(--border);
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--muted);
 }
 
 .error-text {

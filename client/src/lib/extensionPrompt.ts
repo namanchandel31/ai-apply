@@ -1,6 +1,9 @@
 export const CHROME_EXTENSION_URL =
   "https://chromewebstore.google.com/detail/onetap/faookfjibeagjdkajoacomepnkielodd";
 
+/** Published Chrome Web Store extension ID (last path segment of CHROME_EXTENSION_URL). */
+export const CHROME_WEB_STORE_EXTENSION_ID = "faookfjibeagjdkajoacomepnkielodd";
+
 export const EXTENSION_PROMPT_DISMISSED_KEY = "onetap:extension-prompt-dismissed";
 export const ONBOARDING_EXTENSION_PENDING_KEY = "onetap:onboarding-extension-pending";
 

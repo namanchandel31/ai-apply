@@ -6,19 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   connectExtension,
+  getConfiguredExtensionId,
   getExtensionInstallState,
 } from "@/lib/extensionBridge";
-import { CHROME_EXTENSION_URL } from "@/lib/extensionPrompt";
+import { CHROME_EXTENSION_URL, CHROME_WEB_STORE_EXTENSION_ID } from "@/lib/extensionPrompt";
 
 export function SettingsExtension() {
   const isDev = import.meta.env.DEV;
+  const configuredExtensionId = getConfiguredExtensionId();
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(true);
   const [installed, setInstalled] = useState(false);
   const [accountConnected, setAccountConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [awaitingInstall, setAwaitingInstall] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     setLoading(true);
@@ -27,9 +28,6 @@ export function SettingsExtension() {
     setInstalled(state.installed);
     setAccountConnected(state.accountConnected);
     setLoading(false);
-    if (state.installed) {
-      setAwaitingInstall(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -37,31 +35,18 @@ export function SettingsExtension() {
   }, [refreshStatus]);
 
   useEffect(() => {
-    if (!awaitingInstall) return;
-
-    let active = true;
-
     const checkOnReturn = () => {
-      if (!active || document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible") return;
       void refreshStatus();
     };
 
     document.addEventListener("visibilitychange", checkOnReturn);
     window.addEventListener("focus", checkOnReturn);
-    const intervalId = window.setInterval(checkOnReturn, 3000);
-
     return () => {
-      active = false;
       document.removeEventListener("visibilitychange", checkOnReturn);
       window.removeEventListener("focus", checkOnReturn);
-      window.clearInterval(intervalId);
     };
-  }, [awaitingInstall, refreshStatus]);
-
-  const handleInstall = () => {
-    window.open(CHROME_EXTENSION_URL, "_blank", "noopener,noreferrer");
-    setAwaitingInstall(true);
-  };
+  }, [refreshStatus]);
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -77,115 +62,107 @@ export function SettingsExtension() {
     }
   };
 
-  const installStatusLabel = loading
-    ? "Checking…"
-    : installed
-      ? "Extension is installed"
-      : awaitingInstall
-        ? "Waiting for install…"
-        : "Not installed";
-
-  const installStatusVariant = loading
-    ? "secondary"
-    : installed
-      ? "success"
-      : awaitingInstall
-        ? "warning"
-        : "secondary";
-
   const connectStatusLabel = loading ? "Checking…" : accountConnected ? "Connected" : "Not connected";
   const connectStatusVariant = loading ? "secondary" : accountConnected ? "success" : "secondary";
+  const showLocalDevHelp = isDev && configured && !installed && !loading;
 
   return (
     <SetupPageShell
       title="Chrome Extension"
-      description="Install the OneTap extension and connect it to your account for LinkedIn job discovery."
+      description="Connect the OneTap extension to apply to jobs directly from LinkedIn."
     >
-      <div className="max-w-xl space-y-4">
-        <section className="space-y-4 rounded-lg border border-border p-5">
-          <h2 className="text-base font-semibold">1. Install extension</h2>
-
-          {installed ? (
-            <dl className="text-sm">
-              <div className="flex items-center justify-between gap-4 py-2">
-                <dt className="text-muted-foreground">Status</dt>
-                <dd>
-                  <Badge variant={installStatusVariant}>{installStatusLabel}</Badge>
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <>
-              <dl className="grid gap-2 text-sm">
-                <div className="flex items-center justify-between gap-4 border-b border-border/60 py-2">
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd>
-                    <Badge variant={installStatusVariant}>{installStatusLabel}</Badge>
-                  </dd>
-                </div>
-              </dl>
-
-              <p className="text-sm text-muted-foreground">
-                Install OneTap from the Chrome Web Store, then return to this tab to continue.
-              </p>
-              <Button type="button" className="gap-2" onClick={handleInstall} disabled={awaitingInstall}>
-                {awaitingInstall ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <Puzzle className="h-4 w-4" aria-hidden />
-                )}
-                {awaitingInstall ? "Waiting for installation…" : "Install Chrome Extension"}
-                {!awaitingInstall ? <ExternalLink className="h-3.5 w-3.5 opacity-70" aria-hidden /> : null}
-              </Button>
-
-              {isDev ? (
-                <div className="space-y-2 border-t border-border pt-4">
-                  <p className="text-sm font-medium text-foreground">Local development</p>
-                  {!configured ? (
-                    <p className="text-sm text-muted-foreground">
-                      Set <code className="text-sm">VITE_ONETAP_EXTENSION_ID</code> in{" "}
-                      <code className="text-sm">client/.env</code> from{" "}
-                      <code className="text-sm">chrome://extensions</code>, then restart the dev server.
-                    </p>
-                  ) : null}
-                  <p className="text-sm text-muted-foreground">
-                    To test an unpacked build: open <code className="text-sm">chrome://extensions</code>,
-                    enable Developer mode, click <strong>Load unpacked</strong>, and select the{" "}
-                    <code className="text-sm">extension/</code> folder in this repository.
-                  </p>
-                </div>
-              ) : null}
-            </>
-          )}
-        </section>
-
-        <section className="space-y-4 rounded-lg border border-border p-5">
-          <h2 className="text-base font-semibold">2. Connect extension</h2>
-
-          <dl className="grid gap-2 text-sm">
-            <div className="flex items-center justify-between gap-4 py-2">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd>
-                <Badge variant={connectStatusVariant}>{connectStatusLabel}</Badge>
-              </dd>
-            </div>
-          </dl>
+      <div className="max-w-xl">
+        <section className="space-y-5 rounded-lg border border-border p-6">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-base font-medium text-foreground">Status</p>
+            <Badge variant={connectStatusVariant} className="px-3 py-1 text-sm">
+              {connectStatusLabel}
+            </Badge>
+          </div>
 
           {connectError ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-base text-destructive" role="alert">
               {connectError}
             </p>
           ) : null}
 
-          <Button
-            type="button"
-            onClick={() => void handleConnect()}
-            disabled={connecting || loading || !installed || !configured}
-            className="gap-2"
-          >
-            {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Puzzle className="h-4 w-4" />}
-            Connect Extension
-          </Button>
+          {accountConnected && !loading ? (
+            <p className="text-base leading-relaxed text-muted-foreground">
+              You&apos;re connected. Open LinkedIn, find a hiring post, and tap OneTap to apply.
+            </p>
+          ) : (
+            <>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                Link the extension to this account, then apply from LinkedIn in one tap.
+              </p>
+              <Button
+                type="button"
+                size="lg"
+                className="h-11 w-full gap-2 text-base"
+                onClick={() => void handleConnect()}
+                disabled={connecting || loading || !configured}
+              >
+                {connecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Puzzle className="h-4 w-4" aria-hidden />
+                )}
+                Connect Extension
+              </Button>
+
+              {isDev ? (
+                <p className="text-center text-base text-muted-foreground">
+                  Local dev: open <code className="text-sm">chrome://extensions</code>, enable Developer
+                  mode, click <strong>Load unpacked</strong>, and select the{" "}
+                  <code className="text-sm">extension/</code> folder in this repo.
+                </p>
+              ) : (
+                <p className="text-center text-base text-muted-foreground">
+                  Don&apos;t have the extension yet?{" "}
+                  <a
+                    href={CHROME_EXTENSION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-base font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Install from the Chrome Web Store
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </p>
+              )}
+            </>
+          )}
+
+          {showLocalDevHelp ? (
+            <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-4">
+              <p className="text-sm font-medium text-foreground">Extension not detected</p>
+              <p className="text-sm text-muted-foreground">
+                This page is looking for extension ID{" "}
+                <code className="text-sm">{configuredExtensionId}</code>. The Chrome Web Store build uses
+                ID <code className="text-sm">{CHROME_WEB_STORE_EXTENSION_ID}</code> and cannot connect to
+                localhost.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Load the local <code className="text-sm">extension/</code> folder via{" "}
+                <strong>Load unpacked</strong>, copy its ID into{" "}
+                <code className="text-sm">VITE_ONETAP_EXTENSION_ID</code> in{" "}
+                <code className="text-sm">client/.env</code>, reload the extension, then restart the dev
+                server.
+              </p>
+            </div>
+          ) : null}
+
+          {isDev && !configured ? (
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground">Local development</p>
+              <p className="text-sm text-muted-foreground">
+                Set <code className="text-sm">VITE_ONETAP_EXTENSION_ID</code> in{" "}
+                <code className="text-sm">client/.env</code> from{" "}
+                <code className="text-sm">chrome://extensions</code>, then restart the dev server.
+                Load unpacked from the <code className="text-sm">extension/</code> folder.
+              </p>
+            </div>
+          ) : null}
         </section>
       </div>
     </SetupPageShell>

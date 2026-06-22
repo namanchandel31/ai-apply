@@ -1,19 +1,23 @@
 import { DEFAULT_WEB_BASE } from "../config/app.config.js";
+import { autoApplyToggleDescription, isAutoApplyMode } from "../shared/applyModeCopy.js";
 
 const POPUP_STATUS_CACHE_KEY = "cachedPopupStatus";
 const SETTINGS_PATH = "/settings/extension";
+const APPLICATIONS_PATH = "/applications";
 
 const viewLoading = document.getElementById("view-loading");
-const viewDisconnected = document.getElementById("view-disconnected");
-const viewConnected = document.getElementById("view-connected");
-const openSettingsBtn = document.getElementById("open-settings");
-const planNameEl = document.getElementById("plan-name");
+const viewMain = document.getElementById("view-main");
+const connectExtensionBtn = document.getElementById("connect-extension");
+const connectionStatusEl = document.getElementById("connection-status");
+const openApplicationsBtn = document.getElementById("open-applications");
 const autoToggleBtn = document.getElementById("auto-toggle");
+const toggleHintEl = document.getElementById("toggle-hint");
 const toggleLabelEl = document.getElementById("toggle-label");
-const disconnectBtn = document.getElementById("disconnect");
+const closePanelBtn = document.getElementById("close-panel");
 const errorEl = document.getElementById("error");
 
 let applyModePending = false;
+let isConnected = false;
 
 function openWebApp(path) {
   chrome.tabs.create({ url: `${DEFAULT_WEB_BASE.replace(/\/$/, "")}${path}` });
@@ -42,50 +46,84 @@ async function readCachedPopupStatus() {
 
 function showView(name) {
   viewLoading.hidden = name !== "loading";
-  viewDisconnected.hidden = name !== "disconnected";
-  viewConnected.hidden = name !== "connected";
+  viewMain.hidden = name !== "main";
+  notifyPopupHeight();
+}
+
+function notifyPopupHeight() {
+  if (window.parent === window) return;
+  requestAnimationFrame(() => {
+    const height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    window.parent.postMessage({ type: "ONETAP_POPUP_RESIZE", height }, "*");
+  });
 }
 
 function setError(message) {
   if (!message) {
     errorEl.hidden = true;
     errorEl.textContent = "";
+    notifyPopupHeight();
     return;
   }
   errorEl.hidden = false;
   errorEl.textContent = message;
+  notifyPopupHeight();
+}
+
+function setConnectionUi(connected) {
+  isConnected = connected;
+  connectExtensionBtn.hidden = connected;
+  connectionStatusEl.hidden = !connected;
+  autoToggleBtn.disabled = !connected || applyModePending;
+  notifyPopupHeight();
+}
+
+async function readIsConnected() {
+  try {
+    const ping = await bgRequest("ONETAP_PING");
+    if (ping?.connected) return true;
+  } catch {
+    /* fall through to storage check */
+  }
+  const { accessToken } = await chrome.storage.local.get("accessToken");
+  return Boolean(accessToken);
 }
 
 function setAutoApplyUi(enabled) {
   autoToggleBtn.setAttribute("aria-checked", enabled ? "true" : "false");
   toggleLabelEl.textContent = enabled ? "On" : "Off";
+  toggleHintEl.textContent = autoApplyToggleDescription(enabled);
+  autoToggleBtn.setAttribute(
+    "aria-label",
+    enabled ? "Auto apply on — sends automatically" : "Auto apply off — review before sending"
+  );
+  openApplicationsBtn.textContent = enabled ? "Open Applications" : "Review applications";
+  notifyPopupHeight();
 }
 
 function applyPopupStatus(status) {
   if (!status) return;
-  planNameEl.textContent = status.plan?.label || "No active plan";
-  setAutoApplyUi(status.applyMode === "auto_apply");
+  setAutoApplyUi(isAutoApplyMode(status.applyMode));
 }
 
-openSettingsBtn.addEventListener("click", () => {
+connectExtensionBtn.addEventListener("click", () => {
   openWebApp(SETTINGS_PATH);
 });
 
-disconnectBtn.addEventListener("click", async () => {
-  disconnectBtn.disabled = true;
-  setError("");
-  try {
-    await bgRequest("ONETAP_DISCONNECT");
-    await render();
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Disconnect failed");
-  } finally {
-    disconnectBtn.disabled = false;
+openApplicationsBtn.addEventListener("click", () => {
+  openWebApp(APPLICATIONS_PATH);
+});
+
+closePanelBtn.addEventListener("click", () => {
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: "ONETAP_POPUP_CLOSE" }, "*");
+    return;
   }
+  window.close();
 });
 
 autoToggleBtn.addEventListener("click", async () => {
-  if (applyModePending) return;
+  if (applyModePending || !isConnected) return;
 
   const nextEnabled = autoToggleBtn.getAttribute("aria-checked") !== "true";
   const nextMode = nextEnabled ? "auto_apply" : "review_apply";
@@ -103,21 +141,28 @@ autoToggleBtn.addEventListener("click", async () => {
     setError(err instanceof Error ? err.message : "Could not update auto apply");
   } finally {
     applyModePending = false;
-    autoToggleBtn.disabled = false;
+    autoToggleBtn.disabled = !isConnected;
   }
 });
 
 async function refreshPopupStatus() {
+  if (!isConnected) return;
+
   try {
     const status = await bgRequest("POPUP_STATUS");
     applyPopupStatus(status);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (/not connected|401|unauthorized/i.test(message)) {
+      setConnectionUi(false);
+      setAutoApplyUi(false);
+      return;
+    }
     const cached = await readCachedPopupStatus();
     if (cached) {
       applyPopupStatus(cached);
     } else {
-      planNameEl.textContent = "Could not load plan";
-      setError(err instanceof Error ? err.message : "Could not load status");
+      setError(message || "Could not load status");
     }
   }
 }
@@ -126,26 +171,32 @@ async function render() {
   showView("loading");
   setError("");
 
-  let ping;
-  try {
-    ping = await bgRequest("ONETAP_PING");
-  } catch {
-    ping = { connected: false };
+  const connected = await readIsConnected();
+
+  showView("main");
+  setConnectionUi(connected);
+
+  if (connected) {
+    const cached = await readCachedPopupStatus();
+    if (cached) {
+      applyPopupStatus(cached);
+    }
+    void refreshPopupStatus();
+  } else {
+    setAutoApplyUi(false);
   }
-
-  if (!ping.connected) {
-    showView("disconnected");
-    return;
-  }
-
-  showView("connected");
-
-  const cached = await readCachedPopupStatus();
-  if (cached) {
-    applyPopupStatus(cached);
-  }
-
-  void refreshPopupStatus();
 }
 
 render();
+notifyPopupHeight();
+window.addEventListener("load", notifyPopupHeight);
+
+if (window.parent !== window && typeof ResizeObserver !== "undefined") {
+  const resizeObserver = new ResizeObserver(() => notifyPopupHeight());
+  resizeObserver.observe(document.body);
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.accessToken) return;
+  void render();
+});

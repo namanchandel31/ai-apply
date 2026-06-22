@@ -1,5 +1,85 @@
 ## Log (newest first)
 
+### 2026-06-22 — Close button hover-only background
+- **Prompt:** Default close X grey with no bg; on hover show 44×44 grey circle and black X.
+- **Outcome:** close-btn transparent by default; hover shows muted background + foreground icon color.
+
+### 2026-06-22 — Close X icon 28px
+- **Prompt:** Make the X icon 28×28.
+- **Outcome:** close-icon size updated to 28×28px.
+
+### 2026-06-22 — Close button 44px
+- **Prompt:** Make close button 44×44 instead of 32×32.
+- **Outcome:** close-btn size updated to 44×44px.
+
+### 2026-06-22 — Close X icon 24px
+- **Prompt:** Make the X icon in the close button 24×24.
+- **Outcome:** close-icon size updated to 24×24px.
+
+### 2026-06-22 — Remove current plan from extension popup
+- **Prompt:** Remove the current plan section from extension popup.
+- **Outcome:** Removed plan card from popup.html; cleaned popup.js and plan CSS.
+
+### 2026-06-22 — Close button 32px
+- **Prompt:** Make close icon 32 by 32.
+- **Outcome:** close-btn size updated to 32×32px.
+
+### 2026-06-22 — Extension popup close button
+- **Prompt:** Add circular grey close (X) button to the right of OneTap logo in header.
+- **Outcome:** Header close-btn closes injected panel via postMessage; v0.2.3.
+
+### 2026-06-22 — Connected status at bottom of popup
+- **Prompt:** Reposition Connected at the bottom.
+- **Outcome:** Moved status row below plan/toggle in connected view; centered at bottom; v0.2.2.
+
+### 2026-06-22 — Extension popup vertical center (360px panel)
+- **Prompt:** Contents should be vertically center aligned.
+- **Outcome:** Fixed 360px embedded panel; html/body flex justify-content center; iframe height locked; v0.2.1.
+
+### 2026-06-22 — Extension popup fit content height
+- **Prompt:** Disconnect gone but panel still top-aligned with empty bottom space.
+- **Outcome:** Removed fixed 400px panel; iframe resizes to content height so panel hugs content; v0.2.0.
+
+### 2026-06-22 — Remove disconnect from extension popup
+- **Prompt:** Remove the disconnect button from the extension popup.
+- **Outcome:** Removed disconnect button from popup.html and popup.js handler.
+
+### 2026-06-22 — Extension popup vertical center (fix)
+- **Prompt:** Vertical center still not visible after prior change.
+- **Outcome:** Set embedded flag in inline head script; fixed 400px panel/body height; body flex align-items center; stop iframe shrink; v0.1.9.
+
+### 2026-06-22 — Extension popup vertical center
+- **Prompt:** Vertically center popup content and elements.
+- **Outcome:** Embedded shell uses flex center; min panel height 400px; connected view column centered; v0.1.8.
+
+### 2026-06-22 — Fix extension panel toggle on icon click
+- **Prompt:** Extension panel sometimes doesn't appear after first click.
+- **Outcome:** Removed toggle-close on icon click; icon always opens panel; persistent page controller via sendMessage; v0.1.7.
+
+### 2026-06-22 — Extension popup 16px via injected panel
+- **Prompt:** Still no visible 16px corner radius on extension popup after CSS change.
+- **Outcome:** Replaced default_popup with toolbar click → injected floating panel (16px radius + shadow); iframe resize messaging; v0.1.6.
+
+### 2026-06-22 — Extension popup 16px corner radius
+- **Prompt:** Extension popup should have 16px corner radius.
+- **Outcome:** Outer popup clip on html only (--popup-radius: 16px); removed redundant shell/body radius; bump v0.1.5.
+
+### 2026-06-22 — Fix Connect Extension ID mismatch guidance
+- **Prompt:** Connect Extension fails with "extension not installed" despite install.
+- **Outcome:** Logs confirmed env targets hnhmh… but no listener (Web Store vs local unpacked ID). Clearer error, dev setup panel, local Load unpacked instructions on settings page.
+
+### 2026-06-22 — Debug Connect Extension failure
+- **Prompt:** Connect Extension errors with "extension not installed or disabled" despite install.
+- **Outcome:** Added runtime instrumentation to extensionBridge/settingsExtension to capture extension ID, origin, and Chrome lastError.
+
+### 2026-06-22 — Extension install link font size
+- **Prompt:** Make "Don't have the extension yet? Install from the Chrome Web Store" 14px.
+- **Outcome:** Switched install helper copy from text-sm (12px) to text-base (14px).
+
+### 2026-06-22 — Simplify extension settings page
+- **Prompt:** Remove two-step install/connect on profile extension page; one Connect button + install link below.
+- **Outcome:** settingsExtension.tsx is a single card with primary Connect Extension CTA and Chrome Web Store install link.
+
 ### 2026-06-22 — Recommended chip absolute on plan cards
 - **Prompt:** Absolute-position Recommended chip so plan titles align across cards.
 - **Outcome:** Recommended badge top-right on card; titles start at same vertical position.
