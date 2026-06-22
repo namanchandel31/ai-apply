@@ -380,8 +380,8 @@
     "semantic_hash": ""
   },
   "client/src/components/landing/mindoo/MindooFooter.tsx": {
-    "mtime": 1781977915.2592695,
-    "ast_hash": "a958e39ac977182cf82f11b9ef983cdd",
+    "mtime": 1782093693.7752848,
+    "ast_hash": "7354d9d43c081060b68d6ff58d8220d5",
     "semantic_hash": ""
   },
   "client/src/components/landing/mindoo/MindooNav.tsx": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "client/src/components/onboarding/ExtensionInstallPrompt.tsx": {
-    "mtime": 1782088344.340597,
-    "ast_hash": "95bda3c3227dac7e6b816bffc089ddff",
+    "mtime": 1782105738.375733,
+    "ast_hash": "22d738b4589d9d511ddcf25b52874ee5",
     "semantic_hash": ""
   },
   "client/src/components/onboarding/LinkedInApplyVisual.tsx": {
@@ -895,8 +895,8 @@
     "semantic_hash": ""
   },
   "client/src/pages/privacyPolicy.tsx": {
-    "mtime": 1781643175.7951968,
-    "ast_hash": "b19e4c35bfad2176250c695b3080a6da",
+    "mtime": 1782093706.0418398,
+    "ast_hash": "d1a8503d84781b3305211077f20e45d2",
     "semantic_hash": ""
   },
   "client/src/pages/resetPassword.tsx": {
@@ -915,8 +915,8 @@
     "semantic_hash": ""
   },
   "client/src/pages/support.tsx": {
-    "mtime": 1781643160.4452767,
-    "ast_hash": "f170bd9be91f7cbe2ec1ff1eda019304",
+    "mtime": 1782093700.3837206,
+    "ast_hash": "39d4775b1cd3150ea21ad98d85322ad0",
     "semantic_hash": ""
   },
   "client/src/queries/applicationsCache.ts": {
@@ -935,8 +935,8 @@
     "semantic_hash": ""
   },
   "client/src/routes/AppRoutes.tsx": {
-    "mtime": 1782082288.6472738,
-    "ast_hash": "22ba9db8cb10de854608408c02cb18f8",
+    "mtime": 1782093692.081564,
+    "ast_hash": "a82c6842c19fe38c91e1b9df947401b4",
     "semantic_hash": ""
   },
   "client/src/routes/AuthenticatedHomeRedirect.tsx": {
@@ -1185,13 +1185,13 @@
     "semantic_hash": ""
   },
   "extension/manifest.json": {
-    "mtime": 1781885928.0118008,
-    "ast_hash": "20fcf7aba321731071958d9b73fcea32",
+    "mtime": 1782105648.5861738,
+    "ast_hash": "d5f03aabb868b87e6c63dc8d7ce5b8df",
     "semantic_hash": ""
   },
   "extension/src/background/serviceWorker.js": {
-    "mtime": 1781642524.2539437,
-    "ast_hash": "bddf1d6a6cf3fa74df5653cfd4ad9ac8",
+    "mtime": 1782105645.599295,
+    "ast_hash": "1adef57afd5a69389540ea3432252dc2",
     "semantic_hash": ""
   },
   "extension/src/config/app.config.example.js": {
@@ -1210,8 +1210,8 @@
     "semantic_hash": ""
   },
   "extension/src/popup/popup.js": {
-    "mtime": 1781645634.175358,
-    "ast_hash": "304ede2c6eb6ffc094214bb2c8fd81af",
+    "mtime": 1782105730.6653626,
+    "ast_hash": "724182df15998dcdd243dae8e5d9ea63",
     "semantic_hash": ""
   },
   "index.js": {
@@ -2610,8 +2610,8 @@
     "semantic_hash": ""
   },
   "src/services/extensionPopupStatusService.js": {
-    "mtime": 1781642524.3240013,
-    "ast_hash": "1decba3796528193c4b2fb6d896b4956",
+    "mtime": 1782105641.6787443,
+    "ast_hash": "7c3b42e78289d0e1ca66d64c885a3553",
     "semantic_hash": ""
   },
   "src/services/failureDecision.js": {
@@ -3170,8 +3170,8 @@
     "semantic_hash": ""
   },
   "tests/extensionPopupStatus.unit.test.js": {
-    "mtime": 1781642524.3343232,
-    "ast_hash": "b29a92979d076e498ec7bfe9e3651fcc",
+    "mtime": 1782105735.8832164,
+    "ast_hash": "d0eec4e1ad0d784772cf29090c9a6fa0",
     "semantic_hash": ""
   },
   "tests/failureDecision.unit.test.js": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "extension/src/popup/popup.html": {
-    "mtime": 1781645596.4410057,
-    "ast_hash": "a88a3b0ad06f28032212eea88f6527ab",
+    "mtime": 1782105718.8380272,
+    "ast_hash": "89d1f11e71b03dad5e02da12e0896366",
     "semantic_hash": ""
   },
   "failure-log.md": {
@@ -4807,6 +4807,11 @@
   "tests/dashboardSendEnqueue.unit.test.js": {
     "mtime": 1782089190.2606864,
     "ast_hash": "171c533bbb5d6f4abae5464ecb755441",
+    "semantic_hash": ""
+  },
+  "client/src/pages/termsOfService.tsx": {
+    "mtime": 1782093691.1591377,
+    "ast_hash": "87e8696a7b0276dc298d4628a89b6cfe",
     "semantic_hash": ""
   }
 }

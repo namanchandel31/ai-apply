@@ -14,8 +14,9 @@
  * ENVIRONMENTS.production.apiBase) and rebuild.
  */
 
-// Flip to "production" for hosted testing / Chrome Web Store builds.
-const ENVIRONMENT = "production";
+// Flip to "development" for local testing (localhost:5173 / localhost:5000).
+// Use "production" for Chrome Web Store builds (onetapjob.com).
+const ENVIRONMENT = "development";
 
 const ENVIRONMENTS = {
   development: {
@@ -27,8 +28,8 @@ const ENVIRONMENTS = {
     // Backend API origin (Render). Only a fallback — the live value is sent by the
     // website during connect (driven by the site's VITE_API_URL).
     apiBase: "https://ai-apply-jwan.onrender.com",
-    // Website origin (Vercel) the popup opens for dashboard / settings.
-    webBase: "https://onetap-ai-apply.vercel.app",
+    // Website origin the popup opens for dashboard / settings.
+    webBase: "https://onetapjob.com",
   },
 };
 

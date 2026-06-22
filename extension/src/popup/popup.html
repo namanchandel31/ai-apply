@@ -3,26 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <title>OneTap</title>
-    <style>
-      body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; width: 280px; }
-      .muted { color: #64748b; font-size: 13px; margin: 4px 0; }
-      .row { margin-top: 8px; }
-      button { margin-top: 8px; width: 100%; padding: 8px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; }
-      button.primary { background: #2563eb; color: #fff; }
-      button.secondary { background: #e2e8f0; color: #0f172a; }
-      a { color: #2563eb; font-size: 13px; }
-    </style>
+    <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
-    <h2 style="margin:0 0 8px;font-size:16px;">OneTap</h2>
-    <p id="status" class="muted">Checking connection…</p>
-    <p id="meta" class="muted"></p>
-    <p id="setup" class="muted"></p>
-    <p id="mode" class="muted"></p>
-    <div class="row">
-      <button id="open" type="button" class="primary">Open OneTap</button>
-      <button id="dashboard" type="button" class="secondary" hidden>Open Dashboard</button>
-      <button id="disconnect" type="button" class="secondary" hidden>Disconnect</button>
+    <div class="shell">
+      <header class="header">
+        <svg class="logo" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M20 44C31.0457 44 40 35.0457 40 24C40 12.9543 31.0457 4 20 4C8.95428 4 0 12.9543 0 24C0 35.0457 8.95428 44 20 44ZM26.2393 13.3168C26.543 12.2381 25.4961 11.6001 24.54 12.2813L11.1931 21.7896C10.1562 22.5283 10.3193 24 11.4381 24H14.9527V23.9728H21.8025L16.2212 25.9421L13.7607 34.6832C13.457 35.762 14.5038 36.3999 15.46 35.7187L28.8069 26.2105C29.8438 25.4718 29.6806 24 28.5619 24H23.2321L26.2393 13.3168Z"
+            fill="currentColor"
+          />
+        </svg>
+        <span class="wordmark">OneTap</span>
+      </header>
+
+      <div id="view-loading" class="view">
+        <p class="muted">Checking connection…</p>
+      </div>
+
+      <div id="view-disconnected" class="view" hidden>
+        <p class="lead">Connect this extension to your OneTap account.</p>
+        <button id="open-settings" type="button" class="btn btn-primary">Open settings</button>
+      </div>
+
+      <div id="view-connected" class="view" hidden>
+        <div class="status-row">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-text">Connected</span>
+        </div>
+
+        <div class="plan-card">
+          <p class="plan-label">Current plan</p>
+          <p id="plan-name" class="plan-name">Loading…</p>
+        </div>
+
+        <div class="toggle-card">
+          <p class="toggle-title">Auto apply</p>
+          <p class="toggle-hint">Send applications automatically without reviewing each draft.</p>
+          <button
+            id="auto-toggle"
+            type="button"
+            class="warp-toggle"
+            role="switch"
+            aria-checked="false"
+            aria-label="Toggle auto apply"
+          >
+            <span class="warp-track">
+              <span class="warp-thumb"></span>
+            </span>
+            <span id="toggle-label" class="warp-label">Off</span>
+          </button>
+        </div>
+
+        <button id="disconnect" type="button" class="btn btn-ghost">Disconnect</button>
+        <p id="error" class="error-text" hidden></p>
+      </div>
     </div>
     <script type="module" src="./popup.js"></script>
   </body>
