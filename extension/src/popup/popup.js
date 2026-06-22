@@ -7,6 +7,8 @@ const APPLICATIONS_PATH = "/applications";
 
 const viewLoading = document.getElementById("view-loading");
 const viewMain = document.getElementById("view-main");
+const disconnectedMessageEl = document.getElementById("disconnected-message");
+const connectedContentEl = document.getElementById("connected-content");
 const connectExtensionBtn = document.getElementById("connect-extension");
 const connectionStatusEl = document.getElementById("connection-status");
 const openApplicationsBtn = document.getElementById("open-applications");
@@ -72,6 +74,8 @@ function setError(message) {
 
 function setConnectionUi(connected) {
   isConnected = connected;
+  disconnectedMessageEl.hidden = connected;
+  connectedContentEl.hidden = !connected;
   connectExtensionBtn.hidden = connected;
   connectionStatusEl.hidden = !connected;
   autoToggleBtn.disabled = !connected || applyModePending;
@@ -155,7 +159,6 @@ async function refreshPopupStatus() {
     const message = err instanceof Error ? err.message : "";
     if (/not connected|401|unauthorized/i.test(message)) {
       setConnectionUi(false);
-      setAutoApplyUi(false);
       return;
     }
     const cached = await readCachedPopupStatus();
@@ -182,8 +185,6 @@ async function render() {
       applyPopupStatus(cached);
     }
     void refreshPopupStatus();
-  } else {
-    setAutoApplyUi(false);
   }
 }
 

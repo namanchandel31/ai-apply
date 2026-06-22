@@ -35,16 +35,22 @@ export function setupIssuesFromStatus(setup) {
   if (!setup.hasEmailSetup) {
     issues.push({ label: "Connect Gmail", path: "/setup" });
   }
-  if (!setup.hasVerifiedAiCredential) {
+  const hasAi =
+    setup.hasAiSetup ||
+    setup.hasVerifiedAiCredential ||
+    setup.canUseManagedAi;
+  if (!hasAi) {
     issues.push({ label: "Configure AI", path: "/setup" });
   }
   return issues;
 }
 
 export function isSetupCompleteFromStatus(setup) {
-  return Boolean(
-    setup?.hasValidResume && setup?.hasEmailSetup && setup?.hasVerifiedAiCredential
-  );
+  const hasAi =
+    setup?.hasAiSetup ||
+    setup?.hasVerifiedAiCredential ||
+    setup?.canUseManagedAi;
+  return Boolean(setup?.hasValidResume && setup?.hasEmailSetup && hasAi);
 }
 
 export function friendlyApplyError(message) {

@@ -37,6 +37,8 @@ describe("extensionPopupStatusService", () => {
       setup: {
         hasValidResume: true,
         hasEmailSetup: true,
+        hasAiSetup: true,
+        canUseManagedAi: false,
         hasVerifiedAiCredential: false,
       },
       applyMode: "auto_apply",

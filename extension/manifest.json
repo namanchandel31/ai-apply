@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OneTap",
-  "version": "0.2.4",
+  "version": "0.2.7",
   "description": "Discover LinkedIn hiring posts and add them to OneTap.",
   "permissions": ["storage", "activeTab", "alarms", "tabs", "scripting"],
   "icons": {
@@ -11,7 +11,7 @@
     "128": "icons/icon-128.png"
   },
   "host_permissions": [
-    "http://localhost:5001/*",
+    "http://localhost:5000/*",
     "https://ybfzpfouqmdacgfxieec.supabase.co/*",
     "https://ai-apply-jwan.onrender.com/*",
     "https://www.linkedin.com/*",
@@ -34,7 +34,6 @@
     {
       "matches": ["https://www.linkedin.com/*", "https://linkedin.com/*"],
       "js": ["src/content/linkedin/main.js"],
-      "type": "module",
       "run_at": "document_idle"
     }
   ],
@@ -42,8 +41,10 @@
     {
       "resources": [
         "src/popup/popup.html",
+        "src/popup/popup-embedded.js",
         "src/popup/popup.js",
         "src/popup/popup.css",
+        "src/content/linkedin/main.js",
         "src/config/app.config.js",
         "src/shared/applyModeCopy.js"
       ],
