@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState("");
@@ -45,7 +47,7 @@ export function ResetPasswordPage() {
         return;
       }
       toast.success("Password updated successfully");
-      navigate(await resolvePostAuthPath(), { replace: true });
+      navigate(await resolvePostAuthPath(queryClient), { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reset password");
     } finally {

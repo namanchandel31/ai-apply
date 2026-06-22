@@ -21,11 +21,9 @@ const {
 const { ResumeSchema } = require("../schemas/resumeSchema");
 const { JDSchema } = require("../schemas/jdSchema");
 
-const { createResumeWithParsedData } = require("../models/resumeModel");
+const { createResumeWithParsedData, saveParsedDataForResume } = require("../models/resumeModel");
 const { createJDWithParsedData } = require("../models/jdModel");
 const { saveFailedParse } = require("../models/failedParseModel");
-const quotaService = require("./quotaService");
-const { QUOTA_FEATURE_KEYS } = quotaService;
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -87,6 +85,30 @@ const llmRetryOptions = {
 // Inflight request cache to deduplicate concurrent requests
 const inflightJobs = new Map();
 
+async function persistResumeParseResult({
+  existingResumeId,
+  originalname,
+  size,
+  fileHash,
+  cleanedText,
+  parsedData,
+  userId,
+  filePath,
+}) {
+  if (existingResumeId) {
+    return saveParsedDataForResume(existingResumeId, cleanedText, parsedData);
+  }
+  return createResumeWithParsedData(
+    originalname,
+    size,
+    fileHash,
+    cleanedText,
+    parsedData,
+    userId,
+    filePath
+  );
+}
+
 /**
  * Process a Resume.
  * Note: This executes the parsing job synchronously within the current process.
@@ -101,6 +123,7 @@ const processResumeJob = async ({
   fileHash,
   userId = null,
   filePath = null,
+  existingResumeId = null,
   signal,
 }) => {
   if (inflightJobs.has(fileHash)) {
@@ -110,7 +133,6 @@ const processResumeJob = async ({
 
   const jobPromise = (async () => {
     let sanitizedRaw = null;
-    let quotaReserved = false;
 
     try {
       logInfo("PDF_EXTRACTION_STARTED", { reqId, jobId, fileHash });
@@ -189,25 +211,22 @@ const processResumeJob = async ({
         throw new NonRetryableError("Resume content too weak to parse");
       }
 
-      // Reserve the credit immediately before the (expensive) LLM parse. Atomic, so
-      // concurrent uploads can't overshoot; released below if the parse then fails.
-      await quotaService.reserve(userId, QUOTA_FEATURE_KEYS.RESUME_PARSED);
-      quotaReserved = true;
 
       const data = await withRetry(async (attempt) => {
         try {
           const cached = getCache(fileHash);
           if (cached) {
             logInfo("cache_hit", { reqId, jobId, stage: "llm_parsing", attempt, fileHash });
-            const dbResult = await createResumeWithParsedData(
+            const dbResult = await persistResumeParseResult({
+              existingResumeId,
               originalname,
               size,
               fileHash,
               cleanedText,
-              cached,
+              parsedData: cached,
               userId,
-              filePath
-            );
+              filePath,
+            });
             return { ...cached, _dbIds: dbResult };
           }
 
@@ -272,15 +291,16 @@ const processResumeJob = async ({
           setCache(fileHash, parsedData);
 
           logInfo("db_persist_start", { reqId, jobId, stage: "db_persist", attempt, fileHash });
-          const dbResult = await createResumeWithParsedData(
+          const dbResult = await persistResumeParseResult({
+            existingResumeId,
             originalname,
             size,
             fileHash,
             cleanedText,
             parsedData,
             userId,
-            filePath
-          );
+            filePath,
+          });
           logInfo("db_write_success", { reqId, jobId, stage: "db_persist", attempt, fileHash });
 
           deleteCache(fileHash);
@@ -315,10 +335,6 @@ const processResumeJob = async ({
 
       logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash, source: "resume" });
 
-      if (quotaReserved) {
-        await quotaService.release(userId, QUOTA_FEATURE_KEYS.RESUME_PARSED);
-      }
-
       if (sanitizedRaw) {
         await persistFailedParse(fileHash, "resume", sanitizedRaw, err, { reqId, jobId, stage: "fallback" });
       }
@@ -346,13 +362,8 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
 
   const jobPromise = (async () => {
     const cleanedText = sanitizeTextForLlm(text, MAX_LLM_INPUT_CHARS);
-    let quotaReserved = false;
 
     try {
-      // Reserve the credit before the LLM parse begins (atomic; released on failure).
-      await quotaService.reserve(userId, QUOTA_FEATURE_KEYS.JD_PARSED);
-      quotaReserved = true;
-
       const data = await withRetry(async (attempt) => {
         try {
           const cached = getCache(fileHash);
@@ -420,10 +431,6 @@ const processJDJob = async ({ reqId, jobId, title, text, fileHash, userId = null
       }
 
       logError("job_failed", err, { reqId, jobId, stage: "failure", fileHash, source: "jd" });
-
-      if (quotaReserved) {
-        await quotaService.release(userId, QUOTA_FEATURE_KEYS.JD_PARSED);
-      }
 
       await persistFailedParse(fileHash, "jd", cleanedText, err, { reqId, jobId, stage: "fallback" });
       throw err;

@@ -145,7 +145,7 @@ export function LinkedInApplyVisual({ className, showExtensionCallout = true }: 
       {showExtensionCallout ? (
         <div className="m-li-onetap-callout-side">
           <p className="m-li-onetap-callout-text">
-            Install the extension — you&apos;ll see this button on every job post
+            Install the extension - you&apos;ll see this button on every job post
           </p>
           <CalloutArrow />
         </div>

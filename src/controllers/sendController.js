@@ -94,8 +94,7 @@ const sendApplicationController = async (req, res) => {
       });
     }
 
-    // Fast paywall feedback before queueing. Advisory only: the send worker performs the
-    // authoritative atomic reserve right before delivery, so this can't overshoot.
+    // Hard gate before queueing send — uses effective limit (base + referral bonus).
     const quota = await quotaService.check(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
     if (!quota.allowed) {
       return sendQuotaExceeded(res, {

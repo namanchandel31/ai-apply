@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Loader2,
   Sparkles,
@@ -20,12 +20,10 @@ import { api, type AiCredentialSummary } from "@/lib/api";
 import { useAiCredentials } from "@/hooks/useAiCredentials";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AiProviderCredentialFields } from "@/components/ai/AiProviderCredentialFields";
 
-const SECTION_LABEL = "text-base font-medium";
 const SETUP_BOX_RADIUS = "rounded-sm";
 
 const REMOTE_PROVIDERS = [
@@ -112,25 +110,6 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
   const [allowPlatformFallback, setAllowPlatformFallback] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [curatedModels, setCuratedModels] = useState<
-    Array<{ modelId: string; displayName: string }>
-  >([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setSelectedModel("");
-    api
-      .getCuratedAiModels(provider)
-      .then((res) => {
-        if (!cancelled) setCuratedModels(res.data?.models ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setCuratedModels([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [provider]);
 
   const sorted = [...credentials].sort((a, b) => a.priority - b.priority);
   const usesOwnKey = sorted.length > 0;
@@ -442,68 +421,19 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
             </label>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="ai-provider" className={SECTION_LABEL}>Provider</Label>
-            <select
-              id="ai-provider"
-              className={cn(
-                "flex h-10 w-full border border-input-border bg-input px-[14px] py-2.5 text-base",
-                SETUP_BOX_RADIUS
-              )}
-              value={provider}
-              onChange={(e) => {
-                setProvider(e.target.value);
-                setSelectedModel("");
-              }}
-            >
-              {REMOTE_PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ai-model" className={SECTION_LABEL}>Model</Label>
-            {curatedModels.length > 0 ? (
-              <select
-                id="ai-model"
-                className={cn(
-                  "flex h-10 w-full border border-input-border bg-input px-[14px] py-2.5 text-base",
-                  SETUP_BOX_RADIUS
-                )}
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                required
-              >
-                <option value="">Select certified model</option>
-                {curatedModels.map((m) => (
-                  <option key={m.modelId} value={m.modelId}>
-                    {m.displayName}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p className={cn("border border-dashed border-border px-3 py-2 text-base text-muted-foreground", SETUP_BOX_RADIUS)}>
-                No certified models for this provider yet. Certify and promote a model from the{" "}
-                <span className="font-medium text-foreground">Admin console → AI models</span> first.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ai-api-key" className={SECTION_LABEL}>API key</Label>
-            <Input
-              id="ai-api-key"
-              type="password"
-              placeholder="sk-..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className={SETUP_BOX_RADIUS}
-              required
-            />
-          </div>
+          <AiProviderCredentialFields
+            provider={provider}
+            onProviderChange={(p) => {
+              setProvider(p);
+              setSelectedModel("");
+            }}
+            modelValue={selectedModel}
+            onModelChange={setSelectedModel}
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            modelValueKey="modelId"
+            providers={REMOTE_PROVIDERS}
+          />
 
           {formRole === "primary" && (
             <div className={cn("border border-border p-3", SETUP_BOX_RADIUS)}>
@@ -529,15 +459,12 @@ export function AiProviderStatusCard({ activeAiProvider, hasAiSetup, onUpdate }:
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={testing || loading || !selectedModel || curatedModels.length === 0}
+              disabled={testing || loading || !selectedModel}
             >
               {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Test connection
             </Button>
-            <Button
-              type="submit"
-              disabled={loading || !selectedModel || curatedModels.length === 0}
-            >
+            <Button type="submit" disabled={loading || !selectedModel}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
             </Button>

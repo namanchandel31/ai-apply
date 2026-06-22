@@ -9,8 +9,8 @@ export function DateTimeCell({
   variant?: "stacked" | "inline";
 }) {
   const { date, time } = formatDateTime(iso);
-  if (date === "—") {
-    return <span className={tableTextSecondary}>—</span>;
+  if (date === "-") {
+    return <span className={tableTextSecondary}>-</span>;
   }
   if (variant === "inline") {
     const line = time ? `${date} · ${time}` : date;

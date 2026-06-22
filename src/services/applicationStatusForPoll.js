@@ -14,6 +14,7 @@ function serializeApplicationFromSnapshot(row) {
     retryCount: row.retry_count ?? 0,
     emailSubject: row.email_subject,
     emailBody: row.email_body,
+    sourcePlatform: row.source_platform ?? null,
   });
   const resolved = resolveUiStatus(ctx);
 
@@ -36,6 +37,7 @@ function serializeApplicationFromSnapshot(row) {
     completedAt: row.completed_at,
     matchScore: row.match_score ?? null,
     trackerStatusId: row.tracker_status_id ?? null,
+    sourcePlatform: row.source_platform ?? null,
   };
 }
 

@@ -2,6 +2,7 @@ const express = require('express');
 const { autoApplyController } = require('../controllers/autoApplyController');
 const { previewEmailController } = require('../controllers/previewEmailController');
 const supabaseAuthMiddleware = require('../middlewares/supabaseAuthMiddleware');
+const requireNotBlocked = require('../middlewares/requireNotBlocked');
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ const router = express.Router();
  *       500:
  *         description: Internal error
  */
-router.post('/preview-email', supabaseAuthMiddleware, previewEmailController);
-router.post('/auto-apply', supabaseAuthMiddleware, autoApplyController);
+router.post('/preview-email', supabaseAuthMiddleware, requireNotBlocked, previewEmailController);
+router.post('/auto-apply', supabaseAuthMiddleware, requireNotBlocked, autoApplyController);
 
 module.exports = router;

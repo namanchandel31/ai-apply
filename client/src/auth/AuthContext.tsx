@@ -49,6 +49,15 @@ async function fetchMe(): Promise<AuthUser | null> {
   try {
     const res = await api.getMe();
     logAuthLifecycle("FETCH_ME_SUCCESS", { userId: res.data.id });
+    const ref = sessionStorage.getItem("referral_code");
+    if (ref) {
+      try {
+        await api.attachReferral(ref);
+        sessionStorage.removeItem("referral_code");
+      } catch {
+        /* best-effort */
+      }
+    }
     return res.data;
   } catch (err) {
     logAuthLifecycle("FETCH_ME_FAILED", {
@@ -125,9 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         applySession(data.session);
         if (data.session) {
-          await refreshUser();
+          finalizeHydration();
+          void refreshUser();
         } else {
           setUser(null);
+          finalizeHydration();
         }
       } catch (err) {
         if (!mountedRef.current) return;
@@ -136,10 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           message: err instanceof Error ? err.message : "unknown",
         });
         clearAuthState();
-      } finally {
-        if (mountedRef.current) {
-          finalizeHydration();
-        }
       }
     };
 

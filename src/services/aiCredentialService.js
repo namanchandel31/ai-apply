@@ -9,21 +9,52 @@ const { logInfo } = require("../utils/logger");
 
 const config = require("../config");
 
-function resolvePlatformCredentials() {
-  const provider = config.ai.DEFAULT_AI_PROVIDER;
-  const apiKey = config.ai.openaiApiKey;
-  if (!apiKey && provider === "openai") {
-    return null;
+const entitlementService = require("./entitlementService");
+const platformAiConfigService = require("./platformAiConfigService");
+
+async function resolvePlatformCredentials(task = null) {
+  if (task) {
+    try {
+      return await platformAiConfigService.resolve(task);
+    } catch {
+      return platformAiConfigService.envBootstrapCredential(task);
+    }
   }
-  return {
-    provider,
-    providerType: "remote",
-    apiKey,
-    model: config.ai.DEFAULT_AI_MODEL || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai,
-    baseUrl: null,
-    credentialSource: "platform",
-    allowPlatformFallback: true,
-  };
+  return platformAiConfigService.envBootstrapCredential("resume_parse");
+}
+
+async function resolvePlatformForUser(userId, task) {
+  const canUse = await entitlementService.hasEntitlement(userId, "can_use_managed_ai");
+  if (!canUse) return null;
+  try {
+    return await platformAiConfigService.resolve(task);
+  } catch {
+    return platformAiConfigService.envBootstrapCredential(task);
+  }
+}
+
+async function resolvePlatformChainForUser(userId, task) {
+  const canUse = await entitlementService.hasEntitlement(userId, "can_use_managed_ai");
+  if (!canUse) return [];
+  try {
+    return await platformAiConfigService.resolveChain(task);
+  } catch {
+    const bootstrap = platformAiConfigService.envBootstrapCredential(task);
+    return bootstrap ? [bootstrap] : [];
+  }
+}
+
+async function resolvePlatformCredentialChain(task = null) {
+  if (task) {
+    try {
+      return await platformAiConfigService.resolveChain(task);
+    } catch {
+      const bootstrap = platformAiConfigService.envBootstrapCredential(task);
+      return bootstrap ? [bootstrap] : [];
+    }
+  }
+  const bootstrap = platformAiConfigService.envBootstrapCredential("resume_parse");
+  return bootstrap ? [bootstrap] : [];
 }
 
 function rowToCredential(row) {
@@ -60,14 +91,14 @@ function rowToCredential(row) {
   };
 }
 
-async function resolveCredentialsForUser(userId) {
+async function resolveCredentialsForUser(userId, { task } = {}) {
   const chain = await resolveCredentialChainForUser(userId);
   if (chain.length) return chain[0];
-  const platform = resolvePlatformCredentials();
-  if (!platform?.apiKey) {
-    throw new NonRetryableError("No AI credentials configured. Add your API key in Setup.");
+  if (task) {
+    const platform = await resolvePlatformForUser(userId, task);
+    if (platform?.apiKey) return platform;
   }
-  return platform;
+  throw new NonRetryableError("No AI credentials configured. Add your API key in Setup.");
 }
 
 async function resolveCredentialChainForUser(userId, { includeDisabled = false } = {}) {
@@ -197,6 +228,9 @@ module.exports = {
   resolveCredentialsForUser,
   resolveCredentialChainForUser,
   resolvePlatformCredentials,
+  resolvePlatformForUser,
+  resolvePlatformChainForUser,
+  resolvePlatformCredentialChain,
   saveCredential,
   listCredentials,
   reorderCredentialChain,

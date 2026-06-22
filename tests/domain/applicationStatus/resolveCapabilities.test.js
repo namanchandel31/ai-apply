@@ -58,6 +58,28 @@ describe("resolveCapabilities via resolveUiStatus", () => {
     expect(r.terminal).toBe(false);
   });
 
+  it("dashboard generated rows cannot send from applications table", () => {
+    const r = caps({
+      applicationStatus: APPLICATION_STATUS.GENERATED,
+      latestProcessJob: { status: "completed", job_type: "ai_process" },
+      emailSubject: "Hello",
+      emailBody: "Body",
+      sourcePlatform: "dashboard",
+    });
+    expect(r.canSend).toBe(false);
+  });
+
+  it("extension generated rows can send from applications table when review mode", () => {
+    const r = caps({
+      applicationStatus: APPLICATION_STATUS.GENERATED,
+      latestProcessJob: { status: "completed", job_type: "ai_process" },
+      emailSubject: "Hello",
+      emailBody: "Body",
+      sourcePlatform: "linkedin",
+    });
+    expect(r.canSend).toBe(true);
+  });
+
   it("sending is pollable", () => {
     const r = caps({
       applicationStatus: APPLICATION_STATUS.GENERATED,

@@ -33,8 +33,8 @@ Location: ${parsedJd.location || "unknown"}
 Required skills: ${(parsedJd.skills || []).join(", ")}`;
 }
 
-function resolveJudgeCredentialOverride(fallbackOverride) {
-  const platform = resolvePlatformCredentials();
+async function resolveJudgeCredentialOverride(fallbackOverride) {
+  const platform = await resolvePlatformCredentials("email_generate");
   if (platform?.apiKey) {
     return {
       provider: platform.provider,
@@ -62,7 +62,7 @@ async function judgeCertificationEmail({
     jobSummary: buildJobSummary(parsedJd),
   });
 
-  const judgeOverride = resolveJudgeCredentialOverride(credentialOverride);
+  const judgeOverride = await resolveJudgeCredentialOverride(credentialOverride);
 
   const gatewayResult = await generateStructuredJson({
     userId,

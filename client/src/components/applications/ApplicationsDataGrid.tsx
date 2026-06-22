@@ -25,6 +25,7 @@ import {
   ApplicationTableStatusCell,
 } from "@/components/applications/ApplicationTableStatusCell";
 import { ApplicationCompanyCell } from "@/components/applications/ApplicationCompanyCell";
+import { ApplicationSourceIcon } from "@/components/applications/ApplicationSourceIcon";
 import { formatDateTime } from "@/lib/formatDateTime";
 import { ApplicationRowActions } from "@/components/applications/ApplicationRowActions";
 import { TableRowSelectCheckbox } from "@/components/applications/TableRowSelectCheckbox";
@@ -122,6 +123,7 @@ function ApplicationTableRow({
             className={cn(
               tableCellPaddingX,
               "py-2.5",
+              cell.column.id === "source" && "w-10 px-2",
               cell.column.id === "match" && "hidden sm:table-cell",
               cell.column.id === "updated" && "hidden md:table-cell"
             )}
@@ -254,6 +256,17 @@ export function ApplicationsDataGrid({
         enableHiding: false,
       },
       {
+        id: "source",
+        header: () => <span className="sr-only">Source</span>,
+        cell: ({ row }) => (
+          <div className="flex items-center justify-center">
+            <ApplicationSourceIcon sourcePlatform={row.original.sourcePlatform} />
+          </div>
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
         id: "role",
         header: () => <span className={tableTextSecondary}>Role</span>,
         cell: ({ row }) => (
@@ -294,7 +307,7 @@ export function ApplicationsDataGrid({
         cell: ({ row }) => {
           const score = row.original.matchScore;
           const label =
-            score == null || Number.isNaN(score) ? "—" : `${Math.round(score)}%`;
+            score == null || Number.isNaN(score) ? "-" : `${Math.round(score)}%`;
           return (
             <ApplicationTableShimmerText app={row.original} className={cn(tableTextSecondary, "tabular-nums")}>
               {label}
@@ -315,7 +328,7 @@ export function ApplicationsDataGrid({
         ),
         cell: ({ row }) => {
           const { date, time } = formatDateTime(row.original.updatedAt ?? row.original.createdAt);
-          const line = date === "—" ? "—" : time ? `${date} · ${time}` : date;
+          const line = date === "-" ? "-" : time ? `${date} · ${time}` : date;
           return (
             <ApplicationTableShimmerText app={row.original} className={tableTextSecondary}>
               {line}
@@ -348,6 +361,9 @@ export function ApplicationsDataGrid({
         <TableHeader className="sticky top-0 z-10 bg-background">
           <TableRow>
             <TableHead className={cn("w-12 pl-0 pr-0", tableCellPaddingX)} />
+            <TableHead className={cn("w-10 px-2", tableCellPaddingX)}>
+              <span className="sr-only">Source</span>
+            </TableHead>
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Role</TableHead>
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Company</TableHead>
             <TableHead className={cn(tableTextSecondary, tableCellPaddingX)}>Status</TableHead>
@@ -389,6 +405,7 @@ export function ApplicationsDataGrid({
                     tableTextSecondary,
                     tableCellPaddingX,
                     h.id === "select" && "w-12 pl-0 pr-0",
+                    h.id === "source" && "w-10 px-2",
                     h.id === "match" && "hidden sm:table-cell",
                     h.id === "updated" && "hidden md:table-cell"
                   )}

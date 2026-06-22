@@ -71,6 +71,18 @@ function computePromptHash(systemPrompt, userPrompt) {
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 32);
 }
 
+function isProviderJsonValidationFailure(err) {
+  const msg = String(err?.message || err?.error?.message || "").toLowerCase();
+  const code = String(err?.error?.code || err?.code || "").toLowerCase();
+  return (
+    err?.status === 400 &&
+    (msg.includes("failed to validate json") ||
+      msg.includes("failed_generation") ||
+      msg.includes("invalid json") ||
+      code === "json_validate_failed")
+  );
+}
+
 function classifyProviderError(err, { operationType } = {}) {
   if (err instanceof NonRetryableError || err instanceof RetryableError) return err;
   if (
@@ -91,6 +103,9 @@ function classifyProviderError(err, { operationType } = {}) {
     return new NonRetryableError(`Authentication failed: ${err.message}`);
   }
   if (err.status === 400) {
+    if (isProviderJsonValidationFailure(err)) {
+      return new RetryableError(`JSON generation failed: ${err.message}`);
+    }
     return new NonRetryableError(`Malformed request: ${err.message}`);
   }
   const isQuota = err.status === 429 && (
@@ -122,6 +137,7 @@ module.exports = {
   safeReadResponseJson,
   normalizeUsage,
   computePromptHash,
+  isProviderJsonValidationFailure,
   classifyProviderError,
   DEFAULT_MODELS,
 };

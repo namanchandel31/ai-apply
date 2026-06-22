@@ -159,7 +159,7 @@ export function SubscriptionsPanel() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs">
-                      {s.accessEndsAt ? new Date(s.accessEndsAt).toLocaleDateString() : "—"}
+                      {s.accessEndsAt ? new Date(s.accessEndsAt).toLocaleDateString() : "-"}
                     </TableCell>
                     <TableCell className="space-x-2">
                       <Button type="button" size="sm" variant="outline" onClick={() => void action(s.userId, "grant", { planSlug: planById(s.planId), days: 30 })}>

@@ -24,18 +24,27 @@ const SETUP_TABS = [
 
 type SetupTab = (typeof SETUP_TABS)[number]["value"];
 
-function resolveInitialTab(searchParams: URLSearchParams): SetupTab {
+function visibleSetupTabs(canUseByok: boolean) {
+  return canUseByok ? SETUP_TABS : SETUP_TABS.filter((t) => t.value !== "ai");
+}
+
+function resolveInitialTab(searchParams: URLSearchParams, canUseByok: boolean): SetupTab {
   if (searchParams.get("focus") === "email") return "email";
   const tab = searchParams.get("tab");
-  if (tab === "resume" || tab === "email" || tab === "style" || tab === "ai") return tab;
-  return "ai";
+  if (tab === "resume" || tab === "email" || tab === "style") return tab;
+  if (tab === "ai" && canUseByok) return "ai";
+  return canUseByok ? "ai" : "resume";
 }
 
 export function Setup() {
   const { data: status, isLoading } = useSetupStatus();
+  const canUseByok = status?.entitlements?.can_use_byok === true;
+  const setupTabs = visibleSetupTabs(canUseByok);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<SetupTab>(() => resolveInitialTab(searchParams));
+  const [activeTab, setActiveTab] = useState<SetupTab>(() =>
+    resolveInitialTab(searchParams, canUseByok)
+  );
 
   useActivationTracking(status, "setup");
 
@@ -48,6 +57,12 @@ export function Setup() {
       setActiveTab("email");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!canUseByok && activeTab === "ai") {
+      setActiveTab("resume");
+    }
+  }, [canUseByok, activeTab]);
 
   const handleTabChange = (tab: SetupTab) => {
     setActiveTab(tab);
@@ -75,7 +90,7 @@ export function Setup() {
       <div className="space-y-6">
         <SegmentedControl
           value={activeTab}
-          options={[...SETUP_TABS]}
+          options={[...setupTabs]}
           onValueChange={handleTabChange}
           fullWidth={false}
         />

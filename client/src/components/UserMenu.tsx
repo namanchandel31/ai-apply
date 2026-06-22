@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Loader2, LogOut, Puzzle, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { ChevronDown, CreditCard, Gift, Loader2, LogOut, Puzzle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { useLogout } from "@/auth/useLogout";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { api } from "@/lib/api";
 import { getDisplayFirstName, getUserInitials } from "@/lib/userDisplay";
+import { getSubscriptionMenuBadge } from "@/lib/subscriptionDisplay";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -148,6 +150,7 @@ export function UserMenu() {
   const setupLoaded = !isLoading && (isSuccess || isError);
   const setupIncomplete =
     setupLoaded && (!status?.hasResume || !status?.hasEmailSetup || !status?.hasAiSetup);
+  const planBadge = getSubscriptionMenuBadge(status);
 
   return (
     <>
@@ -160,13 +163,27 @@ export function UserMenu() {
             aria-label="Account menu"
           >
             <UserAvatar avatarUrl={user.avatarUrl} initials={initials} />
-            <span className="hidden max-w-[120px] truncate sm:inline">
-              {displayName}
-            </span>
+            <div className="hidden min-w-0 flex-col items-start sm:flex">
+              <span className="max-w-[120px] truncate">{displayName}</span>
+              {planBadge ? (
+                <span className="max-w-[140px] truncate text-xs text-muted-foreground">{planBadge}</span>
+              ) : null}
+            </div>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-56">
+          {planBadge ? (
+            <>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-muted-foreground">Your plan</span>
+                  <span className="text-sm font-medium text-foreground">{planBadge}</span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
             <UserRound className="mr-2 h-4 w-4" />
             Edit profile
@@ -188,6 +205,14 @@ export function UserMenu() {
           <DropdownMenuItem onSelect={() => navigate("/settings/extension")}>
             <Puzzle className="mr-2 h-4 w-4" />
             Chrome Extension
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => navigate("/referrals")}>
+            <Gift className="mr-2 h-4 w-4" />
+            Refer & earn
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => navigate("/subscriptions")}>
+            <CreditCard className="mr-2 h-4 w-4" />
+            Subscription
           </DropdownMenuItem>
           {user.isAdmin && (
             <DropdownMenuItem onSelect={() => navigate("/admin")}>

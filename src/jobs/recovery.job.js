@@ -287,6 +287,25 @@ async function runRecovery() {
         logError("RECOVERY_QUEUE_METRICS_FAILED", metricsErr);
       }
       await recoverStuckJobs(client);
+      try {
+        const { recoverDashboardPendingSends } = require("../services/dashboardSendRecoveryService");
+        const { recovered } = await recoverDashboardPendingSends(client);
+        if (recovered > 0) {
+          logInfo("RECOVERY_DASHBOARD_SEND_BATCH", { recovered });
+        }
+      } catch (dashboardRecoveryErr) {
+        logError("RECOVERY_DASHBOARD_SEND_BATCH_FAILED", dashboardRecoveryErr);
+      }
+      try {
+        const referralService = require("../services/referralService");
+        const expired = await referralService.expireStaleReferrals();
+        if (expired > 0) {
+          logInfo("REFERRAL_EXPIRE_BATCH", { expired });
+        }
+        await referralService.retryFailedQuotaConsumptions();
+      } catch (maintenanceErr) {
+        logError("RECOVERY_MAINTENANCE_FAILED", maintenanceErr);
+      }
     } finally {
       if (lockAcquired) {
         await client.query("SELECT pg_advisory_unlock(987654321)");

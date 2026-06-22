@@ -18,6 +18,9 @@ jest.mock("../src/utils/logger", () => ({
   logInfo: jest.fn(),
   logError: jest.fn(),
 }));
+jest.mock("../src/services/email/mailDeliveryService", () => ({
+  resolveSendingAccount: jest.fn().mockResolvedValue({ provider: "smtp" }),
+}));
 
 const { pool } = require("../src/db");
 const { resolveResumeForAutoApply } = require("../src/services/resolveResumeForAutoApply");

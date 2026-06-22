@@ -7,7 +7,8 @@ export function useActivationTracking(
   source: ActivationSource
 ) {
   useEffect(() => {
-    if (!status?.hasVerifiedAiCredential || !status?.hasValidResume) return;
+    const aiReady = Boolean(status?.hasAiSetup || status?.hasVerifiedAiCredential);
+    if (!aiReady || !status?.hasValidResume) return;
     markActivationCompleted(source);
-  }, [status?.hasVerifiedAiCredential, status?.hasValidResume, source]);
+  }, [status?.hasAiSetup, status?.hasVerifiedAiCredential, status?.hasValidResume, source]);
 }

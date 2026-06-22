@@ -70,6 +70,32 @@ async function listPayments({ limit = 100, offset = 0 } = {}) {
   return rows;
 }
 
+async function listPaymentsForUser(userId, { limit = 50, offset = 0 } = {}) {
+  const { rows } = await pool.query(
+    `SELECT p.id, p.amount_paise, p.currency, p.status, p.razorpay_order_id,
+            p.razorpay_payment_id, p.captured_at, p.created_at,
+            pl.slug AS plan_slug, pl.display_name AS plan_display_name
+     FROM payments p
+     LEFT JOIN plans pl ON pl.id = p.plan_id
+     WHERE p.user_id = $1
+     ORDER BY p.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    planSlug: row.plan_slug,
+    planDisplayName: row.plan_display_name,
+    amountPaise: row.amount_paise,
+    currency: row.currency,
+    status: row.status,
+    razorpayOrderId: row.razorpay_order_id,
+    razorpayPaymentId: row.razorpay_payment_id,
+    capturedAt: row.captured_at,
+    createdAt: row.created_at,
+  }));
+}
+
 // ----- billing_events (webhook idempotency) -----
 async function recordBillingEvent({ razorpayEventId, eventType, payload }, client = pool) {
   const { rows } = await client.query(
@@ -98,6 +124,7 @@ module.exports = {
   getPaymentByRazorpayPaymentId,
   createCapturedPayment,
   listPayments,
+  listPaymentsForUser,
   recordBillingEvent,
   markBillingEventProcessed,
 };

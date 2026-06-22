@@ -6,7 +6,8 @@ const {
 describe("isUserVisibleTransition", () => {
   it("recognizes visible ui statuses", () => {
     expect(isVisibleUiStatus("processing")).toBe(true);
-    expect(isVisibleUiStatus("draft")).toBe(false);
+    expect(isVisibleUiStatus("draft")).toBe(true);
+    expect(isVisibleUiStatus("")).toBe(false);
   });
 
   it("skips publish when version unchanged and visible ui unchanged", () => {

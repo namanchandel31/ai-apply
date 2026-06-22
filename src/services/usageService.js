@@ -1,7 +1,7 @@
 const usageCounterModel = require("../models/usageCounterModel");
 const entitlementService = require("./entitlementService");
 const settingsService = require("./settingsService");
-const { periodTypeForFeatureKey } = require("../constants/featureKeys");
+const { periodTypeForFeatureKey, FEATURE_KEYS } = require("../constants/featureKeys");
 
 /**
  * Generic, feature-agnostic quota tracking over usage_counters.
@@ -103,10 +103,30 @@ async function getUsageSummary(userId) {
   for (const [key, raw] of Object.entries(entitlement.entitlements)) {
     if (typeof raw !== "number") continue;
     if (key.startsWith("quota_") && trialMode === "time") continue;
+    // Internal parse quotas are logged but not user-facing in trial UI.
+    if (
+      key === FEATURE_KEYS.QUOTA_RESUMES_PARSED ||
+      key === FEATURE_KEYS.QUOTA_JDS_PARSED ||
+      key === FEATURE_KEYS.QUOTA_EMAILS_GENERATED
+    ) {
+      continue;
+    }
     const value = paywallEnabled ? raw : -1;
     const periodType = resolvePeriod(key);
     if (isUnlimited(value)) {
       summary[key] = { limit: -1, used: 0, remaining: -1, periodType, unlimited: true };
+    } else if (key === FEATURE_KEYS.QUOTA_APPLICATIONS_SENT) {
+      const trialLimitService = require("./trialLimitService");
+      const appQuota = await trialLimitService.checkApplicationQuota(userId);
+      summary[key] = {
+        limit: appQuota.limit,
+        used: appQuota.used,
+        remaining: appQuota.remaining,
+        baseLimit: appQuota.baseLimit,
+        bonusLimit: appQuota.bonusLimit,
+        periodType: appQuota.periodType,
+        unlimited: appQuota.unlimited,
+      };
     } else {
       const used = await usageCounterModel.getUsage(userId, key, periodType);
       summary[key] = { limit: value, used, remaining: Math.max(0, value - used), periodType, unlimited: false };

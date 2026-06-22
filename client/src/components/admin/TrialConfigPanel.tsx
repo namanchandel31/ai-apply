@@ -160,7 +160,7 @@ export function TrialConfigPanel() {
             </div>
             <p className="text-sm text-muted-foreground">
               Meter specific actions (resume parses, sends, etc.). Users hit limits one action at a
-              time — ideal for letting prospects feel the product without giving full access.
+              time - ideal for letting prospects feel the product without giving full access.
             </p>
           </button>
           <button

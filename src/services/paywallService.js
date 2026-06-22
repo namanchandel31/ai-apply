@@ -11,8 +11,9 @@ const entitlementService = require("./entitlementService");
  *   - "first_apply"   : the apply action (gated by before_first_apply)
  */
 const ACTION_TRIGGERS = Object.freeze({
-  access: ["after_plan_selection", "after_onboarding"],
+  access: ["after_plan_selection"],
   first_apply: ["before_first_apply"],
+  post_onboarding: ["after_onboarding"],
 });
 
 async function requiresPaymentNow(userId, actionKey = "access") {
@@ -43,6 +44,7 @@ async function nextPaywallAction(userId) {
   if (ent.entitled) return null;
   const trigger = await settingsService.getPaywallTrigger();
   if (trigger === "before_first_apply") return "first_apply";
+  if (trigger === "after_onboarding") return "post_onboarding";
   return "access";
 }
 

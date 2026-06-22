@@ -7,16 +7,18 @@ import { trackOnboardingEvent } from "@/lib/onboardingEvents";
 import "@/styles/mindoo.css";
 
 const BENEFITS = [
-  "Detects job posts on LinkedIn automatically — no copy-paste",
+  "Detects job posts on LinkedIn automatically - no copy-paste",
   "Drafts a personalized email from your résumé in one click",
   "Keep browsing listings without switching tabs",
 ] as const;
 
 type Props = {
   onContinue: () => void;
+  /** When true, omits top branding — for use inside the onboarding card. */
+  embedded?: boolean;
 };
 
-export function ExtensionInstallPrompt({ onContinue }: Props) {
+export function ExtensionInstallPrompt({ onContinue, embedded = false }: Props) {
   const handleInstall = () => {
     trackOnboardingEvent("extension_install_clicked");
     window.open(CHROME_EXTENSION_URL, "_blank", "noopener,noreferrer");
@@ -28,26 +30,44 @@ export function ExtensionInstallPrompt({ onContinue }: Props) {
   };
 
   return (
-    <div className="w-full max-w-lg overflow-visible">
-      <div className="flex flex-col items-center text-center">
-        <OneTapBrand className="mb-6 justify-center" />
-        <p className="text-sm font-medium text-muted-foreground">One more thing</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Apply directly from LinkedIn
-        </h1>
-        <p className="mt-3 text-base text-muted-foreground">
-          Install the OneTap Chrome extension to spot hiring posts and queue applications while you
-          scroll your feed.
+    <div className={embedded ? "w-full" : "w-full max-w-lg overflow-visible"}>
+      <div className={embedded ? "space-y-4" : "flex flex-col items-center text-center"}>
+        {!embedded ? <OneTapBrand className="mb-6 justify-center" /> : null}
+        {!embedded ? (
+          <p className="text-sm font-medium text-muted-foreground">One more thing</p>
+        ) : null}
+        <h2
+          className={
+            embedded
+              ? "text-base font-medium text-foreground"
+              : "mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+          }
+        >
+          {embedded ? "Install the Chrome extension" : "Apply directly from LinkedIn"}
+        </h2>
+        <p className={embedded ? "text-sm text-muted-foreground" : "mt-3 text-base text-muted-foreground"}>
+          {embedded
+            ? "Spot hiring posts on LinkedIn and queue applications while you browse."
+            : "Install the OneTap Chrome extension to spot hiring posts and queue applications while you scroll your feed."}
         </p>
       </div>
 
-      <div className="mt-8 w-full overflow-visible">
-        <LinkedInApplyVisual />
-      </div>
+      {!embedded ? (
+        <div className="mt-8 w-full overflow-visible">
+          <LinkedInApplyVisual />
+        </div>
+      ) : null}
 
-      <ul className="mt-8 space-y-3">
+      <ul className={embedded ? "mt-4 space-y-2" : "mt-8 space-y-3"}>
         {BENEFITS.map((benefit) => (
-          <li key={benefit} className="flex items-start gap-3 text-base text-foreground">
+          <li
+            key={benefit}
+            className={
+              embedded
+                ? "flex items-start gap-2 text-sm text-foreground"
+                : "flex items-start gap-3 text-base text-foreground"
+            }
+          >
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
               <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
             </span>
@@ -56,7 +76,7 @@ export function ExtensionInstallPrompt({ onContinue }: Props) {
         ))}
       </ul>
 
-      <div className="mt-8 flex flex-col gap-3">
+      <div className={embedded ? "mt-5 flex flex-col gap-2" : "mt-8 flex flex-col gap-3"}>
         <Button type="button" className="w-full" onClick={handleInstall}>
           <Puzzle className="h-4 w-4" aria-hidden />
           Add to Chrome
@@ -67,7 +87,7 @@ export function ExtensionInstallPrompt({ onContinue }: Props) {
         </Button>
       </div>
 
-      <p className="mt-4 text-center text-sm text-muted-foreground">
+      <p className={embedded ? "mt-3 text-xs text-muted-foreground" : "mt-4 text-center text-sm text-muted-foreground"}>
         Install from the Chrome Web Store. You can add it anytime from Settings → Extension.
       </p>
     </div>

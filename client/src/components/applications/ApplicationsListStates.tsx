@@ -14,6 +14,9 @@ export function TableSkeletonRows({ rows = 6 }: { rows?: number }) {
           <TableCell className={cn("w-12 pl-0 pr-0", tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-[18px] w-[18px]" />
           </TableCell>
+          <TableCell className={cn("w-10 px-2", tableCellPaddingX, "py-2.5")}>
+            <Skeleton className="mx-auto h-4 w-4 rounded-sm" />
+          </TableCell>
           <TableCell className={cn(tableCellPaddingX, "py-2.5")}>
             <Skeleton className="h-4 w-40" />
           </TableCell>

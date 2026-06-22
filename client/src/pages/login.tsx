@@ -1,13 +1,10 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { resolvePostAuthPath } from "@/lib/postAuthDestination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { OneTapBrand } from "@/components/OneTapLogomark";
 
 const BENEFITS = [
@@ -40,11 +37,13 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export function LoginPage() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) sessionStorage.setItem("referral_code", ref.trim().toUpperCase());
+  }, [searchParams]);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -61,29 +60,6 @@ export function LoginPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
       setGoogleLoading(false);
-    }
-  };
-
-  const handleEmailSignIn = async () => {
-    if (!email.trim() || !password.trim()) {
-      toast.error("Enter your email and password");
-      return;
-    }
-    setEmailLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      navigate(await resolvePostAuthPath(), { replace: true });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign-in failed");
-    } finally {
-      setEmailLoading(false);
     }
   };
 
@@ -111,47 +87,10 @@ export function LoginPage() {
           </ul>
 
           <div className="mt-10 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
-              <Input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="login-password">Password</Label>
-                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter your password"
-              />
-            </div>
             <Button
               type="button"
-              disabled={emailLoading}
-              className="h-11 w-full text-base"
-              onClick={() => void handleEmailSignIn()}
-            >
-              {emailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Sign in with email
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
               disabled={googleLoading}
-              className="h-11 w-full border-input-border bg-white text-base font-medium hover:bg-black/[0.04]"
+              className="h-11 w-full text-base"
               onClick={() => void handleGoogleSignIn()}
             >
               {googleLoading ? (
@@ -161,12 +100,6 @@ export function LoginPage() {
               )}
               Continue with Google
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              New to OneTap?{" "}
-              <Link to="/signup" className="font-medium text-primary hover:underline">
-                Create account
-              </Link>
-            </p>
           </div>
         </CardContent>
       </Card>

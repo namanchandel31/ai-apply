@@ -30,7 +30,7 @@ type Props = {
 
 function TimestampRow({ label, iso }: { label: string; iso?: string | null }) {
   const { date, time } = formatDateTime(iso);
-  if (!date || date === "—") return null;
+  if (!date || date === "-") return null;
   return (
     <div className="flex justify-between gap-4 py-1 text-xs text-muted-foreground/80">
       <span>{label}</span>

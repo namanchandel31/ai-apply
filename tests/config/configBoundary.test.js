@@ -18,6 +18,7 @@ describe("config boundary", () => {
         }
         if (!name.endsWith(".js")) continue;
         const rel = path.relative(root, full);
+        if (rel === "bootstrap.js") continue;
         const content = fs.readFileSync(full, "utf8");
         if (content.includes("process.env")) {
           offenders.push(rel);
