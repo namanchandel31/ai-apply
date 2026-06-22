@@ -9,7 +9,7 @@ export function MatchScoreCell({
   variant?: "default" | "table";
 }) {
   if (score == null || Number.isNaN(score)) {
-    return <span className={tableTextSecondary}>—</span>;
+    return <span className={tableTextSecondary}>-</span>;
   }
   if (variant === "table") {
     return <span className={cn(tableTextSecondary, "tabular-nums")}>{score}%</span>;

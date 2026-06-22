@@ -31,9 +31,15 @@ type Props = {
   autoApplyEnabled: boolean;
   canApply: boolean;
   applyDisabledReason: string | null;
+  resumeParsing?: boolean;
 };
 
-export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason }: Props) {
+export function ApplyComposer({
+  autoApplyEnabled,
+  canApply,
+  applyDisabledReason,
+  resumeParsing = false,
+}: Props) {
   const isAutoMode = autoApplyEnabled;
   const queryClient = useQueryClient();
   const prefs = useEmailPreferences();
@@ -101,6 +107,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
       const applyRes = await api.autoApply(trimmedJd, {
         emailSubject: emailSubject.trim(),
         emailBody: emailBody.trim(),
+        sourcePlatform: "dashboard",
       });
       removeOptimisticApplication(queryClient, optimisticId);
       upsertOptimisticApplication(
@@ -120,7 +127,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
           description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
         });
       } else {
-        toast.success("Application queued. We'll send your email in the background.", {
+        toast.success("Application sent. Your email is going out shortly.", {
           description: `Application ${applyRes.applicationId.slice(0, 8)}…`,
         });
       }
@@ -221,9 +228,10 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
       return;
     }
 
-    if (!canApply) return;
+    if (!canApply && !resumeParsing) return;
 
     const timer = setTimeout(() => {
+      if (resumeParsing) return;
       const reqId = ++previewRequestRef.current;
       setGenerating(true);
 
@@ -252,7 +260,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
     }, PREVIEW_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmedJd, canApply, prefs.toneLevel, prefs.structureLevel]);
+  }, [trimmedJd, canApply, resumeParsing, prefs.toneLevel, prefs.structureLevel]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,7 +290,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
             disabled={busy}
             required
           />
-          {isAutoMode && !canApply && applyDisabledReason && (
+          {isAutoMode && !canApply && applyDisabledReason && !resumeParsing && (
             <p className={PREVIEW_TEXT_SECONDARY}>{applyDisabledReason}</p>
           )}
         </div>
@@ -315,6 +323,21 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                 >
                   <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
                     Paste a job description. We'll prepare and send your application automatically
+                  </p>
+                </div>
+              ) : resumeParsing ? (
+                <div
+                  className={cn(
+                    "flex h-full flex-col items-center justify-center gap-3 border border-dashed border-border bg-muted/10 px-6 text-center",
+                    APPLY_BOX_RADIUS
+                  )}
+                >
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+                  <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
+                    Please wait - your resume is being parsed
+                  </p>
+                  <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
+                    Email copy will appear here once parsing finishes.
                   </p>
                 </div>
               ) : (
@@ -374,6 +397,23 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
               ) : (
                 <>
                   <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                    {resumeParsing ? (
+                      <div
+                        className={cn(
+                          "flex flex-1 min-h-32 flex-col items-center justify-center gap-3 border border-dashed border-border bg-muted/10 px-6 py-6 text-center",
+                          APPLY_BOX_RADIUS
+                        )}
+                      >
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+                        <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
+                          Please wait - your resume is being parsed
+                        </p>
+                        <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
+                          Email copy will appear here once parsing finishes.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
                     {showEmailStyle && (
                       <div
                         className={cn(
@@ -470,6 +510,8 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                     {generating && hasPreview && (
                       <LoadingTimer label="Updating your email preview…" />
                     )}
+                      </>
+                    )}
                   </div>
 
                   <div className="shrink-0 space-y-2">
@@ -477,7 +519,7 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                       type="submit"
                       size="lg"
                       className={cn("h-12 w-full font-medium", APPLY_BOX_RADIUS)}
-                      disabled={!canApply || busy || !hasPreview || previewStale}
+                      disabled={!canApply || busy || !hasPreview || previewStale || resumeParsing}
                     >
                       {sending ? (
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -487,11 +529,9 @@ export function ApplyComposer({ autoApplyEnabled, canApply, applyDisabledReason 
                       {canApply ? "Send application" : "Complete Setup To Apply"}
                     </Button>
 
-                    {applyDisabledReason && (
+                    {applyDisabledReason && !resumeParsing && (
                       <p className={PREVIEW_TEXT_SECONDARY}>{applyDisabledReason}</p>
                     )}
-
-                    {sending && <LoadingTimer label="Queuing your application…" />}
                   </div>
                 </>
               )}

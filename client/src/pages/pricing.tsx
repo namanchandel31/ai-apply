@@ -7,7 +7,10 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { loadRazorpayCheckout } from "@/lib/loadRazorpayCheckout";
-import { api, type PricingPlan } from "@/lib/api";
+import { mergeSetupStatusWithEntitlement } from "@/lib/paywallRouting";
+import { isOnboardingFlowComplete } from "@/lib/onboardingFlow";
+import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
+import { api, type BillingEntitlement, type PricingPlan, type SetupStatusData } from "@/lib/api";
 
 function formatAmount(amountPaise: number, currency: string) {
   const value = amountPaise / 100;
@@ -39,10 +42,25 @@ export function PricingPage() {
     return composed || undefined;
   }, [user?.firstName, user?.fullName, user?.lastName]);
 
-  const goAfterActivation = async () => {
+  const goAfterActivation = async (entitlement?: BillingEntitlement) => {
+    if (entitlement) {
+      queryClient.setQueryData(setupStatusQueryOptions.queryKey, (prev: SetupStatusData | undefined) =>
+        mergeSetupStatusWithEntitlement(prev, entitlement)
+      );
+    }
     await refreshUser();
-    await queryClient.invalidateQueries({ queryKey: ["setup-status"] });
-    toast.success("You're all set. Continuing to onboarding.");
+    await queryClient.refetchQueries({ queryKey: setupStatusQueryOptions.queryKey });
+    const status = queryClient.getQueryData<SetupStatusData>(setupStatusQueryOptions.queryKey);
+    const planSlug = entitlement?.planSlug ?? status?.planSlug;
+    toast.success("You're all set. Continuing…");
+    if (status && isOnboardingFlowComplete(status)) {
+      if (planSlug === "byok" && !status?.hasVerifiedAiCredential) {
+        navigate("/setup?tab=ai", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+      return;
+    }
     navigate("/onboarding", { replace: true });
   };
 
@@ -51,8 +69,8 @@ export function PricingPage() {
     if (!campaign?.code) return;
     setActiveSlug(plan.slug);
     try {
-      await api.claimTrial({ campaignCode: campaign.code, planSlug: plan.slug });
-      await goAfterActivation();
+      const res = await api.claimTrial({ campaignCode: campaign.code, planSlug: plan.slug });
+      await goAfterActivation(res.data.entitlement);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start trial");
     } finally {
@@ -94,12 +112,12 @@ export function PricingPage() {
         handler: (response) => {
           void (async () => {
             try {
-              await api.verifyBillingPayment({
+              const verifyRes = await api.verifyBillingPayment({
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 razorpaySignature: response.razorpay_signature,
               });
-              await goAfterActivation();
+              await goAfterActivation(verifyRes.data.entitlement);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Payment verification failed");
             } finally {
@@ -167,7 +185,7 @@ export function PricingPage() {
                   </div>
                   <h2 className="mt-3 text-2xl font-semibold text-foreground">{plan.displayName}</h2>
                   <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {pricePoint ? formatAmount(pricePoint.amountPaise, pricePoint.currency) : "—"}{" "}
+                    {pricePoint ? formatAmount(pricePoint.amountPaise, pricePoint.currency) : "-"}{" "}
                     <span className="text-base font-normal text-muted-foreground">
                       {pricePoint ? `/ ${pricePoint.durationDays} days` : ""}
                     </span>

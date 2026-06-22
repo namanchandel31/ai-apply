@@ -122,6 +122,9 @@ const createApplication = async ({
         resume_snapshot_path = EXCLUDED.resume_snapshot_path,
         normalized_job_title = EXCLUDED.normalized_job_title,
         normalized_company_name = EXCLUDED.normalized_company_name,
+        email_subject = COALESCE(EXCLUDED.email_subject, applications.email_subject),
+        email_body = COALESCE(EXCLUDED.email_body, applications.email_body),
+        source_platform = COALESCE(EXCLUDED.source_platform, applications.source_platform),
         tracker_status_id = COALESCE(EXCLUDED.tracker_status_id, applications.tracker_status_id)
      RETURNING *`,
     [

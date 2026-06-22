@@ -1,4 +1,5 @@
 const { UI_STATUS, TERMINAL_UI_STATUSES, APPLICATION_STATUS } = require("../constants/uiStatuses");
+const { isDashboardSubmission } = require("../../../services/applyModeService");
 
 const ACTIVE_POLL_UI = new Set([
   UI_STATUS.PROCESSING,
@@ -49,7 +50,8 @@ function resolveCapabilities(ctx, uiStatus) {
     ctx.applicationStatus === APPLICATION_STATUS.GENERATED &&
     Boolean(ctx.emailSubject?.trim()) &&
     Boolean(ctx.emailBody?.trim()) &&
-    !ctx.hasActiveSendJob;
+    !ctx.hasActiveSendJob &&
+    !isDashboardSubmission(ctx.sourcePlatform);
 
   return { terminal, pollable, canContinue, canRetry, canSend };
 }

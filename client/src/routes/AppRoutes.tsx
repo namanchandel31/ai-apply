@@ -3,7 +3,6 @@ import { RealtimeProvider } from "@/contexts/RealtimeProvider";
 import { Layout } from "@/components/layout";
 import { LandingPage } from "@/pages/landing";
 import { LoginPage } from "@/pages/login";
-import { SignupPage } from "@/pages/signup";
 import { PricingPage } from "@/pages/pricing";
 import { ForgotPasswordPage } from "@/pages/forgotPassword";
 import { ResetPasswordPage } from "@/pages/resetPassword";
@@ -12,6 +11,8 @@ import { Dashboard } from "@/pages/dashboard";
 import { Applications } from "@/pages/applications";
 import { Setup } from "@/pages/setup";
 import { SettingsExtension } from "@/pages/settingsExtension";
+import { ReferralsPage } from "@/pages/referrals";
+import { SubscriptionsPage } from "@/pages/subscriptions";
 import { Onboarding } from "@/pages/onboarding";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { GuestRoute } from "@/routes/GuestRoute";
@@ -62,7 +63,7 @@ export function AppRoutes() {
         <Route element={<GuestRoute />}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/signup" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
@@ -83,6 +84,8 @@ export function AppRoutes() {
               </Route>
               <Route path="/setup" element={<Setup />} />
               <Route path="/settings/extension" element={<SettingsExtension />} />
+              <Route path="/referrals" element={<ReferralsPage />} />
+              <Route path="/subscriptions" element={<SubscriptionsPage />} />
               {isAdmin && <Route path="/admin" element={<AdminPage />} />}
             </Route>
           </Route>

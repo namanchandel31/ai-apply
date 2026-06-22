@@ -22,6 +22,7 @@ function serializeApplication(row, jobs = {}) {
     retryCount: row.retry_count ?? 0,
     emailSubject: row.email_subject,
     emailBody: row.email_body,
+    sourcePlatform: row.source_platform ?? null,
   });
   const resolved = resolveUiStatus(ctx);
 
@@ -48,6 +49,7 @@ function serializeApplication(row, jobs = {}) {
     emailSubject: row.email_subject,
     emailBody: row.email_body,
     trackerStatusId: row.tracker_status_id ?? null,
+    sourcePlatform: row.source_platform ?? null,
   };
   const jdEnrichment = deriveJdEnrichment(base);
   if (jdEnrichment) {

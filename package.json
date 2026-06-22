@@ -4,7 +4,8 @@
   "description": "",
   "main": "src/bootstrap.js",
   "scripts": {
-    "dev": "nodemon index.js",
+    "dev": "nodemon src/bootstrap.js",
+    "dev:api": "nodemon index.js",
     "dev:client": "npm run dev --prefix client",
     "build:ui": "npm run build --prefix client",
     "start": "node src/bootstrap.js",

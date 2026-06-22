@@ -27,7 +27,10 @@ const { computeMatch } = require("../services/matchingService");
 const { generateApplicationEmail } = require("../services/emailService");
 const { buildEmailGenerationContext } = require("../services/emailContextBuilder");
 const { getEmailPreferenceLevels, getUserApplyMode } = require("../models/userModel");
-const { shouldEnqueueSendAfterGeneration } = require("../services/applyModeService");
+const {
+  shouldEnqueueSendAfterGeneration,
+  resolveSendEnqueueFlags,
+} = require("../services/applyModeService");
 const { autoAssignEmailReadyTrackerStatus } = require("../services/applicationTrackerStatusAssignment");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { createJob } = require("../models/applicationJobModel");
@@ -102,6 +105,8 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     return { skipped: true, skipReason: "job_claim_not_queued" };
   }
 
+  const sendEnqueueFlags = resolveSendEnqueueFlags(app);
+
   logInfo(
     "processing_started",
     buildLogContext({
@@ -111,6 +116,8 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       reqId,
       workerName: "process-application",
       queueName: QUEUE_NAMES.PROCESS_APPLICATION,
+      dashboardIntent: sendEnqueueFlags.dashboardIntent,
+      userProvidedEmail: sendEnqueueFlags.userProvidedEmail,
     })
   );
   await recordEvent({
@@ -184,6 +191,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       cachedEmail = await generateApplicationEmail(emailContext, {
         reqId,
         userId,
+        applicationId,
         resumeId: resume.resumeId,
         jobDescriptionId: app.job_description_id,
       });
@@ -271,7 +279,16 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
     if (!genTr.ok) throw new Error("Failed to transition to generated");
 
     const applyMode = await getUserApplyMode(userId, client);
-    if (!shouldEnqueueSendAfterGeneration(applyMode)) {
+    const enqueueSend = shouldEnqueueSendAfterGeneration(applyMode, sendEnqueueFlags);
+
+    logInfo("send_enqueue_decision", {
+      applicationId,
+      applyMode,
+      enqueueSend,
+      ...sendEnqueueFlags,
+    });
+
+    if (!enqueueSend) {
       await autoAssignEmailReadyTrackerStatus(userId, applicationId, client);
       await recordEvent(
         {
@@ -279,7 +296,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
           eventType: "ready_for_review",
           actorType: "worker",
           actorId: "process-application",
-          metadata: { applyMode },
+          metadata: { applyMode, ...sendEnqueueFlags, enqueueSend: false },
         },
         client
       );
@@ -305,7 +322,7 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       eventType: "process_job_queued",
       actorType: "worker",
       actorId: "send",
-      metadata: { sendJobId: sendDbJob.id },
+      metadata: { sendJobId: sendDbJob.id, ...sendEnqueueFlags, enqueueSend: true },
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});

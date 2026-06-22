@@ -7,23 +7,40 @@ async function listCuratedForAdmin() {
   return rows;
 }
 
+async function listAllActive() {
+  const { rows } = await pool.query(
+    `SELECT id, provider, model_id, display_name, overall_score, sort_order, certification_status
+     FROM curated_ai_models
+     WHERE is_active = true
+       AND COALESCE(certification_status, 'certified') = 'certified'
+     ORDER BY provider, overall_score DESC, sort_order ASC`
+  );
+  return rows;
+}
+
 async function listActiveByProvider(provider) {
   const { rows } = await pool.query(
-    `SELECT provider, model_id, display_name, overall_score, sort_order
+    `SELECT id, provider, model_id, display_name, overall_score, sort_order, certification_status
      FROM curated_ai_models
-     WHERE is_active = true AND provider = $1
+     WHERE is_active = true
+       AND provider = $1
+       AND COALESCE(certification_status, 'certified') = 'certified'
      ORDER BY overall_score DESC, sort_order ASC`,
     [provider]
   );
   return rows;
 }
 
-async function listAllActive() {
+async function getById(id) {
+  const { rows } = await pool.query(`SELECT * FROM curated_ai_models WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+async function listInactiveOrDeprecated() {
   const { rows } = await pool.query(
-    `SELECT provider, model_id, display_name, overall_score, sort_order
-     FROM curated_ai_models
-     WHERE is_active = true
-     ORDER BY provider, overall_score DESC, sort_order ASC`
+    `SELECT * FROM curated_ai_models
+     WHERE is_active = false OR COALESCE(certification_status, 'certified') != 'certified'
+     ORDER BY created_at DESC`
   );
   return rows;
 }
@@ -32,6 +49,7 @@ async function isModelAllowed(provider, modelId) {
   const { rows } = await pool.query(
     `SELECT 1 FROM curated_ai_models
      WHERE provider = $1 AND model_id = $2 AND is_active = true
+       AND COALESCE(certification_status, 'certified') = 'certified'
      LIMIT 1`,
     [provider, modelId]
   );
@@ -61,6 +79,7 @@ async function promoteFromRun({ run, displayName, userId }) {
       overall_score = EXCLUDED.overall_score,
       certification_run_id = EXCLUDED.certification_run_id,
       is_active = true,
+      certification_status = 'certified',
       promoted_by_user_id = EXCLUDED.promoted_by_user_id
     RETURNING *`,
     [
@@ -102,7 +121,10 @@ async function updateCurated(id, { isActive, sortOrder }) {
 
 async function deactivateCurated(id) {
   const { rows } = await pool.query(
-    `UPDATE curated_ai_models SET is_active = false WHERE id = $1 RETURNING *`,
+    `UPDATE curated_ai_models
+     SET is_active = false, certification_status = 'revoked'
+     WHERE id = $1
+     RETURNING *`,
     [id]
   );
   return rows[0] || null;
@@ -117,4 +139,6 @@ module.exports = {
   promoteFromRun,
   updateCurated,
   deactivateCurated,
+  getById,
+  listInactiveOrDeprecated,
 };

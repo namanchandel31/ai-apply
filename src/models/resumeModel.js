@@ -129,6 +129,39 @@ const createResumeWithParsedData = async (fileName, fileSize, fileHash, rawText,
 };
 
 /**
+ * Create resume metadata only (parsing may complete later).
+ * @returns {Promise<{ id: string }>}
+ */
+const createResumeRecord = async (fileName, fileSize, fileHash, userId = null, filePath = null) => {
+  const { withPgTransaction } = require("../db/pgClient");
+  try {
+    return await withPgTransaction(pool, async (client) => {
+      return createResume(client, fileName, fileSize, fileHash, userId, filePath);
+    });
+  } catch (err) {
+    throw new Error(`Resume metadata insert failed: ${err.message}`);
+  }
+};
+
+/**
+ * Attach parsed output to an existing resume row.
+ */
+const saveParsedDataForResume = async (resumeId, rawText, parsedJson) => {
+  const { withPgTransaction } = require("../db/pgClient");
+  try {
+    return await withPgTransaction(pool, async (client) => {
+      const parsed = await saveParsedResume(client, resumeId, rawText, parsedJson);
+      return {
+        resumeId,
+        parsedResumeId: parsed.id,
+      };
+    });
+  } catch (err) {
+    throw new Error(`Resume parse persist failed: ${err.message}`);
+  }
+};
+
+/**
  * Fetch a resume by ID joined with its most recent parsed data.
  * @param {string} resumeId 
  * @returns {Promise<{resumeId: string, parsedResumeId: string, parsedJson: object} | null>}
@@ -194,6 +227,8 @@ module.exports = {
   saveParsedResume,
   findResumeByHash,
   createResumeWithParsedData,
+  createResumeRecord,
+  saveParsedDataForResume,
   getResumeById,
   getLatestParsedResumeForUser,
 };

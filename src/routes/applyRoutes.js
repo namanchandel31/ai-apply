@@ -5,6 +5,7 @@ const { listApplicationsLegacyController } = require("../controllers/application
 const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const { applyRateLimit } = require("../middlewares/rateLimitMiddleware");
 const { requirePaidAccess } = require("../middlewares/entitlementMiddleware");
+const requireNotBlocked = require("../middlewares/requireNotBlocked");
 
 /**
  * @openapi
@@ -58,6 +59,7 @@ const { requirePaidAccess } = require("../middlewares/entitlementMiddleware");
 router.post(
   "/",
   supabaseAuthMiddleware,
+  requireNotBlocked,
   applyRateLimit,
   requirePaidAccess("first_apply"),
   processApplication

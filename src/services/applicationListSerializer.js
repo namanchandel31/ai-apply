@@ -58,6 +58,7 @@ function serializeApplicationListItem(row) {
     normalizedJobTitle: row.normalized_job_title ?? null,
     jdEnrichment: base.jdEnrichment,
     trackerStatusId: row.tracker_status_id ?? null,
+    sourcePlatform: base.sourcePlatform ?? null,
   };
 }
 

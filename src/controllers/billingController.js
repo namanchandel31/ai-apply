@@ -180,7 +180,21 @@ const verifyBillingPaymentController = async (req, res) => {
   }
 };
 
+const getBillingOrdersController = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const orders = await paymentModel.listPaymentsForUser(userId, { limit, offset });
+    return ok(res, { orders });
+  } catch (err) {
+    logError("BILLING_ORDERS_ERROR", err, { userId, reqId: req.requestId });
+    return error(res, 500, "Failed to load order history", ERROR_CODES.INTERNAL_ERROR);
+  }
+};
+
 module.exports = {
   createCheckoutController,
   verifyBillingPaymentController,
+  getBillingOrdersController,
 };

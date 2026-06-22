@@ -1,6 +1,6 @@
 /**
- * API-only entrypoint (local dev: npm run dev).
- * Workers: npm run worker | Combined: npm run start:all
+ * API-only entrypoint (local dev: npm run dev:api).
+ * Combined API + workers: npm run dev | npm run start:all
  */
 require("dotenv").config();
 

@@ -79,6 +79,7 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   const candidateName = resume.parsedJson?.name || null;
 
   // 7. Generate personalized email
+  const applicationId = require("crypto").randomUUID();
   let cachedEmail;
   try {
     const emailContext = buildEmailGenerationContext({
@@ -91,6 +92,7 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
     cachedEmail = await generateApplicationEmail(emailContext, {
       reqId,
       userId,
+      applicationId,
       resumeId,
       jobDescriptionId: "auto",
     });
@@ -105,7 +107,6 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   const { withPgClient, markClientInTransaction } = require("../db/pgClient");
   let appRecord;
   let jdRecordId;
-  const applicationId = require("crypto").randomUUID();
 
   await withPgClient(pool, async (client) => {
   try {

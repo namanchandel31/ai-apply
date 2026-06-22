@@ -51,7 +51,7 @@ export function ApplicationsTableFooter({
       <p className="text-sm text-muted-foreground">
         {totalItems === 0
           ? "No applications"
-          : `Showing ${start}–${end} of ${totalItems} applications`}
+          : `Showing ${start}-${end} of ${totalItems} applications`}
       </p>
 
       {totalPages > 1 && (

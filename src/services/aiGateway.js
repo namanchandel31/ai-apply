@@ -14,6 +14,8 @@ const {
   resolveCredentialsForUser,
   resolveCredentialChainForUser,
   resolvePlatformCredentials,
+  resolvePlatformChainForUser,
+  resolvePlatformCredentialChain,
   updateCredentialHealth,
   markCredentialSuccess,
 } = require("./aiCredentialService");
@@ -48,17 +50,19 @@ const TASK_TIMEOUTS = {
 // =============================================================================
 
 async function resolveCredentialContext(userId, executionContext, options = {}) {
+  const { task } = options;
   if (executionContext?.getCredentialChain) {
     const chain = await executionContext.getCredentialChain();
     if (chain.length) return chain[0];
   }
 
   try {
-    const primary = await resolveCredentialsForUser(userId);
+    const primary = await resolveCredentialsForUser(userId, { task });
     return primary;
   } catch (err) {
-    if (options.allowPlatformFallback !== false) {
-      const platform = resolvePlatformCredentials();
+    if (options.allowPlatformFallback !== false && task) {
+      const { resolvePlatformForUser } = require("./aiCredentialService");
+      const platform = await resolvePlatformForUser(userId, task);
       if (platform?.apiKey) return platform;
     }
     throw err;
@@ -134,9 +138,12 @@ function buildPlatformFallbackChain() {
   return [config.ai.DEFAULT_AI_PROVIDER];
 }
 
-function getPlatformCredentialForProvider(provider) {
-  const platform = resolvePlatformCredentials();
-  if (!platform?.apiKey) return null;
+async function getPlatformCredentialForProvider(provider, task, userId) {
+  const { resolvePlatformForUser } = require("./aiCredentialService");
+  const platform = userId
+    ? await resolvePlatformForUser(userId, task)
+    : await resolvePlatformCredentials(task);
+  if (!platform?.apiKey || platform.provider !== provider) return null;
   return { ...platform, provider, credentialSource: "platform" };
 }
 
@@ -219,17 +226,15 @@ async function executeWithFallback({
   const allowPlatformFallback = primaryCreds?.allowPlatformFallback ?? userAttempts[0]?.allowPlatformFallback;
 
   let attempts = userAttempts;
-  if (!attempts.length && primaryCreds?.credentialSource === "platform") {
-    attempts = buildPlatformFallbackChain().map((provider) => {
-      const platform = resolvePlatformCredentials();
-      return { ...platform, provider, credentialSource: "platform" };
-    });
-  }
-
   if (!attempts.length) {
-    const platform = resolvePlatformCredentials();
-    if (platform?.apiKey) {
-      attempts = [{ ...platform, credentialSource: "platform" }];
+    const platformAttempts = userId
+      ? await resolvePlatformChainForUser(userId, task)
+      : await resolvePlatformCredentialChain(task);
+    if (platformAttempts.length) {
+      attempts = platformAttempts.map((platform) => ({
+        ...platform,
+        credentialSource: "platform",
+      }));
     }
   }
 
@@ -335,7 +340,7 @@ async function executeWithFallback({
     attempts[0].credentialSource === "user"
   ) {
     for (const provider of platformProviders) {
-      const platformCreds = getPlatformCredentialForProvider(provider);
+      const platformCreds = await getPlatformCredentialForProvider(provider, task, userId);
       if (!platformCreds) continue;
 
       logInfo("AI_CHAIN_ATTEMPT", {
@@ -400,14 +405,19 @@ async function recordTelemetry(payload) {
       reqId,
       promptVersion,
       promptHash,
+      featureKey,
+      applicationId,
+      certifiedModelId,
+      platformCredentialId,
     } = payload;
 
     await pool.query(
       `INSERT INTO llm_usage_logs (
         user_id, provider, model, endpoint, credential_source,
         prompt_tokens, completion_tokens, total_tokens, estimated_cost,
-        latency_ms, retries, success, error_code, req_id, prompt_version, prompt_hash
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        latency_ms, retries, success, error_code, req_id, prompt_version, prompt_hash,
+        feature_key, application_id, certified_model_id, platform_credential_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
         userId || null,
         provider,
@@ -425,6 +435,10 @@ async function recordTelemetry(payload) {
         reqId || null,
         promptVersion || null,
         promptHash || null,
+        featureKey || null,
+        applicationId || null,
+        certifiedModelId || null,
+        platformCredentialId || null,
       ]
     );
   } catch (err) {
@@ -471,10 +485,10 @@ async function healthCheck({ userId, provider, credentialId, model, apiKey, base
     const { rowToCredential } = require("./aiCredentialService");
     credentials = rowToCredential(row);
   } else if (userId) {
-    credentials = await resolveCredentialsForUser(userId);
+    credentials = await resolveCredentialsForUser(userId, { task: "resume_parse" });
     if (provider) credentials = { ...credentials, provider };
   } else {
-    credentials = resolvePlatformCredentials();
+    credentials = await resolvePlatformCredentials("resume_parse");
   }
 
   const adapter = getProvider(credentials.provider);
@@ -590,6 +604,7 @@ async function runGatewayRequest(params, structured = true) {
     reqId,
     jobId,
     endpoint,
+    applicationId,
     executionContext: providedContext,
     credentialOverride,
     returnExecutionDetails,
@@ -639,7 +654,7 @@ async function runGatewayRequest(params, structured = true) {
       result = overrideExec.result;
       usedCreds = overrideExec.credentials;
     } else {
-      const credentials = await resolveCredentialContext(userId, executionContext);
+      const credentials = await resolveCredentialContext(userId, executionContext, { task });
       const fallbackResult = await executeWithFallback({
         userId,
         credentials,
@@ -678,6 +693,11 @@ async function runGatewayRequest(params, structured = true) {
       reqId,
       promptVersion,
       promptHash,
+      featureKey: task,
+      applicationId: applicationId || null,
+      certifiedModelId: usedCreds.certifiedModelId || null,
+      platformCredentialId:
+        usedCreds.credentialSource === "platform" ? usedCreds.credentialId || null : null,
     });
 
     logInfo("ai_gateway_success", {
@@ -737,6 +757,8 @@ async function runGatewayRequest(params, structured = true) {
       reqId,
       promptVersion,
       promptHash,
+      featureKey: task,
+      applicationId: applicationId || null,
     });
 
     logError("ai_gateway_error", err, { reqId, jobId, task });

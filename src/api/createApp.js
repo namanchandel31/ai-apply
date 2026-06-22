@@ -100,6 +100,9 @@ function createApp() {
   const adminBillingRoutes = require("../routes/adminBillingRoutes");
   app.use("/api", adminBillingRoutes);
 
+  const platformAiAdminRoutes = require("../routes/platformAiAdminRoutes");
+  app.use("/api", platformAiAdminRoutes);
+
   // Admin-only (gated by users.is_admin via adminGuard inside the router).
   const modelCertificationRoutes = require("../routes/modelCertificationRoutes");
   app.use("/api", modelCertificationRoutes);

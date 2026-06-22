@@ -2,18 +2,17 @@ const entitlementService = require("./entitlementService");
 const planModel = require("../models/planModel");
 
 /**
- * Plan-driven onboarding. Steps come from the active plan's onboarding_flows row;
- * completion is DERIVED from setup facts (no persistent "complete" flag). This is
- * what lets a plan switch (e.g. managed -> byok) automatically re-open the BYOK
- * step the user never did.
+ * Plan-driven onboarding. BYOK is configured in Setup after plan selection — not here.
  */
 
-const DEFAULT_STEPS = ["byok", "resume", "email"];
+const DEFAULT_STEPS = ["resume", "email"];
+
+const ONBOARDING_ONLY_STEPS = new Set(["resume", "email", "profile", "preferences"]);
 
 // Which steps block "ready", and how each maps to the legacy client step name.
 const STEP_META = {
-  byok: { blocking: true, clientStep: "ai", fact: "hasVerifiedAiCredential" },
-  resume: { blocking: true, clientStep: "resume", fact: "hasValidResume" },
+  byok: { blocking: false, clientStep: "ai", fact: "hasVerifiedAiCredential" },
+  resume: { blocking: true, clientStep: "resume", fact: "hasResume" },
   email: { blocking: false, clientStep: "email", fact: "hasEmailSetup" },
   profile: { blocking: false, clientStep: "profile", fact: null },
   preferences: { blocking: false, clientStep: "preferences", fact: null },
@@ -21,13 +20,15 @@ const STEP_META = {
 
 function isComplete(stepKey, facts) {
   const meta = STEP_META[stepKey];
-  if (!meta || !meta.fact) return true; // unknown/no-fact steps don't block
+  if (!meta || !meta.fact) {
+    return true;
+  }
   return Boolean(facts[meta.fact]);
 }
 
 /**
  * @param {string} userId
- * @param {{hasVerifiedAiCredential:boolean, hasValidResume:boolean, hasEmailSetup:boolean}} facts
+ * @param {{hasVerifiedAiCredential:boolean, hasResume:boolean, hasValidResume:boolean, hasEmailSetup:boolean}} facts
  */
 async function resolveOnboarding(userId, facts) {
   let stepKeys = DEFAULT_STEPS;
@@ -37,7 +38,9 @@ async function resolveOnboarding(userId, facts) {
     planSlug = entitlement.planSlug;
     if (entitlement.planId) {
       const flow = await planModel.getOnboardingFlow(entitlement.planId);
-      if (Array.isArray(flow) && flow.length) stepKeys = flow;
+      if (Array.isArray(flow) && flow.length) {
+        stepKeys = flow.filter((key) => ONBOARDING_ONLY_STEPS.has(key));
+      }
     }
   } catch {
     stepKeys = DEFAULT_STEPS;
@@ -49,10 +52,15 @@ async function resolveOnboarding(userId, facts) {
   });
 
   const firstIncompleteBlocking = steps.find((s) => s.blocking && !s.complete);
+  const firstIncompleteGuided = steps.find((s) => !s.complete);
   const onboardingRequired = Boolean(firstIncompleteBlocking);
-  const currentOnboardingStep = firstIncompleteBlocking
-    ? STEP_META[firstIncompleteBlocking.key].clientStep
-    : "ready";
+
+  let currentOnboardingStep = "ready";
+  if (firstIncompleteBlocking) {
+    currentOnboardingStep = STEP_META[firstIncompleteBlocking.key]?.clientStep ?? firstIncompleteBlocking.key;
+  } else if (firstIncompleteGuided) {
+    currentOnboardingStep = STEP_META[firstIncompleteGuided.key]?.clientStep ?? firstIncompleteGuided.key;
+  }
 
   return { planSlug, steps, onboardingRequired, currentOnboardingStep };
 }

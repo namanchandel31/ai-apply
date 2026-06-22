@@ -2,6 +2,8 @@ import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { isPricingEnabled } from "@/lib/featureFlags";
+import { postAuthPathWithoutSubscription } from "@/lib/paywallRouting";
+import { isOnboardingFlowComplete } from "@/lib/onboardingFlow";
 
 /** Waits for setup status, then routes to onboarding or dashboard (no dashboard flash). */
 export function AuthenticatedHomeRedirect() {
@@ -18,8 +20,8 @@ export function AuthenticatedHomeRedirect() {
   const to =
     !isError && status
       ? !status.hasActiveSubscription
-        ? "/pricing"
-        : !status.onboardingRequired
+        ? postAuthPathWithoutSubscription(status)
+        : isOnboardingFlowComplete(status)
           ? "/dashboard"
           : "/onboarding"
       : isPricingEnabled

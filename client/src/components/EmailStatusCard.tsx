@@ -156,7 +156,7 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
         <p>
           Connect your Gmail so OneTap can send applications{" "}
           <strong className="text-foreground">from your address</strong>. We request a{" "}
-          <strong className="text-foreground">send-only</strong> permission — we cannot read your
+          <strong className="text-foreground">send-only</strong> permission - we cannot read your
           inbox or change your account.
         </p>
       </div>
@@ -174,7 +174,7 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
             checked={readChecked}
             onCheckedChange={(v) => setReadChecked(v === true)}
           />
-          Also allow reading recruiter replies (reply tracking — coming soon)
+          Also allow reading recruiter replies (reply tracking - coming soon)
         </label>
       )}
     </div>

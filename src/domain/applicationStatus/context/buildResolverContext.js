@@ -12,6 +12,7 @@ function buildResolverContext({
   retryCount = 0,
   emailSubject = null,
   emailBody = null,
+  sourcePlatform = null,
 }) {
   const latestProcessJobStatus = latestProcessJob?.status ?? null;
   const latestSendJobStatus = latestSendJob?.status ?? null;
@@ -39,6 +40,7 @@ function buildResolverContext({
     isNeedsReview: applicationStatus === APPLICATION_STATUS.NEEDS_REVIEW,
     emailSubject,
     emailBody,
+    sourcePlatform,
   };
 }
 

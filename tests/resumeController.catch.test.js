@@ -14,6 +14,10 @@ jest.mock("../src/services/setupStatusService", () => ({
   userHasVerifiedAiCredential: jest.fn().mockResolvedValue(true),
 }));
 
+jest.mock("../src/services/entitlementService", () => ({
+  hasEntitlement: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock("../src/config/supabase", () => ({
   supabase: {
     storage: {

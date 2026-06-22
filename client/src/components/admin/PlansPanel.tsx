@@ -90,7 +90,7 @@ function PlanCard({ plan, features, onChanged }: { plan: AdminPlan; features: Ad
 
         <div>
           <p className="mb-1 text-sm font-medium">Onboarding steps</p>
-          <p className="text-sm text-muted-foreground">{(plan.onboarding ?? []).join(" → ") || "—"}</p>
+          <p className="text-sm text-muted-foreground">{(plan.onboarding ?? []).join(" → ") || "-"}</p>
         </div>
 
         <div>

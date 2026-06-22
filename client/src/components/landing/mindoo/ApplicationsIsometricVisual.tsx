@@ -106,7 +106,7 @@ export function ApplicationsIsometricVisual() {
             </table>
           </div>
           <div className="m-iso-track-footer">
-            <span>Showing 1–5 of 12 applications</span>
+            <span>Showing 1-5 of 12 applications</span>
             <span className="m-iso-track-pages">20 / page</span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
@@ -18,6 +19,7 @@ function isSessionReadyEvent(event: AuthChangeEvent) {
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const redirectedRef = useRef(false);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function AuthCallbackPage() {
     const completeWithSession = async (session: Session) => {
       if (!session) return;
       stripOAuthHashFromUrl();
-      const path = await resolvePostAuthPath();
+      const path = await resolvePostAuthPath(queryClient);
       if (!mounted || redirectedRef.current) return;
       redirect(path);
     };
@@ -76,7 +78,7 @@ export function AuthCallbackPage() {
       window.clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

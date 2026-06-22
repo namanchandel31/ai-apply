@@ -6,6 +6,7 @@ const {
   classifyHealthCheckError,
 } = require("../utils/operationTimeout");
 const { logInfo, logError } = require("../utils/logger");
+const { RetryableError } = require("../utils/errors");
 const {
   buildOpenAICompatibleClient,
   normalizeUsage,
@@ -18,6 +19,62 @@ const { estimateCost } = require("../config/providerPricing");
  * Shared OpenAI-compatible adapter (OpenAI, OpenRouter, Grok, Groq, NVIDIA NIM).
  */
 const ADAPTER_VERSION = "1.0.0";
+const STRUCTURED_JSON_ATTEMPTS = 3;
+
+function buildStructuredJsonStrategies(providerId) {
+  if (providerId === "groq") {
+    // Groq Responses API JSON mode fails often; fall back to chat.completions sooner.
+    return [
+      { api: "responses" },
+      { api: "chat_completions" },
+      { api: "chat_completions" },
+    ];
+  }
+  return Array.from({ length: STRUCTURED_JSON_ATTEMPTS }, () => ({
+    api: "responses",
+  }));
+}
+
+async function invokeStructuredJson(client, { api, model, systemPrompt, userPrompt, signal }) {
+  if (api === "chat_completions") {
+    const response = await client.chat.completions.create(
+      {
+        model,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      },
+      { signal }
+    );
+    const content = response.choices?.[0]?.message?.content?.trim();
+    return {
+      parsed: parseJsonFromText(content),
+      raw: response,
+      usage: normalizeUsage(response.usage || {}),
+    };
+  }
+
+  const response = await client.responses.create(
+    {
+      model,
+      temperature: 0,
+      text: { format: { type: "json_object" } },
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    },
+    { signal }
+  );
+  return {
+    parsed: extractOpenAIResponse(response),
+    raw: response,
+    usage: normalizeUsage(response.usage || {}),
+  };
+}
 
 function createOpenAICompatibleProvider({ id, providerType = "remote", defaultBaseUrl, capabilities }) {
   return {
@@ -39,37 +96,58 @@ function createOpenAICompatibleProvider({ id, providerType = "remote", defaultBa
       const client = buildOpenAICompatibleClient({ apiKey, baseUrl });
       const resolvedModel = model || credentials?.model;
 
-      try {
-        const response = await client.responses.create(
-          {
+      const strategies = buildStructuredJsonStrategies(id);
+      let lastError;
+
+      for (let attempt = 0; attempt < strategies.length; attempt++) {
+        const strategy = strategies[attempt];
+        try {
+          const { parsed, raw, usage } = await invokeStructuredJson(client, {
+            api: strategy.api,
             model: resolvedModel,
-            temperature: 0,
-            text: { format: { type: "json_object" } },
-            input: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-          },
-          { signal }
-        );
+            systemPrompt,
+            userPrompt,
+            signal,
+          });
+          const latencyMs = Date.now() - startedAt;
 
-        const parsed = extractOpenAIResponse(response);
-        const usage = normalizeUsage(response.usage || {});
-        const latencyMs = Date.now() - startedAt;
+          if (attempt > 0) {
+            logInfo("AI_STRUCTURED_JSON_RETRY_SUCCESS", {
+              provider: id,
+              model: resolvedModel,
+              attempt: attempt + 1,
+              api: strategy.api,
+            });
+          }
 
-        return {
-          parsed,
-          text: null,
-          raw: response,
-          usage,
-          model: resolvedModel,
-          provider: id,
-          latencyMs,
-          estimatedCost: estimateCost(id, resolvedModel, usage),
-        };
-      } catch (err) {
-        throw classifyProviderError(err);
+          return {
+            parsed,
+            text: null,
+            raw,
+            usage,
+            model: resolvedModel,
+            provider: id,
+            latencyMs,
+            estimatedCost: estimateCost(id, resolvedModel, usage),
+          };
+        } catch (err) {
+          const classified = classifyProviderError(err);
+          lastError = classified;
+          const canRetry =
+            classified instanceof RetryableError && attempt < strategies.length - 1;
+          if (!canRetry) throw classified;
+
+          logInfo("AI_STRUCTURED_JSON_RETRY", {
+            provider: id,
+            model: resolvedModel,
+            attempt: attempt + 1,
+            nextApi: strategies[attempt + 1]?.api,
+            reason: classified.message,
+          });
+        }
       }
+
+      throw lastError || new Error("Structured JSON generation failed");
     },
 
     async generateText({ systemPrompt, userPrompt, model, credentials, signal }) {

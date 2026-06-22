@@ -265,6 +265,7 @@ export type GmailStatus = {
 
 export type SetupStatusData = {
   pricingEnabled?: boolean;
+  paywallTrigger?: "after_plan_selection" | "after_onboarding" | "before_first_apply";
   hasActiveSubscription?: boolean;
   subscriptionTier?: string;
   planSlug?: string | null;
@@ -275,6 +276,7 @@ export type SetupStatusData = {
   hasValidResume?: boolean;
   hasEmailSetup: boolean;
   hasAiSetup?: boolean;
+  canUseManagedAi?: boolean;
   hasVerifiedAiCredential?: boolean;
   hasValidUserAiCredential?: boolean;
   credentialLastValidatedAt?: string | null;
@@ -327,10 +329,26 @@ export type PricingResponse = {
   plans: PricingPlan[];
 };
 
-export type UsageSummary = Record<
-  string,
-  { limit: number; used: number; remaining: number; periodType: string; unlimited: boolean }
->;
+export type BillingEntitlement = {
+  entitled?: boolean;
+  paywallEnabled?: boolean;
+  planSlug?: string | null;
+  status?: string;
+  accessEndsAt?: string | null;
+  entitlements?: EntitlementMap;
+};
+
+export type UsageMetric = {
+  limit: number;
+  used: number;
+  remaining: number;
+  periodType: string;
+  unlimited: boolean;
+  baseLimit?: number;
+  bonusLimit?: number;
+};
+
+export type UsageSummary = Record<string, UsageMetric>;
 
 export type SubscriptionStatusData = {
   entitled: boolean;
@@ -342,6 +360,31 @@ export type SubscriptionStatusData = {
   usage: UsageSummary;
   paywallTrigger: "after_plan_selection" | "after_onboarding" | "before_first_apply";
   nextPaywallAction: "access" | "first_apply" | null;
+  subscription: SubscriptionDetails | null;
+};
+
+export type SubscriptionDetails = {
+  id: string;
+  status: string;
+  source: string | null;
+  planSlug: string | null;
+  planDisplayName: string | null;
+  accessStartsAt: string | null;
+  accessEndsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+export type BillingOrder = {
+  id: string;
+  planSlug: string | null;
+  planDisplayName: string | null;
+  amountPaise: number;
+  currency: string;
+  status: string;
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  capturedAt: string | null;
+  createdAt: string;
 };
 
 export type PlanComparison = {
@@ -424,15 +467,24 @@ export const api = {
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
-    return request<{ success: boolean; data: { user: UserMe } }>("/api/billing/verify-payment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    return request<{ success: boolean; data: { user: UserMe; entitlement: BillingEntitlement } }>(
+      "/api/billing/verify-payment",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
   },
 
   getSubscriptionStatus() {
     return request<{ success: boolean; data: SubscriptionStatusData }>("/api/subscription/status", {
+      method: "GET",
+    });
+  },
+
+  getBillingOrders() {
+    return request<{ success: boolean; data: { orders: BillingOrder[] } }>("/api/billing/orders", {
       method: "GET",
     });
   },
@@ -457,7 +509,7 @@ export const api = {
   },
 
   claimTrial(body: { campaignCode: string; planSlug: string }) {
-    return request<{ success: boolean; data: { entitlement: unknown } }>("/api/trials/claim", {
+    return request<{ success: boolean; data: { entitlement: BillingEntitlement } }>("/api/trials/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -553,8 +605,11 @@ export const api = {
     return request<{
       success: boolean;
       data: {
-        resumeId: string;
-        data: ParsedResume;
+        resumeId?: string;
+        parsedResumeId?: string;
+        status?: "processing" | "completed";
+        jobId?: string;
+        data?: ParsedResume;
         message?: string;
       };
     }>("/api/upload-resume", { method: "POST", body: form });
@@ -595,7 +650,12 @@ export const api = {
 
   autoApply(
     jobDescription: string,
-    options?: { emailSubject?: string; emailBody?: string; resumeId?: string }
+    options?: {
+      emailSubject?: string;
+      emailBody?: string;
+      resumeId?: string;
+      sourcePlatform?: string;
+    }
   ) {
     return request<{
       success: boolean;
@@ -610,6 +670,7 @@ export const api = {
         ...(options?.emailSubject ? { emailSubject: options.emailSubject } : {}),
         ...(options?.emailBody ? { emailBody: options.emailBody } : {}),
         ...(options?.resumeId ? { resumeId: options.resumeId } : {}),
+        ...(options?.sourcePlatform ? { sourcePlatform: options.sourcePlatform } : {}),
       }),
     });
   },
@@ -776,7 +837,7 @@ export const api = {
     const qs = provider ? `?provider=${encodeURIComponent(provider)}` : "";
     return request<{
       success: boolean;
-      data: { models: Array<{ provider: string; modelId: string; displayName: string }> };
+      data: { models: Array<{ id: string; provider: string; modelId: string; displayName: string }> };
     }>(`/api/ai/curated-models${qs}`, { method: "GET" });
   },
 
@@ -831,6 +892,138 @@ export const api = {
 
   deactivateCuratedModel(id: string) {
     return request(`/api/dev/model-certification/curated/${id}`, { method: "DELETE" });
+  },
+
+  getAdminPlatformAi() {
+    return request<{
+      success: boolean;
+      data: {
+        config: PlatformAiGlobalConfig | null;
+        credentials: PlatformAiCredential[];
+        certifiedModels: CertifiedModelOption[];
+        deprecationWarnings: DeprecationWarning[];
+      };
+    }>("/api/admin/platform-ai", { method: "GET" });
+  },
+
+  upsertPlatformAiConfig(body: { certifiedModelId: string; isEnabled?: boolean }) {
+    return request("/api/admin/platform-ai/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  createPlatformAiCredential(body: {
+    provider: string;
+    label?: string;
+    apiKey: string;
+    isActive?: boolean;
+    trafficWeight?: number;
+  }) {
+    return request<{ success: boolean; data: { credential: PlatformAiCredential } }>(
+      "/api/admin/platform-ai/credentials",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+  },
+
+  updatePlatformAiCredential(
+    id: string,
+    body: { label?: string; apiKey?: string; isActive?: boolean; trafficWeight?: number }
+  ) {
+    return request(`/api/admin/platform-ai/credentials/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  deletePlatformAiCredential(id: string) {
+    return request<{
+      success: boolean;
+      data: { credential: PlatformAiCredential; autoFailover?: boolean };
+    }>(`/api/admin/platform-ai/credentials/${id}`, { method: "DELETE" });
+  },
+
+  getAdminAiCost(days = 30) {
+    return request<{ success: boolean; data: AiCostMetrics }>(
+      `/api/admin/ai-cost?days=${days}`,
+      { method: "GET" }
+    );
+  },
+
+  getAdminUsers(params: {
+    search?: string;
+    aiMode?: "all" | "managed" | "byok";
+    limit?: number;
+    offset?: number;
+    days?: number;
+  }) {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set("search", params.search);
+    if (params.aiMode && params.aiMode !== "all") qs.set("aiMode", params.aiMode);
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.offset) qs.set("offset", String(params.offset));
+    if (params.days) qs.set("days", String(params.days));
+    const query = qs.toString();
+    return request<{ success: boolean; data: AdminUsersList }>(
+      `/api/admin/users${query ? `?${query}` : ""}`,
+      { method: "GET" }
+    );
+  },
+
+  blockAdminUser(userId: string, body: { blocked: boolean; reason?: string }) {
+    return request(`/api/admin/users/${userId}/block`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  grantAdminUserApplications(userId: string, body: { applicationsGranted: number; note?: string }) {
+    return request(`/api/admin/users/${userId}/grant-applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  getAdminReferrals() {
+    return request<{ success: boolean; data: AdminReferralData }>("/api/admin/referrals", {
+      method: "GET",
+    });
+  },
+
+  updateReferralSettings(body: Record<string, unknown>) {
+    return request("/api/admin/referrals/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+
+  getReferralSummary() {
+    return request<{ success: boolean; data: ReferralSummary }>("/api/referrals/summary", {
+      method: "GET",
+    });
+  },
+
+  getReferrals() {
+    return request<{ success: boolean; data: { referrals: ReferralRecord[] } }>("/api/referrals", {
+      method: "GET",
+    });
+  },
+
+  attachReferral(referralCode: string) {
+    return request("/api/referrals/attach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referralCode }),
+    });
   },
 
   getApplicationsList(params: ApplicationsListParams, options?: { signal?: AbortSignal }) {
@@ -1249,6 +1442,7 @@ export type ApplicationRecord = {
   normalizedJobTitle?: string | null;
   jdEnrichment?: JdEnrichmentState;
   trackerStatusId?: string | null;
+  sourcePlatform?: string | null;
 };
 
 export type ApplicationEventRecord = {
@@ -1341,6 +1535,126 @@ export type CuratedAiModelRow = {
   overall_score: number;
   is_active: boolean;
   sort_order: number;
+  certification_status?: string;
+};
+
+export type CertifiedModelOption = {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+};
+
+export type PlatformAiCredential = {
+  id: string;
+  provider: string;
+  label: string | null;
+  is_active: boolean;
+  traffic_weight: number;
+};
+
+export type PlatformAiGlobalConfig = {
+  certified_model_id: string;
+  is_enabled: boolean;
+  model_provider?: string;
+  model_id?: string;
+  model_display_name?: string;
+};
+
+export type DeprecationWarning = {
+  certifiedModelId: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  certificationStatus: string;
+  affectedFeatures: string[];
+};
+
+export type AiCostMetrics = {
+  since: string;
+  days: number;
+  totals: { platformCost: number; byokEstimatedCost: number };
+  byModel: Array<{
+    credential_source: string;
+    provider: string;
+    model: string;
+    request_count: number;
+    success_count: number;
+    total_cost: string | number;
+    total_tokens?: number;
+  }>;
+  daily: Array<{
+    day: string;
+    credential_source: string;
+    total_cost: string | number;
+    requests: number;
+  }>;
+  byPlatformCredential: Array<{
+    credential_id: string;
+    label: string | null;
+    provider: string;
+    request_count: number;
+    total_cost: string | number;
+  }>;
+};
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  fullName: string | null;
+  isBlocked: boolean;
+  blockedReason: string | null;
+  planSlug: string | null;
+  aiMode: "managed" | "byok" | "none";
+  applicationsSent: number;
+  aiCost: number;
+  primaryProvider: string | null;
+  primaryModel: string | null;
+  adminBonusApplications: number;
+  referralBonusApplications: number;
+  createdAt: string;
+};
+
+export type AdminUsersList = {
+  users: AdminUserRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  days: number;
+};
+
+export type ReferralSummary = {
+  referralCode: string;
+  rewardsGranted: number;
+  maxRewards: number;
+  rewardApplications: number;
+  requiredSends: number;
+  completionWindowHours: number;
+  bonusApplicationsTotal: number;
+  programEnabled: boolean;
+  canEarnMore: boolean;
+};
+
+export type ReferralRecord = {
+  id: string;
+  status: "pending" | "completed" | "rejected" | "expired";
+  displayName: string;
+  successfulSendCount: number;
+  applicationsGranted: number | null;
+  createdAt: string;
+  completedAt: string | null;
+  expiresAt: string;
+};
+
+export type AdminReferralData = {
+  stats: {
+    total: number;
+    completed: number;
+    expired: number;
+    pending: number;
+    bonusApplicationsGranted: number;
+  };
+  settings: Record<string, unknown>;
 };
 
 export type ParsedResume = {

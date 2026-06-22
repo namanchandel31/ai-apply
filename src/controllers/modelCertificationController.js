@@ -159,6 +159,7 @@ async function listCuratedModelsPublicController(req, res) {
 
     return ok(res, {
       models: models.map((m) => ({
+        id: m.id,
         provider: m.provider,
         modelId: m.model_id,
         displayName: m.display_name,

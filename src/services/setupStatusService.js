@@ -1,8 +1,8 @@
-const config = require("../config");
 const { pool } = require("../db");
 const { getUserDefaults } = require("../models/userModel");
 const { getResumeById } = require("../models/resumeModel");
 const aiCredentialModel = require("../models/aiCredentialModel");
+const settingsService = require("./settingsService");
 const entitlementService = require("./entitlementService");
 const onboardingService = require("./onboardingService");
 
@@ -42,6 +42,7 @@ async function buildSetupStatus(userId) {
   // Entitlement is the single source of truth. It folds in the ENV kill-switch,
   // the DB paywall_enabled setting, and the user's live access period.
   const entitlement = await entitlementService.getEntitlement(userId);
+  const paywallTrigger = await settingsService.getPaywallTrigger();
   const pricingEnabled = entitlement.paywallEnabled;
   const hasActiveSubscription = entitlement.entitled;
 
@@ -71,20 +72,24 @@ async function buildSetupStatus(userId) {
 
   const verified = await aiCredentialModel.getVerifiedCredentialForUser(userId);
   const hasVerifiedAiCredential = !!verified;
+  const canUseManagedAi = entitlement.entitlements?.can_use_managed_ai === true;
   const hasValidResume = await computeHasValidResume(userId);
 
   const hasResume = resumeRows.length > 0;
   const hasEmailSetup = credRows.length > 0 || gmailRows.length > 0;
-  const hasAiSetup = aiChainRows.length > 0 || !!config.ai.openaiApiKey;
+  const hasAiSetup = aiChainRows.length > 0 || canUseManagedAi;
 
   const onboarding = await onboardingService.resolveOnboarding(userId, {
     hasVerifiedAiCredential,
+    canUseManagedAi,
+    hasResume,
     hasValidResume,
     hasEmailSetup,
   });
 
   return {
     pricingEnabled,
+    paywallTrigger,
     hasActiveSubscription,
     subscriptionTier,
     planSlug: entitlement.planSlug,
@@ -96,6 +101,7 @@ async function buildSetupStatus(userId) {
     hasEmailSetup,
     hasAiSetup,
     hasVerifiedAiCredential,
+    canUseManagedAi,
     hasValidUserAiCredential: hasVerifiedAiCredential,
     credentialLastValidatedAt: verified?.lastValidatedAt ?? null,
     onboardingRequired: onboarding.onboardingRequired,

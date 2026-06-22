@@ -11,19 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/**
- * Global paywall surface. The API client dispatches a QUOTA_EXCEEDED context (feature +
- * limit/used/remaining + upgrade eligibility) on any 402 from a credit-gated endpoint, so
- * we can render the paywall and route to pricing without an extra request. Mounted once
- * near the app root; any action that exhausts an allowance triggers it automatically.
- */
-const FEATURE_LABELS: Record<string, string> = {
-  quota_resumes_parsed: "resume parses",
-  quota_jds_parsed: "job description parses",
-  quota_emails_generated: "AI email generations",
-  quota_applications_sent: "application sends",
-};
-
 export function QuotaPaywall() {
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<QuotaExceededContext | null>(null);
@@ -34,9 +21,8 @@ export function QuotaPaywall() {
   }, []);
 
   const open = ctx !== null;
-  const label = (ctx?.feature && FEATURE_LABELS[ctx.feature]) || "this feature";
+  const isApplicationQuota = ctx?.feature === "quota_applications_sent";
   const hasCount = typeof ctx?.limit === "number" && ctx.limit >= 0;
-  const used = typeof ctx?.used === "number" ? ctx.used : ctx?.limit;
   const canUpgrade = ctx?.upgradeEligible !== false && isPricingEnabled;
 
   return (
@@ -48,20 +34,55 @@ export function QuotaPaywall() {
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>You've reached your plan limit</DialogTitle>
+          <DialogTitle>
+            {isApplicationQuota ? "Trial applications used up" : "You've reached your plan limit"}
+          </DialogTitle>
           <DialogDescription>
-            You've used all of your {label}
-            {hasCount ? ` (${used} of ${ctx?.limit})` : ""}.{" "}
-            {canUpgrade
-              ? "Upgrade your plan to keep going."
-              : "Your plan limit for this action has been reached."}
+            {isApplicationQuota ? (
+              <>
+                You've sent {ctx?.used ?? 0} of {ctx?.limit ?? 0} trial applications.
+                Choose how you'd like to continue.
+              </>
+            ) : (
+              <>
+                You've used all of your allowance
+                {hasCount ? ` (${ctx?.used} of ${ctx?.limit})` : ""}.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => setCtx(null)}>
-            Not now
-          </Button>
-          {canUpgrade && (
+        <div className="flex flex-col gap-2 pt-2">
+          {canUpgrade && isApplicationQuota && (
+            <>
+              <Button
+                onClick={() => {
+                  setCtx(null);
+                  navigate("/pricing?plan=managed");
+                }}
+              >
+                Upgrade to OneTap AI
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setCtx(null);
+                  navigate("/pricing?plan=byok");
+                }}
+              >
+                Upgrade to BYOK
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCtx(null);
+                  navigate("/dashboard?share=referral");
+                }}
+              >
+                Refer friends for bonus sends
+              </Button>
+            </>
+          )}
+          {canUpgrade && !isApplicationQuota && (
             <Button
               onClick={() => {
                 setCtx(null);
@@ -71,6 +92,9 @@ export function QuotaPaywall() {
               View plans
             </Button>
           )}
+          <Button variant="ghost" onClick={() => setCtx(null)}>
+            Not now
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

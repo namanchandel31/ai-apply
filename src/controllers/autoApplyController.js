@@ -1,4 +1,5 @@
 const { startAutoApply } = require("../services/applicationOrchestrationService");
+const { DASHBOARD_SOURCE_PLATFORM } = require("../services/applyModeService");
 const { ok, ERROR_CODES } = require("../utils/response");
 const { sendError } = require("../utils/httpErrorResponse");
 const { logError } = require("../utils/logger");
@@ -79,25 +80,26 @@ const autoApplyController = async (req, res) => {
     // out-of-credit user gets an immediate paywall instead of a queued job that fails in the
     // worker. The worker still does the authoritative atomic reserve at the point of use.
     const QK = quotaService.QUOTA_FEATURE_KEYS;
-    const preChecks = [QK.APPLICATION_SENT];
-    if (!hasCustomEmail) preChecks.push(QK.EMAIL_GENERATED);
-    for (const featureKey of preChecks) {
-      const quota = await quotaService.check(userId, featureKey);
-      if (!quota.allowed) {
-        return sendQuotaExceeded(res, {
-          feature: featureKey,
-          limit: quota.limit,
-          used: quota.used,
-          remaining: quota.remaining,
-        });
-      }
+    const quota = await quotaService.check(userId, QK.APPLICATION_SENT);
+    if (!quota.allowed) {
+      return sendQuotaExceeded(res, {
+        feature: QK.APPLICATION_SENT,
+        limit: quota.limit,
+        used: quota.used,
+        remaining: quota.remaining,
+      });
     }
 
     const result = await startAutoApply(userId, jobDescription, reqId, {
       resumeId: bodyResumeId,
       emailSubject: hasCustomEmail ? trimmedSubject : undefined,
       emailBody: hasCustomEmail ? trimmedBody : undefined,
-      sourcePlatform: typeof sourcePlatform === "string" ? sourcePlatform.trim() || undefined : undefined,
+      sourcePlatform:
+        typeof sourcePlatform === "string" && sourcePlatform.trim()
+          ? sourcePlatform.trim()
+          : hasCustomEmail
+            ? DASHBOARD_SOURCE_PLATFORM
+            : undefined,
       sourceUrl: typeof sourceUrl === "string" ? sourceUrl.trim() || undefined : undefined,
       sourceEmail: typeof sourceEmail === "string" ? sourceEmail.trim() || undefined : undefined,
       discoveredAt: discoveredAt ? new Date(discoveredAt) : undefined,

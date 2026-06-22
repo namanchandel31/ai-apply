@@ -15,7 +15,7 @@ const {
 const { transitionJobState } = require("../services/transitionJobState");
 const { recordEvent } = require("../models/applicationEventModel");
 const mailDeliveryService = require("../services/email/mailDeliveryService");
-const quotaService = require("../services/quotaService");
+const referralService = require("../services/referralService");
 const { supabase } = require("../config/supabase");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo, logError } = require("../utils/logger");
@@ -42,7 +42,6 @@ const { resolveResumeForAutoApply } = require("../services/resolveResumeForAutoA
 const processor = async (job) => {
   const { applicationId, userId, recipientEmail, dbJobId } = job.data;
   const reqId = job.id;
-  let quotaReserved = false;
 
   const application = await getApplicationById(applicationId, userId);
   if (!application) {
@@ -142,11 +141,6 @@ const processor = async (job) => {
     const arrayBuffer = await data.arrayBuffer();
     fileBuffer = Buffer.from(arrayBuffer);
 
-    // Reserve the send credit immediately before the irreversible send. Atomic, so two
-    // concurrent sends can't overshoot; released in catch if this attempt doesn't deliver.
-    await quotaService.reserve(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
-    quotaReserved = true;
-
     const sendResult = await mailDeliveryService.send(
       userId,
       {
@@ -197,13 +191,10 @@ const processor = async (job) => {
         threadId: sendResult.threadId,
       },
     });
-  } catch (rawErr) {
-    // This attempt reserved a credit but didn't deliver — give it back so a retry (or the
-    // user's allowance) isn't charged for mail that never went out.
-    if (quotaReserved) {
-      await quotaService.release(userId, quotaService.QUOTA_FEATURE_KEYS.APPLICATION_SENT);
-    }
 
+    await referralService.consumeApplicationQuotaAfterSend({ userId, applicationId });
+    await referralService.recordSuccessfulSendForReferral(userId);
+  } catch (rawErr) {
     let err = rawErr;
     if (rawErr.code === "QUOTA_EXCEEDED") {
       // Allowance spent before sending: terminal (a retry can't help) — surface a paywall

@@ -1,11 +1,13 @@
 const crypto = require("crypto");
-const { enqueueResumeParsing } = require("../services/jobHandler");
-const { findResumeByHash } = require("../models/resumeModel");
+const { processResumeJob } = require("../services/jobHandler");
+const { findResumeByHash, createResumeRecord } = require("../models/resumeModel");
+const { enqueueResumeJob } = require("../services/resumeJobRegistry");
 const { autoPopulateDefaultResume } = require("../models/userModel");
 const { RetryableError } = require("../utils/errors");
 const { logInfo, logError } = require("../utils/logger");
 const { supabase } = require("../config/supabase");
 const { error: sendError, ok, ERROR_CODES } = require("../utils/response");
+const entitlementService = require("../services/entitlementService");
 const { userHasVerifiedAiCredential } = require("../services/setupStatusService");
 const { isQuotaError, sendQuotaExceeded } = require("../utils/quotaErrorResponse");
 
@@ -48,6 +50,30 @@ async function respondWithDuplicateResume(res, {
   });
 }
 
+function enqueueBackgroundResumeParse({
+  reqId,
+  jobId,
+  req,
+  fileHash,
+  userId,
+  filePath,
+  existingResumeId = null,
+}) {
+  enqueueResumeJob(jobId, userId, () =>
+    processResumeJob({
+      reqId,
+      jobId,
+      buffer: req.file.buffer,
+      originalname: req.file.originalname,
+      size: req.file.size,
+      fileHash,
+      userId,
+      filePath,
+      existingResumeId,
+    })
+  );
+}
+
 const uploadResumeController = async (req, res) => {
   const reqId = req.requestId || 'UNKNOWN';
   const jobId = crypto.randomUUID();
@@ -73,11 +99,12 @@ const uploadResumeController = async (req, res) => {
 
     if (context === 'onboarding') {
       const hasVerified = await userHasVerifiedAiCredential(userId);
-      if (!hasVerified) {
+      const canUseManaged = await entitlementService.hasEntitlement(userId, 'can_use_managed_ai');
+      if (!hasVerified && !canUseManaged) {
         return sendError(
           res,
           403,
-          'Verify your AI provider key before uploading a resume',
+          'Verify your AI provider key or use OneTap AI before uploading a resume',
           'AI_CREDENTIAL_REQUIRED'
         );
       }
@@ -88,6 +115,26 @@ const uploadResumeController = async (req, res) => {
     // Deduplication check
     const existing = await findResumeByHash(fileHash, userId);
     if (existing) {
+      if (context === "onboarding" && !existing.parsedResumeId) {
+        enqueueBackgroundResumeParse({
+          reqId,
+          jobId,
+          req,
+          fileHash,
+          userId,
+          filePath,
+          existingResumeId: existing.resumeId,
+        });
+        return res.status(202).json({
+          success: true,
+          data: {
+            jobId,
+            status: "processing",
+            resumeId: existing.resumeId,
+            message: "Resume found. Parsing will continue in the background.",
+          },
+        });
+      }
       return respondWithDuplicateResume(res, {
         reqId,
         jobId,
@@ -98,21 +145,8 @@ const uploadResumeController = async (req, res) => {
       });
     }
 
-    // Wrap the handler with a 90s timeout guard
-    // TODO(async-migration): Current synchronous HTTP flow is acceptable temporarily,
-    // but long-term scalability should migrate to:
-    // Upload -> Queue -> Background Worker -> Polling/WebSocket status updates.
-    // Do NOT implement async orchestration yet; focus on stabilizing retries first.
-    const abortController = new AbortController();
-    let timeoutId;
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        abortController.abort("request_timeout");
-        reject(new RetryableError("request_timeout"));
-      }, 90000);
-    });
-
-    // Add debug logging temporarily
+    // Wrap the handler with a 90s timeout guard (profile_update only)
+    // TODO(async-migration): migrate profile_update to the same async path when UI polls status.
     logInfo("DEBUG_DUPLICATE_CHECK", {
       userId,
       fileHash,
@@ -161,6 +195,55 @@ const uploadResumeController = async (req, res) => {
       return sendError(res, 500, 'Failed to upload file to storage', ERROR_CODES.INTERNAL_ERROR);
     }
 
+    if (context === "onboarding") {
+      const resume = await createResumeRecord(
+        req.file.originalname,
+        req.file.size,
+        fileHash,
+        userId,
+        filePath
+      );
+
+      try {
+        await autoPopulateDefaultResume(userId, resume.id);
+      } catch (dbErr) {
+        logError("auto_populate_default_resume_failed", dbErr, { reqId, userId, resumeId: resume.id });
+      }
+
+      enqueueBackgroundResumeParse({
+        reqId,
+        jobId,
+        req,
+        fileHash,
+        userId,
+        filePath,
+        existingResumeId: resume.id,
+      });
+
+      logInfo("RESUME_UPLOAD_ASYNC", { reqId, jobId, fileHash, userId, context, source: "resume" });
+
+      return res.status(202).json({
+        success: true,
+        data: {
+          jobId,
+          status: "processing",
+          resumeId: resume.id,
+          message: "Resume uploaded. Parsing will continue in the background.",
+        },
+      });
+    }
+
+    // profile_update: keep synchronous parse so Setup/profile sees parsed data immediately
+    const abortController = new AbortController();
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        abortController.abort("request_timeout");
+        reject(new RetryableError("request_timeout"));
+      }, 90000);
+    });
+
+    const { enqueueResumeParsing } = require("../services/jobHandler");
     const jobPromise = enqueueResumeParsing({
       reqId,
       jobId,

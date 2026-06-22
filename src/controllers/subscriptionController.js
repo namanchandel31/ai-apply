@@ -6,6 +6,7 @@ const paywallService = require("../services/paywallService");
 const settingsService = require("../services/settingsService");
 const usageService = require("../services/usageService");
 const subscriptionService = require("../services/subscriptionService");
+const subscriptionModel = require("../models/subscriptionModel");
 const campaignService = require("../services/campaignService");
 const planComparisonService = require("../services/planComparisonService");
 const planModel = require("../models/planModel");
@@ -14,12 +15,19 @@ const planModel = require("../models/planModel");
 const getSubscriptionStatusController = async (req, res) => {
   const userId = req.user.id;
   try {
-    const [entitlement, usage, paywallTrigger, nextAction] = await Promise.all([
+    const [entitlement, usage, paywallTrigger, nextAction, live] = await Promise.all([
       entitlementService.getEntitlement(userId),
       usageService.getUsageSummary(userId),
       settingsService.getPaywallTrigger(),
       paywallService.nextPaywallAction(userId),
+      subscriptionModel.getLiveSubscription(userId),
     ]);
+
+    let planDisplayName = null;
+    if (live?.planId) {
+      planDisplayName = (await planModel.getPlanById(live.planId))?.displayName ?? null;
+    }
+
     return ok(res, {
       entitled: entitlement.entitled,
       paywallEnabled: entitlement.paywallEnabled,
@@ -30,6 +38,18 @@ const getSubscriptionStatusController = async (req, res) => {
       usage,
       paywallTrigger,
       nextPaywallAction: nextAction,
+      subscription: live
+        ? {
+            id: live.id,
+            status: live.status,
+            source: live.source,
+            planSlug: entitlement.planSlug,
+            planDisplayName,
+            accessStartsAt: live.accessStartsAt,
+            accessEndsAt: live.accessEndsAt,
+            cancelAtPeriodEnd: Boolean(live.cancelAtPeriodEnd),
+          }
+        : null,
     });
   } catch (err) {
     logError("SUBSCRIPTION_STATUS_ERROR", err, { userId, reqId: req.requestId });

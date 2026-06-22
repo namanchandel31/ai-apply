@@ -9,6 +9,7 @@ const {
 } = require("../models/applicationJobModel");
 const { enqueueSendJob } = require("../queues/sendApplicationQueue");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
+const { isDashboardSubmission } = require("./applyModeService");
 
 const fetchSmtpCredentials = async (userId) => {
   const { rows } = await pool.query(
@@ -56,6 +57,13 @@ const sendApplication = async (applicationId, userId, recipientEmail, logMeta = 
     throw Object.assign(
       new Error("Application is not ready to send — wait for processing to complete"),
       { stage: "validation" }
+    );
+  }
+
+  if (isDashboardSubmission(application.source_platform)) {
+    throw Object.assign(
+      new Error("Dashboard applications are sent from the dashboard"),
+      { stage: "validation", code: "DASHBOARD_SEND_ONLY" }
     );
   }
 

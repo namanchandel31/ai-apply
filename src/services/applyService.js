@@ -114,6 +114,7 @@ const processApplyJob = async (resumeId, jobDescriptionId, reqId, userId = null)
           cachedEmail = await generateApplicationEmail(emailContext, {
             reqId,
             userId,
+            applicationId,
             resumeId,
             jobDescriptionId,
           });

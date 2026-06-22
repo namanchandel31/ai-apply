@@ -49,7 +49,7 @@ describe("gmailIntegrationService", () => {
   it("round-trips a state token (single-use)", async () => {
     const state = await service.createState("user-1", "send");
     const consumed = await service.consumeState(state);
-    expect(consumed).toEqual({ userId: "user-1", tier: "send" });
+    expect(consumed).toEqual({ userId: "user-1", tier: "send", returnTo: "setup" });
     await expect(service.consumeState(state)).rejects.toMatchObject({ code: "INVALID_STATE" });
   });
 

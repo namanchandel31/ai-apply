@@ -3,6 +3,7 @@ const supabaseAuthMiddleware = require("../middlewares/supabaseAuthMiddleware");
 const {
   createCheckoutController,
   verifyBillingPaymentController,
+  getBillingOrdersController,
 } = require("../controllers/billingController");
 const {
   getSubscriptionStatusController,
@@ -25,6 +26,7 @@ router.get("/pricing", getPricingController);
 router.get("/campaigns/active", supabaseAuthMiddleware, getActiveCampaignsController);
 router.post("/checkout/create", supabaseAuthMiddleware, createCheckoutController);
 router.post("/billing/verify-payment", supabaseAuthMiddleware, verifyBillingPaymentController);
+router.get("/billing/orders", supabaseAuthMiddleware, getBillingOrdersController);
 router.post("/trials/claim", supabaseAuthMiddleware, claimTrialController);
 router.get("/subscription/status", supabaseAuthMiddleware, getSubscriptionStatusController);
 router.post("/subscription/cancel", supabaseAuthMiddleware, cancelSubscriptionController);

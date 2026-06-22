@@ -3,13 +3,16 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DetectionConfigPanel } from "@/components/admin/DetectionConfigPanel";
 import { ModelCertificationPanel } from "@/components/admin/ModelCertificationPanel";
+import { AiCostPanel } from "@/components/admin/AiCostPanel";
+import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
+import { ReferralsPanel } from "@/components/admin/ReferralsPanel";
 import { BillingSettingsPanel } from "@/components/admin/BillingSettingsPanel";
 import { TrialConfigPanel } from "@/components/admin/TrialConfigPanel";
 import { PlansPanel } from "@/components/admin/PlansPanel";
 import { CampaignsPanel } from "@/components/admin/CampaignsPanel";
 import { SubscriptionsPanel } from "@/components/admin/SubscriptionsPanel";
 
-const TABS = ["settings", "trial", "plans", "campaigns", "subscriptions", "detection", "models"] as const;
+const TABS = ["settings", "trial", "plans", "campaigns", "subscriptions", "referrals", "users", "ai-cost", "detection", "models"] as const;
 type AdminTab = (typeof TABS)[number];
 
 function normalizeTab(value: string | null): AdminTab {
@@ -43,8 +46,11 @@ export function AdminPage() {
           <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+          <TabsTrigger value="referrals">Referrals</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="ai-cost">OneTap AI &amp; Cost</TabsTrigger>
           <TabsTrigger value="detection">Extension detection</TabsTrigger>
-          <TabsTrigger value="models">AI models</TabsTrigger>
+          <TabsTrigger value="models">Model certification</TabsTrigger>
         </TabsList>
         <TabsContent value="settings">
           <BillingSettingsPanel />
@@ -60,6 +66,15 @@ export function AdminPage() {
         </TabsContent>
         <TabsContent value="subscriptions">
           <SubscriptionsPanel />
+        </TabsContent>
+        <TabsContent value="referrals">
+          <ReferralsPanel />
+        </TabsContent>
+        <TabsContent value="users">
+          <AdminUsersPanel />
+        </TabsContent>
+        <TabsContent value="ai-cost">
+          <AiCostPanel />
         </TabsContent>
         <TabsContent value="detection">
           <DetectionConfigPanel />
