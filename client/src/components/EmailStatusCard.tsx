@@ -23,9 +23,17 @@ interface Props {
   defaultExpanded?: boolean;
   /** Where to land after Google OAuth callback (setup email tab vs onboarding). */
   oauthReturnTo?: "setup" | "onboarding";
+  /** Minimal UI for onboarding: action buttons only, no card chrome or extra copy. */
+  variant?: "default" | "compact";
 }
 
-export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnTo = "setup" }: Props) {
+export function EmailStatusCard({
+  email,
+  onUpdate,
+  defaultExpanded,
+  oauthReturnTo = "setup",
+  variant = "default",
+}: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [gmail, setGmail] = useState<GmailStatus | null>(null);
   const [gmailLoading, setGmailLoading] = useState(true);
@@ -122,6 +130,8 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
   const gmailConnected = !!gmail?.connected;
   const hasAppPassword = !!email;
 
+  const isCompact = variant === "compact";
+
   // ---- Gmail connected (primary, recommended path) ----
   const connectedGmailBlock = gmailConnected && (
     <div className={cn("space-y-3 border border-input-border bg-input p-3", SETUP_BOX_RADIUS)}>
@@ -142,33 +152,58 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
           Disconnect
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Applications are sent via the Gmail API using a send-only permission. We never read your
-        inbox{gmail?.canRead ? " unless you enable reply tracking" : ""}.
-      </p>
+      {!isCompact ? (
+        <p className="text-sm text-muted-foreground">
+          Applications are sent via the Gmail API using a send-only permission. We never read your
+          inbox{gmail?.canRead ? " unless you enable reply tracking" : ""}.
+        </p>
+      ) : null}
     </div>
   );
 
+  const showConnectActions =
+    !gmailConnected && gmailConfigured && !(isCompact && (showAppPassword || isEditing));
+
   // ---- Connect Gmail (prominent CTA) ----
-  const connectGmailBlock = !gmailConnected && gmailConfigured && (
+  const connectGmailBlock = showConnectActions && (
     <div className="space-y-3">
-      <div className="space-y-2 text-base text-muted-foreground leading-relaxed">
-        <p>
-          Connect your Gmail so OneTap can send applications{" "}
-          <strong className="text-foreground">from your address</strong>. We request a{" "}
-          <strong className="text-foreground">send-only</strong> permission - we cannot read your
-          inbox or change your account.
-        </p>
-      </div>
-      <Button onClick={handleConnectGmail} disabled={connecting} size="lg">
+      {!isCompact ? (
+        <div className="space-y-2 text-base text-muted-foreground leading-relaxed">
+          <p>
+            Connect your Gmail so OneTap can send applications{" "}
+            <strong className="text-foreground">from your address</strong>. We request a{" "}
+            <strong className="text-foreground">send-only</strong> permission - we cannot read your
+            inbox or change your account.
+          </p>
+        </div>
+      ) : null}
+      <Button
+        onClick={handleConnectGmail}
+        disabled={connecting}
+        size={isCompact ? "default" : "lg"}
+        className={isCompact ? "w-full" : undefined}
+      >
         {connecting ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
+        ) : isCompact ? null : (
           <ShieldCheck className="mr-2 h-4 w-4" />
         )}
         Connect Gmail
       </Button>
-      {isGmailReadTierEnabled && (
+      {isCompact && !showAppPassword && !isEditing ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            setShowAppPassword(true);
+            setIsEditing(true);
+          }}
+        >
+          Use App Password Instead (advanced)
+        </Button>
+      ) : null}
+      {!isCompact && isGmailReadTierEnabled && (
         <label className="flex items-center gap-2 pt-1 text-sm text-muted-foreground">
           <Checkbox
             checked={readChecked}
@@ -284,7 +319,7 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
     !gmailConfigured || hasAppPassword || showAppPassword || isEditing;
 
   const appPasswordDisclosure =
-    gmailConfigured && !hasAppPassword && !showAppPassword && !isEditing ? (
+    !isCompact && gmailConfigured && !hasAppPassword && !showAppPassword && !isEditing ? (
       <button
         type="button"
         onClick={() => {
@@ -296,6 +331,33 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
         Use App Password Instead (advanced)
       </button>
     ) : null;
+
+  const body = gmailLoading ? (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Checking email connection…
+    </div>
+  ) : (
+    <>
+      {connectedGmailBlock}
+      {connectGmailBlock}
+
+      {(connectGmailBlock || connectedGmailBlock) && showAppPasswordSection && !isCompact ? (
+        <div className="border-t border-input-border pt-3" />
+      ) : null}
+
+      {showAppPasswordSection ? (
+        <div className="space-y-3">
+          {appPasswordConnectedSummary}
+          {appPasswordForm}
+        </div>
+      ) : null}
+      {appPasswordDisclosure}
+    </>
+  );
+
+  if (isCompact) {
+    return <div className="space-y-4">{body}</div>;
+  }
 
   return (
     <Card className={cn(SETUP_BOX_RADIUS, !hasAppPassword && !gmailConnected ? "ring-1 ring-warning/40" : "")}>
@@ -315,30 +377,7 @@ export function EmailStatusCard({ email, onUpdate, defaultExpanded, oauthReturnT
           </Badge>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        {gmailLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking email connection…
-          </div>
-        ) : (
-          <>
-            {connectedGmailBlock}
-            {connectGmailBlock}
-
-            {(connectGmailBlock || connectedGmailBlock) && showAppPasswordSection && (
-              <div className="border-t border-input-border pt-3" />
-            )}
-
-            {showAppPasswordSection && (
-              <div className="space-y-3">
-                {appPasswordConnectedSummary}
-                {appPasswordForm}
-              </div>
-            )}
-            {appPasswordDisclosure}
-          </>
-        )}
-      </CardContent>
+      <CardContent className="space-y-4">{body}</CardContent>
     </Card>
   );
 }

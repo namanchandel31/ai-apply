@@ -18,7 +18,14 @@ import { trackOnboardingEvent } from "@/lib/onboardingEvents";
 
 import { markOnboardingWalkthroughPending } from "@/lib/onboardingWalkthrough";
 
-import { computeOnboardingFlow } from "@/lib/onboardingFlow";
+import {
+  computeOnboardingFlow,
+  ONBOARDING_STEP_DESCRIPTION_CLASS,
+  ONBOARDING_STEP_DESCRIPTION_FOLLOWUP_CLASS,
+  ONBOARDING_STEP_HEADLINE_CLASS,
+  ONBOARDING_STEP_SECTION_CLASS,
+  type OnboardingFlowStep,
+} from "@/lib/onboardingFlow";
 
 import { Button } from "@/components/ui/button";
 
@@ -77,6 +84,39 @@ type StepProgressProps = {
   completed: boolean[];
 
 };
+
+
+
+const STEP_WELCOME_COPY: Record<Exclude<OnboardingFlowStep, "complete">, string> = {
+  resume:
+    "Upload your resume so OneTap can draft personalized application emails that reflect your experience.",
+  email:
+    "Connect the Gmail account you want to send job applications from.",
+  extension: "Add the Chrome extension to apply from LinkedIn without copy-pasting job posts.",
+};
+
+const STEP_HEADLINE: Record<Exclude<OnboardingFlowStep, "complete" | "extension">, string> = {
+  resume: "Your resume powers every application",
+  email: "Connect your Gmail account",
+};
+
+const SKIP_REASSURANCE_COPY: Record<Exclude<OnboardingFlowStep, "resume" | "complete">, string> = {
+  email:
+    "Gmail is only required if you want OneTap to send applications on your behalf. Not ready yet? you can connect your Gmail account later from Settings.",
+  extension:
+    "The Chrome extension lets you apply from LinkedIn in one click. Skip for now and install it later from Setup.",
+};
+
+function getWelcomeDescription(
+  statusLoading: boolean,
+  stepKind: OnboardingFlowStep,
+  remainingCount: number
+): string {
+  if (statusLoading) return "Getting your setup ready…";
+  if (remainingCount === 0) return "You're almost ready to start applying.";
+  if (stepKind === "complete") return "You're almost ready to start applying.";
+  return STEP_WELCOME_COPY[stepKind];
+}
 
 
 
@@ -193,7 +233,6 @@ export function Onboarding() {
   const [extensionDone, setExtensionDone] = useState(() => hasDismissedExtensionPrompt());
 
   const [celebrating, setCelebrating] = useState(false);
-  const [parseStalled, setParseStalled] = useState(false);
   const celebrationStartedRef = useRef(false);
 
   const uploadStartedAt = useRef<number | null>(null);
@@ -220,15 +259,10 @@ export function Onboarding() {
 
 
 
-  const canUseManagedAi =
-
-    status?.canUseManagedAi ?? status?.entitlements?.can_use_managed_ai === true;
-
   const hasResume = !!status?.hasResume;
   const hasValidResume = !!status?.hasValidResume;
   const hasEmailSetup = !!status?.hasEmailSetup;
   const emailStepResolved = hasEmailSetup || emailSkipped || hasEmailStepSkipped();
-  const parsingResume = hasResume && !hasValidResume;
 
 
 
@@ -240,7 +274,7 @@ export function Onboarding() {
 
   const isComplete = flow.complete;
 
-  const completedSteps = [hasResume, emailStepResolved, extensionDone];
+  const completedSteps = [hasResume, emailStepResolved, isComplete];
 
   const completedCount = completedSteps.filter(Boolean).length;
 
@@ -331,27 +365,6 @@ export function Onboarding() {
   }, [hasResume]);
 
   useEffect(() => {
-    if (!parsingResume) {
-      setParseStalled(false);
-      return;
-    }
-
-    const uploadedAt = status?.activeResume?.uploadedAt;
-    if (!uploadedAt) return;
-
-    const uploaded = new Date(uploadedAt).getTime();
-    const tick = setInterval(() => {
-      if (Date.now() - uploaded > 90_000) {
-        setParseStalled(true);
-      }
-    }, 5000);
-
-    return () => clearInterval(tick);
-  }, [parsingResume, status?.activeResume?.uploadedAt]);
-
-
-
-  useEffect(() => {
 
     if (!isLoading && hasEmailStepSkipped()) {
 
@@ -404,7 +417,7 @@ export function Onboarding() {
     try {
       const res = await api.uploadResume(file, "onboarding");
       setResumeUi("completed");
-      toast.success("Resume uploaded - continue to the next step");
+      toast.success("Resume uploaded");
 
       queryClient.setQueryData(setupStatusQueryOptions.queryKey, (old: SetupStatusData | undefined) => {
         if (!old) return old;
@@ -430,19 +443,13 @@ export function Onboarding() {
 
 
 
-  const handleSkipEmail = () => {
-
-    trackOnboardingEvent("email_setup_skipped");
-
-    markEmailStepSkipped();
-
-    setEmailSkipped(true);
-
+  const handleExtensionContinue = () => {
+    markExtensionPromptDismissed();
+    setExtensionDone(true);
+    beginOnboardingCompletion();
   };
 
-
-
-  const handleExtensionContinue = () => {
+  const handleExtensionInstall = () => {
     markExtensionPromptDismissed();
     setExtensionDone(true);
     beginOnboardingCompletion();
@@ -456,25 +463,7 @@ export function Onboarding() {
 
   const currentStepMeta = steps.find((s) => s.id === activeStep);
 
-  const welcomeDescription = statusLoading
-    ? "Getting your setup ready…"
-    : remainingCount === 0
-
-      ? "Almost ready to apply."
-
-      : currentStepKind === "email"
-
-        ? "Connect Gmail so OneTap can send applications from your address."
-
-        : currentStepKind === "extension"
-
-          ? "Install the Chrome extension to apply from LinkedIn."
-
-          : remainingCount === 1
-
-            ? "One step left, then you can explore OneTap."
-
-            : `${remainingCount} steps left. Finish setup to get started.`;
+  const welcomeDescription = getWelcomeDescription(statusLoading, currentStepKind, remainingCount);
 
 
 
@@ -505,7 +494,7 @@ export function Onboarding() {
 
       <div className="flex min-h-screen items-center justify-center px-6 py-12">
 
-        <div className="w-full max-w-lg">
+        <div className="w-full max-w-xl">
 
           <div className="flex flex-col items-center text-center">
 
@@ -519,13 +508,11 @@ export function Onboarding() {
 
             </h1>
 
-            <p className="mt-3 text-base text-muted-foreground">{welcomeDescription}</p>
-
           </div>
 
 
 
-          <div className="mb-6 mt-10 flex justify-center">
+          <div className="mt-8 flex justify-center">
 
             <OnboardingStepProgress
 
@@ -541,7 +528,14 @@ export function Onboarding() {
 
 
 
-          <Card className="w-full border border-border bg-white shadow-none">
+          <p className="mx-auto mt-6 max-w-xl text-center text-base text-muted-foreground">
+
+            {welcomeDescription}
+
+          </p>
+
+
+          <Card className="mt-8 w-full border border-border bg-white shadow-none">
 
             <CardContent className="p-8">
               {statusLoading ? (
@@ -550,43 +544,17 @@ export function Onboarding() {
                 </div>
               ) : activeStep > 0 && currentStepMeta ? (
                 <>
-                  {parsingResume && currentStepKind !== "resume" ? (
-                    <p className="mb-4 flex items-center gap-2 rounded-[10px] bg-muted px-3 py-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      Still reading your resume in the background - you can keep going.
-                    </p>
-                  ) : null}
-
-                  {parseStalled && parsingResume ? (
-                    <p className="mb-4 text-sm text-warning">
-                      Resume parsing is taking longer than expected. You can continue setup; we&apos;ll
-                      keep trying in the background.
-                    </p>
-                  ) : null}
-
-                  {currentStepKind !== "extension" ? (
-
-                    <h2 className="text-base font-medium text-foreground">{currentStepMeta.label}</h2>
-
-                  ) : null}
-
-
-
                   {currentStepKind === "resume" ? (
-
-                    <div className="mt-5 space-y-4">
-
-                      {canUseManagedAi ? (
-
-                        <p className="rounded-[10px] bg-muted px-3 py-2 text-sm text-muted-foreground">
-
-                          You&apos;re on <span className="font-medium text-foreground">OneTap AI</span> - no API
-
-                          key needed. Upload your resume to continue.
-
+                    <div className={ONBOARDING_STEP_SECTION_CLASS}>
+                      <div>
+                        <h2 className={ONBOARDING_STEP_HEADLINE_CLASS}>
+                          {STEP_HEADLINE.resume}
+                        </h2>
+                        <p className={ONBOARDING_STEP_DESCRIPTION_CLASS}>
+                          OneTap reads your roles, skills, and experience to write tailored outreach
+                          for each job. Upload a PDF once and reuse it on every application.
                         </p>
-
-                      ) : null}
+                      </div>
 
                       <ResumeDropzone
                         busy={resumeUi === "uploading"}
@@ -605,21 +573,26 @@ export function Onboarding() {
 
 
                   {currentStepKind === "email" ? (
-
-                    <div className="mt-4 space-y-4">
-
-                      <p className="text-base text-muted-foreground">
-
-                        Connect Gmail so OneTap can send applications from your address. OAuth is
-
-                        recommended; app password is available under Advanced.
-
-                      </p>
+                    <div className={ONBOARDING_STEP_SECTION_CLASS}>
+                      <div>
+                        <h2 className={ONBOARDING_STEP_HEADLINE_CLASS}>
+                          {STEP_HEADLINE.email}
+                        </h2>
+                        <p className={ONBOARDING_STEP_DESCRIPTION_CLASS}>
+                          Connect your Gmail Account so OneTap can send applications from your own
+                          email address.
+                        </p>
+                        <p className={ONBOARDING_STEP_DESCRIPTION_FOLLOWUP_CLASS}>
+                          <span className="font-medium text-foreground">
+                            We request a send-only permission
+                          </span>{" "}
+                          and cannot read your inbox.
+                        </p>
+                      </div>
 
                       <EmailStatusCard
-
                         email={status?.email}
-
+                        variant="compact"
                         onUpdate={() => {
 
                           clearEmailStepSkipped();
@@ -636,18 +609,6 @@ export function Onboarding() {
 
                       />
 
-                      <Button type="button" variant="outline" className="w-full" onClick={handleSkipEmail}>
-
-                        Skip for now
-
-                      </Button>
-
-                      <p className="text-center text-xs text-muted-foreground">
-
-                        You can connect Gmail later in Setup when you&apos;re ready to send.
-
-                      </p>
-
                     </div>
 
                   ) : null}
@@ -656,18 +617,22 @@ export function Onboarding() {
 
                   {currentStepKind === "extension" ? (
 
-                    <ExtensionInstallPrompt embedded onContinue={handleExtensionContinue} />
+                    <ExtensionInstallPrompt
+                      embedded
+                      onContinue={handleExtensionContinue}
+                      onInstall={handleExtensionInstall}
+                    />
 
                   ) : null}
 
                   {hasResume && !isComplete && currentStepKind !== "resume" ? (
-                    <div className="mt-6 border-t border-border pt-4">
-                      <Button type="button" variant="ghost" className="w-full" onClick={handleGoToDashboard}>
-                        Explore dashboard
-                      </Button>
-                      <p className="mt-2 text-center text-xs text-muted-foreground">
-                        Resume parsing continues in the background. You can apply once it&apos;s ready.
+                    <div className="mt-6 space-y-3 border-t border-border pt-4">
+                      <p className="text-center text-base leading-relaxed text-muted-foreground">
+                        {SKIP_REASSURANCE_COPY[currentStepKind]}
                       </p>
+                      <Button type="button" variant="ghost" className="w-full" onClick={handleGoToDashboard}>
+                        Skip for now
+                      </Button>
                     </div>
                   ) : null}
 
