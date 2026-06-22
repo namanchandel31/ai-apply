@@ -92,16 +92,6 @@ export function ReferralsPage() {
     }
   };
 
-  const handleCopyCode = async () => {
-    if (!summary?.referralCode) return;
-    try {
-      await navigator.clipboard.writeText(summary.referralCode);
-      toast.success("Referral code copied");
-    } catch {
-      toast.error("Could not copy code");
-    }
-  };
-
   const rewardApplications = summary?.rewardApplications ?? 10;
   const requiredSends = summary?.requiredSends ?? 1;
   const completionWindowHours = summary?.completionWindowHours ?? 24;
@@ -118,7 +108,7 @@ export function ReferralsPage() {
         </div>
       ) : summary?.programEnabled === false ? (
         <Card className="border border-border shadow-none">
-          <CardContent className="p-6 text-sm text-muted-foreground">
+          <CardContent className="p-6 text-base text-muted-foreground">
             The referral program is not active right now.
           </CardContent>
         </Card>
@@ -140,20 +130,20 @@ export function ReferralsPage() {
           </TabsList>
 
           <TabsContent value="refer" className="mt-0">
-            <Card className="border border-border bg-muted/20 shadow-none">
-              <CardContent className="space-y-6 p-6">
+            <Card className="border border-border bg-white shadow-none">
+              <CardContent className="space-y-6 p-8">
                 <div>
-                  <h2 className="text-base font-medium text-foreground">How it works</h2>
+                  <h2 className="text-xl font-semibold text-foreground">How it works</h2>
                   <ul className="mt-4 space-y-3">
-                    <li className="flex items-start gap-3 text-sm text-foreground">
+                    <li className="flex items-start gap-3 text-base text-foreground">
                       <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      Share your invite link or referral code
+                      Share your invite link
                     </li>
-                    <li className="flex items-start gap-3 text-sm text-foreground">
+                    <li className="flex items-start gap-3 text-base text-foreground">
                       <Crown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       They sign up with your link and start applying
                     </li>
-                    <li className="flex items-start gap-3 text-sm text-foreground">
+                    <li className="flex items-start gap-3 text-base text-foreground">
                       <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       You earn {rewardApplications} bonus applications when they send{" "}
                       {requiredSends} within {completionWindowHours} hours
@@ -162,9 +152,9 @@ export function ReferralsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Your invite link</p>
+                  <p className="text-base font-medium text-foreground">Your invite link</p>
                   <div className="flex gap-2">
-                    <Input readOnly value={shareUrl} className="bg-white font-mono text-xs" />
+                    <Input readOnly value={shareUrl} className="bg-white font-mono text-base" />
                     <Button type="button" variant="outline" onClick={() => void handleCopyLink()} disabled={!shareUrl}>
                       <Copy className="mr-2 h-4 w-4" />
                       Copy
@@ -172,28 +162,8 @@ export function ReferralsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Your referral code</p>
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={summary?.referralCode ?? ""}
-                      className="bg-white font-mono text-sm tracking-widest"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleCopyCode()}
-                      disabled={!summary?.referralCode}
-                    >
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-
                 {summary ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     Rewards earned: {summary.rewardsGranted} / {summary.maxRewards}
                     {summary.bonusApplicationsTotal > 0
                       ? ` · +${summary.bonusApplicationsTotal} bonus applications total`
@@ -208,7 +178,7 @@ export function ReferralsPage() {
             <Card className="border border-border shadow-none">
               <CardContent className="p-0">
                 {referrals.length === 0 ? (
-                  <p className="p-6 text-sm text-muted-foreground">
+                  <p className="p-6 text-base text-muted-foreground">
                     No referrals yet. Share your link to start earning bonus applications.
                   </p>
                 ) : (
@@ -216,10 +186,10 @@ export function ReferralsPage() {
                     {referrals.map((referral) => (
                       <li key={referral.id} className="flex items-center justify-between gap-4 px-6 py-4">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-foreground">
+                          <p className="truncate text-base font-medium text-foreground">
                             {referral.displayName}
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-base text-muted-foreground">
                             Joined {formatReferralDate(referral.createdAt)}
                             {referral.status === "completed" && referral.completedAt
                               ? ` · Rewarded ${formatReferralDate(referral.completedAt)}`
@@ -229,14 +199,14 @@ export function ReferralsPage() {
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <span
                             className={cn(
-                              "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              "rounded-full px-2.5 py-0.5 text-sm font-medium",
                               statusClass(referral.status)
                             )}
                           >
                             {statusLabel(referral.status)}
                           </span>
                           {referral.applicationsGranted ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-sm text-muted-foreground">
                               +{referral.applicationsGranted} applications
                             </span>
                           ) : null}

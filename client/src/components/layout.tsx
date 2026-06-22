@@ -9,13 +9,15 @@ const NAV_ITEMS = [
   { to: "/applications", label: "Applications" },
 ] as const;
 
+const MAIN_NAV_PATHS = ["/dashboard", "/applications"] as const;
+
 export function Layout() {
   const { pathname } = useLocation();
-  const hideHeader = pathname === "/setup";
+  const showHeader = (MAIN_NAV_PATHS as readonly string[]).includes(pathname);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {!hideHeader && (
+      {showHeader && (
       <header className="sticky top-0 z-40 bg-sidebar">
         <div className={cn("flex h-[56px] items-center gap-4", PAGE_PADDING_X)}>
           <OneTapBrand className="mr-20" />
