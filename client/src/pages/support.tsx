@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect } from "react";
 
 // Optional: set VITE_SUPPORT_EMAIL once a real support inbox exists.
@@ -5,6 +6,7 @@ import { useEffect } from "react";
 const SUPPORT_EMAIL =
   (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined)?.trim() || "";
 const PRIVACY_PATH = "/privacy-policy";
+const TERMS_PATH = "/terms-of-service";
 
 type FaqItem = {
   q: string;
@@ -139,12 +141,13 @@ export function SupportPage() {
         <footer className="mt-16 border-t border-border pt-6 text-sm text-muted-foreground">
           <p>
             See also our{" "}
-            <a
-              className="text-primary underline underline-offset-4"
-              href={PRIVACY_PATH}
-            >
+            <Link to={PRIVACY_PATH} className="text-primary underline underline-offset-4">
               Privacy Policy
-            </a>
+            </Link>{" "}
+            and{" "}
+            <Link to={TERMS_PATH} className="text-primary underline underline-offset-4">
+              Terms of Service
+            </Link>
             .
           </p>
           <p className="mt-2">

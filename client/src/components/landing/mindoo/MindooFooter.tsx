@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
 const FOOTER_LINKS = [
-  { label: "Privacy", href: "/privacy-policy" },
+  { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Terms of Service", href: "/terms-of-service" },
   { label: "Support", href: "/support" },
   { label: "Sign in", href: "/login" },
 ] as const;

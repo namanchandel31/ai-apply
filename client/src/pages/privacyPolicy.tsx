@@ -1,6 +1,7 @@
+import { Link } from "react-router-dom";
 import { useEffect } from "react";
 
-const LAST_UPDATED = "June 17, 2026";
+const LAST_UPDATED = "June 21, 2026";
 // Optional: set VITE_SUPPORT_EMAIL once a real inbox exists. Until then the
 // contact section points to the Support page instead of a fake address.
 const CONTACT_EMAIL =
@@ -270,9 +271,9 @@ const SECTIONS: Section[] = [
       <p>
         If you have any questions about this Privacy Policy or how your data is
         handled, please reach out through our{" "}
-        <a className="text-primary underline underline-offset-4" href="/support">
+        <Link to="/support" className="text-primary underline underline-offset-4">
           Support page
-        </a>
+        </Link>
         .
       </p>
     ),
@@ -312,7 +313,16 @@ export function PrivacyPolicyPage() {
         </div>
 
         <footer className="mt-16 border-t border-border pt-6 text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} OneTap. All rights reserved.
+          <p>
+            See also our{" "}
+            <Link to="/terms-of-service" className="text-primary underline underline-offset-4">
+              Terms of Service
+            </Link>
+            .
+          </p>
+          <p className="mt-2">
+            &copy; {new Date().getFullYear()} OneTap. All rights reserved.
+          </p>
         </footer>
       </div>
     </div>
