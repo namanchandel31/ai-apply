@@ -24,7 +24,7 @@ export function SetupPageShell({
 
   return (
     <div className={cn("w-full py-6 lg:py-8", PAGE_PADDING_X, className)}>
-      <div className="mb-6">
+      <div className="mb-[40px]">
         <Button
           type="button"
           variant="ghost"

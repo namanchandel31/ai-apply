@@ -1,5 +1,77 @@
 ## Log (newest first)
 
+### 2026-06-22 — Recommended chip absolute on plan cards
+- **Prompt:** Absolute-position Recommended chip so plan titles align across cards.
+- **Outcome:** Recommended badge top-right on card; titles start at same vertical position.
+
+### 2026-06-22 — OneTap Managed AI recommended plan
+- **Prompt:** Make OneTap Managed AI recommended and highlighted on subscription page.
+- **Outcome:** getRecommendedPlanSlug prefers managed/onetap_llm; recommended card gets primary border/ring highlight.
+
+### 2026-06-22 — Subscription page UX overhaul
+- **Prompt:** Address subscription page critique (except trial quota on page): status model, single recommended plan, typography, CTAs, tabs, pricing copy, included-only features.
+- **Outcome:** Usage-based free trial status card; Recommended badge on one plan; text-base typography; Upgrade CTAs; Plan & billing tab; / month pricing; included features only.
+
+### 2026-06-22 — Remove trial usage from subscriptions page
+- **Prompt:** Remove Free trial / Applications Sent progress block from subscription page.
+- **Outcome:** Removed TrialUsageProgress from subscriptions.tsx.
+
+### 2026-06-22 — Remove Applied from profile trial quota
+- **Prompt:** Remove Applied line from profile menu free trial stats.
+- **Outcome:** Dropdown shows trial total and remaining only.
+
+### 2026-06-22 — Profile menu trial quota font size
+- **Prompt:** Match trial quota lines font size to Free trial label (size only, not weight).
+- **Outcome:** Trial usage lines use text-sm instead of text-xs.
+
+### 2026-06-22 — Free trial quota in profile menu
+- **Prompt:** Show trial application total, applied, and remaining in profile dropdown for free trial users.
+- **Outcome:** UserMenu fetches usage quota and displays counts under Your plan when on free trial.
+
+### 2026-06-22 — Settings page back-to-title spacing
+- **Prompt:** 120px gap between back button and page title/description on settings pages.
+- **Outcome:** SetupPageShell back button margin-bottom set to 120px.
+
+### 2026-06-22 — Hide top nav on internal pages
+- **Prompt:** Apply/Applications tabs should not show on profile menu internal pages; use existing back buttons.
+- **Outcome:** Header nav only renders on /dashboard and /applications; hidden on setup, extension, referrals, subscriptions, admin.
+
+### 2026-06-22 — Remove referral code section
+- **Prompt:** Remove Your referral code input and related UI from referrals page.
+- **Outcome:** Removed referral code block and copy handler; updated How it works bullet to invite link only.
+
+### 2026-06-22 — Referrals How it works heading size
+- **Prompt:** Bump font size of "How it works" on referrals page.
+- **Outcome:** Heading updated to text-xl font-semibold.
+
+### 2026-06-22 — Referrals page typography
+- **Prompt:** Match Referrals page font sizes to onboarding card (How it works, bullets, rest).
+- **Outcome:** Bumped referral card copy from text-sm/text-xs to text-base; aligned card padding with onboarding.
+
+### 2026-06-22 — Minimal install box when extension present
+- **Prompt:** When extension installed, step 1 shows only title + status; remove extra copy/version.
+- **Outcome:** Installed state is title + "Extension installed" status badge only; not-installed keeps short copy + install button.
+
+### 2026-06-22 — Connect step status row
+- **Prompt:** Add single Status line (Not connected) to step 2 connect box.
+- **Outcome:** Step 2 shows Status badge (Connected / Not connected) above Connect Extension button.
+
+### 2026-06-22 — Extension settings connect box simplification
+- **Prompt:** Reduce gap between boxes; step 2 should only show Connect Extension button.
+- **Outcome:** space-y-8 → space-y-4; removed connection status/version rows from step 2.
+
+### 2026-06-22 — Extension settings install detection
+- **Prompt:** Replace dev-only install copy with Chrome Web Store flow; detect install status and show Install button when missing.
+- **Outcome:** Step 1 pings extension for installed/not-installed, offers Install Chrome Extension + auto-detect on tab return; dev unpacked notes only in DEV. Step 2 connect disabled until installed.
+
+### 2026-06-22 — Extension settings page typography and alignment
+- **Prompt:** Bigger body text (~14px) and left-align both boxes on Chrome Extension settings page.
+- **Outcome:** Removed mx-auto centering; normalized section copy and code to text-sm (14px).
+
+### 2026-06-22 — Remove profile name editing
+- **Prompt:** Remove optional name change from user profile menu.
+- **Outcome:** Removed Edit profile menu item and ProfileEditSheet from UserMenu.
+
 ### 2026-06-20 — Commit and push current branch
 - **Prompt:** git push and commit
 - **Outcome:** Started git status/diff/log checks, then staged, committed, and pushed current branch changes.

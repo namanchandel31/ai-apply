@@ -12,6 +12,17 @@ const sharedQueryOptions = {
   refetchOnReconnect: false as const,
 };
 
+export const usageQueryOptions = {
+  queryKey: ["usage"] as const,
+  queryFn: async () => {
+    const res = await api.getUsage();
+    return res.data;
+  },
+  staleTime: 60 * 1000,
+  gcTime: 60 * 1000 * 2,
+  ...sharedQueryOptions,
+};
+
 export const setupStatusQueryOptions = {
   queryKey: ["setup-status"] as const,
   queryFn: async () => {
