@@ -625,7 +625,9 @@ export function Onboarding() {
 
                   ) : null}
 
-                  {hasResume && !isComplete && currentStepKind !== "resume" ? (
+                  {(currentStepKind === "email" || currentStepKind === "extension") &&
+                  hasResume &&
+                  !isComplete ? (
                     <div className="mt-6 space-y-3 border-t border-border pt-4">
                       <p className="text-center text-base leading-relaxed text-muted-foreground">
                         {SKIP_REASSURANCE_COPY[currentStepKind]}

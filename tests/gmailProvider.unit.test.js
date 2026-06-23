@@ -52,7 +52,7 @@ describe("GmailProvider", () => {
       tokens: {
         access_token: "AT",
         refresh_token: "RT",
-        scope: "https://www.googleapis.com/auth/gmail.send openid",
+        scope: "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email",
         expiry_date: 1893456000000,
       },
     });
@@ -67,7 +67,10 @@ describe("GmailProvider", () => {
       refreshToken: "RT",
       accessToken: "AT",
       expiresAt: new Date(1893456000000),
-      grantedScopes: ["https://www.googleapis.com/auth/gmail.send", "openid"],
+      grantedScopes: [
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ],
     });
   });
 

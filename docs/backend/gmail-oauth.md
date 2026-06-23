@@ -14,7 +14,7 @@ plug in without touching application logic.
 - `gmail.readonly` (restricted) is **never requested by default**. It is architected
   for a future opt-in "reply tracking / inbox sync" tier, gated behind
   `GMAIL_READ_TIER_ENABLED` (server) and `VITE_GMAIL_READ_TIER_ENABLED` (UI).
-- We also request `openid` + `userinfo.email` to identify the connected account.
+- We also request `userinfo.email` (non-sensitive) to identify the connected Gmail address.
 - `threadId`/`messageId` are persisted on every send so future reply tracking is cheap.
 
 ## Components
