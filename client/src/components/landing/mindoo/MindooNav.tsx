@@ -45,13 +45,9 @@ export function MindooNav() {
             <Link to="/login" className="m-btn m-btn-secondary m-nav-sign-in">
               Sign in
             </Link>
-            <button
-              type="button"
-              className="m-btn m-btn-primary m-nav-cta"
-              onClick={() => mindooScrollTo("pricing")}
-            >
-              Get started
-            </button>
+            <Link to="/signup" className="m-btn m-btn-primary m-nav-cta">
+              Get Started for Free
+            </Link>
           </div>
 
           <button
@@ -88,13 +84,9 @@ export function MindooNav() {
             <Link to="/login" className="m-btn m-btn-secondary" onClick={() => setOpen(false)}>
               Sign in
             </Link>
-            <button
-              type="button"
-              className="m-btn m-btn-primary"
-              onClick={() => scrollToSection("pricing")}
-            >
-              Get started
-            </button>
+            <Link to="/signup" className="m-btn m-btn-primary" onClick={() => setOpen(false)}>
+              Get Started for Free
+            </Link>
           </div>
         ) : null}
       </nav>

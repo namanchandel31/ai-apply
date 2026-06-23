@@ -26,7 +26,7 @@ function assertConfigured() {
 /** Resolve the OAuth scopes for a requested tier. Read scope only when flag-enabled. */
 function resolveScopes(tier) {
   const { scopes, readTierEnabled } = config.google;
-  const requested = [scopes.openid, scopes.userinfoEmail, scopes.send];
+  const requested = [scopes.userinfoEmail, scopes.send];
   if (tier === "send_read" && readTierEnabled) {
     requested.push(scopes.readonly);
   }

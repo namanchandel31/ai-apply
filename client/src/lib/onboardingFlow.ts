@@ -2,10 +2,16 @@ import type { SetupStatusData } from "@/lib/api";
 import { hasDismissedExtensionPrompt, hasEmailStepSkipped } from "@/lib/extensionPrompt";
 
 export const ONBOARDING_STEPS = [
-  { id: 1, label: "Upload Resume" },
+  { id: 1, label: "Your resume" },
   { id: 2, label: "Connect Gmail" },
   { id: 3, label: "Install Extension" },
 ] as const;
+
+/** Shared layout classes for onboarding card step content */
+export const ONBOARDING_STEP_SECTION_CLASS = "space-y-4";
+export const ONBOARDING_STEP_HEADLINE_CLASS = "text-xl font-semibold text-foreground";
+export const ONBOARDING_STEP_DESCRIPTION_CLASS = "mt-1.5 text-base text-muted-foreground";
+export const ONBOARDING_STEP_DESCRIPTION_FOLLOWUP_CLASS = "mt-2 text-base text-muted-foreground";
 
 export type OnboardingFlowStep = "resume" | "email" | "extension" | "complete";
 

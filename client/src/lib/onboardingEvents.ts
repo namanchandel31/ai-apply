@@ -15,6 +15,7 @@ export type OnboardingEventName =
   | "onboarding_abandoned"
   | "extension_prompt_shown"
   | "extension_install_clicked"
+  | "extension_installed_detected"
   | "extension_prompt_skipped";
 
 export type ActivationSource = "onboarding" | "setup";

@@ -11,7 +11,6 @@ const SCOPES = Object.freeze({
   send: "https://www.googleapis.com/auth/gmail.send",
   readonly: "https://www.googleapis.com/auth/gmail.readonly",
   userinfoEmail: "https://www.googleapis.com/auth/userinfo.email",
-  openid: "openid",
 });
 
 const clientId = str("GOOGLE_CLIENT_ID", null);

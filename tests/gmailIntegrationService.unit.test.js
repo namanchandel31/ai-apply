@@ -39,11 +39,13 @@ describe("gmailIntegrationService", () => {
     mockStore.clear();
   });
 
-  it("requests gmail.send (not readonly) by default and downgrades send_read when flag off", () => {
+  it("requests gmail.send + userinfo.email (not readonly) by default and downgrades send_read when flag off", () => {
     expect(service.effectiveTier("send_read")).toBe("send");
     const scopes = service.resolveScopes("send");
     expect(scopes).toContain(SEND);
+    expect(scopes).toContain("https://www.googleapis.com/auth/userinfo.email");
     expect(scopes).not.toContain(READONLY);
+    expect(scopes).not.toContain("openid");
   });
 
   it("round-trips a state token (single-use)", async () => {
@@ -68,7 +70,7 @@ describe("gmailIntegrationService", () => {
         refreshToken: "RT",
         accessToken: "AT",
         expiresAt: new Date(),
-        grantedScopes: [SEND, "openid"],
+        grantedScopes: [SEND, "https://www.googleapis.com/auth/userinfo.email"],
       }),
     });
     emailAccountModel.upsertOAuthAccount.mockResolvedValue({ id: "acc-1" });
@@ -95,7 +97,7 @@ describe("gmailIntegrationService", () => {
     getProvider.mockReturnValue({
       exchangeCode: jest.fn().mockResolvedValue({
         email: "me@gmail.com",
-        grantedScopes: ["openid"],
+        grantedScopes: ["https://www.googleapis.com/auth/userinfo.email"],
       }),
     });
     await expect(service.handleCallback({ code: "c", state })).rejects.toMatchObject({
