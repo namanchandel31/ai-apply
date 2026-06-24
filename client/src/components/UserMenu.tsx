@@ -54,10 +54,10 @@ export function UserMenu() {
   const navigate = useNavigate();
   const { data: status, isLoading, isSuccess, isError } = useSetupStatus();
 
-  if (!user) return null;
+  // if (!user) return null;
 
-  const displayName = getDisplayFirstName(user);
-  const initials = getUserInitials(user);
+  const displayName = user && getDisplayFirstName(user);
+  const initials = user && getUserInitials(user);
   const setupLoaded = !isLoading && (isSuccess || isError);
   const setupIncomplete =
     setupLoaded && (!status?.hasResume || !status?.hasEmailSetup || !status?.hasAiSetup);
@@ -83,7 +83,7 @@ export function UserMenu() {
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-base font-normal text-muted-foreground transition-[background-color,color] duration-[120ms] hover:bg-black/[0.05] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Account menu"
         >
-          <UserAvatar avatarUrl={user.avatarUrl} initials={initials} />
+          <UserAvatar avatarUrl={user?.avatarUrl} initials={initials} />
           <div className="hidden min-w-0 flex-col items-start sm:flex">
             <span className="max-w-[120px] truncate">{displayName}</span>
             {planBadge ? (
@@ -145,7 +145,7 @@ export function UserMenu() {
           <CreditCard className="mr-2 h-4 w-4" />
           Subscription
         </DropdownMenuItem>
-        {user.isAdmin && (
+        {user?.isAdmin && (
           <DropdownMenuItem onSelect={() => navigate("/admin")}>
             <ShieldCheck className="mr-2 h-4 w-4" />
             Admin
