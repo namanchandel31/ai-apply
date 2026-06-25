@@ -1,8 +1,5 @@
 /** Dev-only structured auth lifecycle logs (no tokens). */
-const enabled =
-  import.meta.env.DEV &&
-  typeof window !== "undefined" &&
-  window.localStorage.getItem("debug:authLifecycle") !== "0";
+const enabled = import.meta.env.DEV;
 
 export function logAuthLifecycle(
   event: string,

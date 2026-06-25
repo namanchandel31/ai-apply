@@ -292,7 +292,6 @@ async function executeWithFallback({
           task,
           reqId,
           jobId,
-          hypothesisId: "A",
           phase: "provider_execute",
         });
       }

@@ -62,7 +62,8 @@ If you don't see buttons:
 1. Confirm extension is **Connected** (popup + Settings page)
 2. Confirm **Setup complete** in the popup
 3. **Reload the LinkedIn tab** after connecting (or scroll the feed — new posts are scanned automatically)
-4. Open DevTools on LinkedIn → Console and look for `[OneTap]` messages
+4. **After updating/reloading the extension**, refresh any open LinkedIn tabs (avoids "Extension context invalidated")
+5. Open DevTools on LinkedIn → Console and look for `[OneTap]` messages
 
 ## Production / Chrome Web Store build
 

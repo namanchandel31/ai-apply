@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OneTap",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Discover LinkedIn hiring posts and add them to OneTap.",
   "permissions": ["storage", "activeTab", "alarms", "tabs", "scripting"],
   "icons": {
@@ -46,7 +46,8 @@
         "src/popup/popup.css",
         "src/content/linkedin/main.js",
         "src/config/app.config.js",
-        "src/shared/applyModeCopy.js"
+        "src/shared/applyModeCopy.js",
+        "icons/hand-stroke.png"
       ],
       "matches": ["<all_urls>"]
     }

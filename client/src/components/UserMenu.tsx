@@ -53,6 +53,11 @@ export function UserMenu() {
   const handleLogout = useLogout();
   const navigate = useNavigate();
   const { data: status, isLoading, isSuccess, isError } = useSetupStatus();
+  const onFreeTrial = isFreeTrialUser(status);
+  const { data: usage } = useQuery({
+    ...usageQueryOptions,
+    enabled: Boolean(user) && onFreeTrial,
+  });
 
   if (!user) return null;
 
@@ -62,11 +67,6 @@ export function UserMenu() {
   const setupIncomplete =
     setupLoaded && (!status?.hasResume || !status?.hasEmailSetup || !status?.hasAiSetup);
   const planBadge = getSubscriptionMenuBadge(status);
-  const onFreeTrial = isFreeTrialUser(status);
-  const { data: usage } = useQuery({
-    ...usageQueryOptions,
-    enabled: onFreeTrial,
-  });
   const applicationQuota = usage?.quota_applications_sent;
   const showTrialQuota =
     onFreeTrial &&

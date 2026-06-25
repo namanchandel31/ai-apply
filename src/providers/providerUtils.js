@@ -38,7 +38,6 @@ async function safeProviderFetch(url, options, meta = {}) {
     logNetworkError(subsystem, err, {
       ...meta,
       phase: `${phase}_failed`,
-      hypothesisId: meta.hypothesisId || "A",
     });
     throw err;
   }
@@ -51,7 +50,6 @@ async function safeReadResponseJson(res, meta = {}) {
     logNetworkError(meta.subsystem || "provider_fetch", err, {
       ...meta,
       phase: "response_body_read",
-      hypothesisId: meta.hypothesisId || "A",
       httpStatus: res?.status,
     });
     if (meta.fallbackOnReadError) return meta.fallbackOnReadError;

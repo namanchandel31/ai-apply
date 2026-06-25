@@ -38,12 +38,11 @@ async function geminiGenerate({ apiKey, model, systemPrompt, userPrompt, jsonMod
       body: JSON.stringify(body),
       signal,
     },
-    { subsystem: "gemini_fetch", provider: "gemini", hypothesisId: "A", phase: "generate" }
+    { subsystem: "gemini_fetch", provider: "gemini", phase: "generate" }
   );
   const data = await safeReadResponseJson(res, {
     subsystem: "gemini_fetch",
     provider: "gemini",
-    hypothesisId: "A",
     fallbackOnReadError: {},
   });
   if (!res.ok) {
