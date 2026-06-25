@@ -42,7 +42,6 @@ function attachRedisErrorHandler(client, subsystem, extra = {}) {
   client.on("error", (err) => {
     logNetworkError(subsystem, err, {
       ...extra,
-      hypothesisId: extra.hypothesisId || "C",
       phase: "redis_error_event",
     });
   });

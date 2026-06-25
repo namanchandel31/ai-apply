@@ -6,22 +6,50 @@
   let isAutoApplyMode;
   let isSetupCompleteFromStatus;
   let linkedInButtonTitle;
-  let linkedInSuccessLabel;
   let linkedInSuccessTitle;
   let setupIssuesFromStatus;
   let WEB_BASE;
 
+  function isExtensionContextValid() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
+
+  function isContextInvalidatedError(message) {
+    return /extension context invalidated/i.test(String(message || ""));
+  }
+
+  async function importExtensionModule(path, attempts = 3) {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      if (!isExtensionContextValid()) {
+        throw new Error("Extension context invalidated");
+      }
+      try {
+        return await import(chrome.runtime.getURL(path));
+      } catch (err) {
+        lastErr = err;
+        if (i < attempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 120 * (i + 1)));
+        }
+      }
+    }
+    throw lastErr;
+  }
+
   try {
     const [applyModeCopy, appConfig] = await Promise.all([
-      import(chrome.runtime.getURL("src/shared/applyModeCopy.js")),
-      import(chrome.runtime.getURL("src/config/app.config.js")),
+      importExtensionModule("src/shared/applyModeCopy.js"),
+      importExtensionModule("src/config/app.config.js"),
     ]);
     ({
       friendlyApplyError,
       isAutoApplyMode,
       isSetupCompleteFromStatus,
       linkedInButtonTitle,
-      linkedInSuccessLabel,
       linkedInSuccessTitle,
       setupIssuesFromStatus,
     } = applyModeCopy);
@@ -31,23 +59,111 @@
     return;
   }
 
-const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;const CONFIG_TTL_MS = 60 * 60 * 1000;
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const CONFIG_TTL_MS = 60 * 60 * 1000;
 const SCAN_DEBOUNCE_MS = 400;
 const MIN_POST_TEXT_LEN = 40;
 
+const ACTION_LABELS = ["like", "comment", "repost", "send"];
+const SOCIAL_CONTROL_SEL = "button, [role='button'], a";
+
+function controlHints(btn) {
+  const parts = [btn.getAttribute("aria-label"), btn.getAttribute("title"), btn.innerText];
+  let node = btn.parentElement;
+  for (let i = 0; i < 3 && node; i++) {
+    parts.push(node.getAttribute("aria-label"));
+    parts.push(node.getAttribute("title"));
+    node = node.parentElement;
+  }
+  return parts
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesLabel(btn, label) {
+  const hints = controlHints(btn);
+  const txt = (btn.innerText || "").trim().toLowerCase();
+  const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+  if (txt === label || txt.startsWith(label) || aria === label || aria.startsWith(label + " ")) {
+    return true;
+  }
+  if (label === "like") {
+    return hints.includes("like") || hints.includes("react");
+  }
+  if (label === "send") {
+    return (
+      hints.includes("send") ||
+      hints.includes("share") ||
+      hints.includes("private message") ||
+      hints.includes("paper plane")
+    );
+  }
+  return hints.includes(label);
+}
+
+function isActionButton(btn) {
+  return ACTION_LABELS.some((label) => matchesLabel(btn, label));
+}
+
+function queryActionCandidates(root) {
+  return Array.from(root.querySelectorAll(SOCIAL_CONTROL_SEL)).filter(isActionButton);
+}
+
+let contextInvalidated = false;
+let initialized = false;
+let scanTimer = null;
+let observer = null;
+let scrollHandler = null;
+
+function shutdownContentScript(reason) {
+  if (contextInvalidated) return;
+  contextInvalidated = true;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  if (scanTimer) {
+    window.clearTimeout(scanTimer);
+    scanTimer = null;
+  }
+  if (scrollHandler) {
+    window.removeEventListener("scroll", scrollHandler);
+    scrollHandler = null;
+  }
+  initialized = false;
+  console.info(`[OneTap] Content script stopped (${reason}) — refresh this tab after updating the extension`);
+}
+
 function bgRequest(type, payload) {
+  if (!isExtensionContextValid()) {
+    shutdownContentScript("invalidated");
+    return Promise.reject(new Error("Extension context invalidated"));
+  }
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(payload ? { type, payload } : { type }, (res) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
+    try {
+      chrome.runtime.sendMessage(payload ? { type, payload } : { type }, (res) => {
+        if (chrome.runtime.lastError) {
+          const msg = chrome.runtime.lastError.message || "Messaging failed";
+          if (isContextInvalidatedError(msg)) {
+            shutdownContentScript("invalidated");
+          }
+          reject(new Error(msg));
+          return;
+        }
+        if (!res?.ok) {
+          reject(new Error(res?.error || "Request failed"));
+          return;
+        }
+        resolve(res.data);
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isContextInvalidatedError(msg)) {
+        shutdownContentScript("invalidated");
       }
-      if (!res?.ok) {
-        reject(new Error(res?.error || "Request failed"));
-        return;
-      }
-      resolve(res.data);
-    });
+      reject(err instanceof Error ? err : new Error(msg));
+    }
   });
 }
 
@@ -103,7 +219,16 @@ const DEFAULT_DETECTION_CONFIG = {
 };
 
 async function getCachedConfig() {
-  const stored = await chrome.storage.local.get(["detectionConfig", "detectionConfigFetchedAt"]);
+  if (contextInvalidated || !isExtensionContextValid()) {
+    return DEFAULT_DETECTION_CONFIG;
+  }
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(["detectionConfig", "detectionConfigFetchedAt"]);
+  } catch {
+    if (!isExtensionContextValid()) shutdownContentScript("invalidated");
+    return DEFAULT_DETECTION_CONFIG;
+  }
   if (
     stored.detectionConfig &&
     stored.detectionConfigFetchedAt &&
@@ -125,12 +250,20 @@ async function getCachedConfig() {
 }
 
 async function isConnected() {
+  if (contextInvalidated || !isExtensionContextValid()) return false;
   try {
     const ping = await bgRequest("ONETAP_PING");
     return Boolean(ping?.connected);
-  } catch {
-    const { accessToken } = await chrome.storage.local.get("accessToken");
-    return Boolean(accessToken);
+  } catch (err) {
+    if (isContextInvalidatedError(err instanceof Error ? err.message : String(err))) {
+      return false;
+    }
+    try {
+      const { accessToken } = await chrome.storage.local.get("accessToken");
+      return Boolean(accessToken);
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -181,6 +314,10 @@ function countDistinctEmails(el) {
   return new Set(matches.map((m) => m.toLowerCase())).size;
 }
 
+function countSocialButtons(el) {
+  return queryActionCandidates(el).length;
+}
+
 function findPostContainer(emailEl) {
   let node = emailEl;
   let best = emailEl;
@@ -190,6 +327,7 @@ function findPostContainer(emailEl) {
     const len = (node.innerText || "").trim().length;
     if (len > 8000) break;
     best = node;
+    if (len >= MIN_POST_TEXT_LEN && countSocialButtons(node) >= 2) break;
     node = node.parentElement;
     depth += 1;
   }
@@ -211,11 +349,20 @@ function collectPostRoots() {
   const containers = [];
   for (const anchor of anchors) {
     const container = findPostContainer(anchor);
-    if (
-      containers.some(
-        (c) => c === container || c.contains(container) || container.contains(c)
-      )
-    ) {
+
+    for (let i = containers.length - 1; i >= 0; i--) {
+      if (containers[i] !== container && containers[i].contains(container)) {
+        containers.splice(i, 1);
+      }
+    }
+
+    if (containers.some((c) => c !== container && container.contains(c))) {
+      continue;
+    }
+    if (containers.includes(container)) {
+      continue;
+    }
+    if ((container.innerText || "").length > MAX_POST_CONTAINER_TEXT) {
       continue;
     }
     containers.push(container);
@@ -253,23 +400,25 @@ function extractPermalink(container) {
 const ONETAP_MARK_PATH =
   "M20 44C31.0457 44 40 35.0457 40 24C40 12.9543 31.0457 4 20 4C8.95428 4 0 12.9543 0 24C0 35.0457 8.95428 44 20 44ZM26.2393 13.3168C26.543 12.2381 25.4961 11.6001 24.54 12.2813L11.1931 21.7896C10.1562 22.5283 10.3193 24 11.4381 24H14.9527V23.9728H21.8025L16.2212 25.9421L13.7607 34.6832C13.457 35.762 14.5038 36.3999 15.46 35.7187L28.8069 26.2105C29.8438 25.4718 29.6806 24 28.5619 24H23.2321L26.2393 13.3168Z";
 
-const ONETAP_STYLE_ID = "onetap-style";
+const ONETAP_UI_VERSION = "0.1.24";
+const HAND_STROKE_URL = chrome.runtime.getURL("icons/hand-stroke.png");
+
+const ONETAP_STYLE_ID = `onetap-style-${ONETAP_UI_VERSION}`;
 
 function ensureStyles() {
-  if (document.getElementById(ONETAP_STYLE_ID)) return;
+  document.querySelectorAll('[id^="onetap-style-"]').forEach((el) => el.remove());
   const style = document.createElement("style");
   style.id = ONETAP_STYLE_ID;
   style.textContent = `
 [data-onetap-btn]{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 [data-onetap-btn]:disabled{cursor:default;}
-.onetap-standalone{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:transparent;transition:background .2s ease;}
-.onetap-standalone:hover{background:rgba(37,99,235,.10);}
-.onetap-standalone:disabled:hover{background:transparent;}
-.onetap-action{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:transparent;}
-.onetap-action .onetap-label{font-weight:600;font-size:14px;line-height:1;color:var(--color-text-low-emphasis,rgba(0,0,0,.6));}
-.onetap-ico{display:block;overflow:visible;}
-.onetap-standalone .onetap-ico{width:28px;height:28px;}
-.onetap-action .onetap-ico{width:20px;height:20px;}
+.onetap-standalone{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;padding:0;border:0;background:transparent;}
+.onetap-standalone:hover{opacity:.9;}
+.onetap-standalone:disabled:hover{opacity:1;}
+.onetap-visual{position:relative;display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;}
+.ot-stroke{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);object-fit:contain;pointer-events:none;opacity:1;transition:opacity .2s ease;z-index:2;filter:brightness(0) saturate(100%) invert(24%) sepia(98%) saturate(4452%) hue-rotate(353deg) brightness(93%) contrast(92%);}
+.onetap-visual:has(.onetap-ico.is-loading) .ot-stroke,.onetap-visual:has(.onetap-ico.is-success) .ot-stroke,.onetap-visual:has(.onetap-ico.is-error) .ot-stroke{opacity:0;}
+.onetap-ico{display:block;overflow:visible;width:36px;height:36px;position:relative;z-index:1;}
 .onetap-ico .ot-mark{fill:#2563eb;transition:opacity .25s ease;}
 .onetap-ico .ot-ring{fill:none;stroke:#2563eb;stroke-width:3.5;stroke-linecap:round;opacity:0;transform:rotate(-90deg);transform-box:fill-box;transform-origin:center;transition:stroke .35s ease;}
 .onetap-ico .ot-check{fill:none;stroke:#16a34a;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;opacity:0;}
@@ -281,8 +430,7 @@ function ensureStyles() {
 .onetap-ico.is-success .ot-check{opacity:1;animation:ot-draw-check .3s ease .42s forwards;}
 .onetap-ico.is-error{animation:ot-shake .4s ease;}
 .onetap-ico.is-error .ot-mark{fill:#dc2626;}
-.onetap-ico.is-error + .onetap-label,.onetap-action.is-error .onetap-label{color:#dc2626!important;}
-.onetap-label.is-subtle{font-size:12px!important;}
+.onetap-action.is-error{opacity:.85;}
 #onetap-linkedin-banner{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:2147483646;display:flex;align-items:center;gap:10px;max-width:min(560px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;background:#1e293b;color:#f8fafc;font:500 13px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.28);}
 #onetap-linkedin-banner a{color:#93c5fd;text-decoration:none;font-weight:600;white-space:nowrap;}
 #onetap-linkedin-banner a:hover{text-decoration:underline;}
@@ -298,24 +446,28 @@ function ensureStyles() {
 }
 
 const ICON_SVG = `
-    <svg class="onetap-ico" viewBox="0 0 52 52" fill="none" aria-hidden="true">
-      <g class="ot-mark" transform="translate(6,2)"><path fill-rule="evenodd" clip-rule="evenodd" d="${ONETAP_MARK_PATH}"/></g>
-      <circle class="ot-ring" cx="26" cy="26" r="23"/>
-      <path class="ot-check" d="M15 27 l7 7 l15 -15"/>
+    <svg class="onetap-ico" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+      <g class="ot-mark" transform="translate(8,2)"><path fill-rule="evenodd" clip-rule="evenodd" d="${ONETAP_MARK_PATH}"/></g>
+      <circle class="ot-ring" cx="28" cy="28" r="24"/>
+      <path class="ot-check" d="M16 29 l7 7 l15 -15"/>
     </svg>
   `;
 
+function buttonIconHtml() {
+  return `
+    <span class="onetap-visual">
+      ${ICON_SVG.trim()}
+      <img class="ot-stroke" src="${HAND_STROKE_URL}" alt="" aria-hidden="true" />
+    </span>
+  `;
+}
+
 function updateButtonIdleState(btn, autoApply) {
   if (btn.dataset.onetapAdded) return;
-  const label = btn.querySelector(".onetap-label");
   const title = linkedInButtonTitle(autoApply);
   btn.title = title;
   btn.setAttribute("aria-label", title);
   btn.classList.remove("is-error");
-  if (label) {
-    label.textContent = "OneTap";
-    label.classList.remove("is-subtle");
-  }
 }
 
 async function refreshButtonApplyModeHints() {
@@ -384,100 +536,279 @@ async function refreshLinkedInBanner() {
   removeLinkedInBanner();
 }
 
-// Standalone circular button — fallback used only when the post's action bar
-// can't be located (e.g. detail views without a Like/Comment/Repost/Send row).
+// Standalone circular button — used when the action bar is found but no sibling
+// item can be cloned, or as a last-resort when no social row exists.
 function createStandaloneButton(autoApply) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.dataset.onetapBtn = "1";
+  btn.dataset.onetapUiVersion = ONETAP_UI_VERSION;
   btn.className = "onetap-standalone";
   const title = linkedInButtonTitle(autoApply);
   btn.setAttribute("aria-label", title);
   btn.title = title;
-  btn.innerHTML = ICON_SVG;
+  btn.innerHTML = buttonIconHtml();
   return btn;
 }
 
-const ACTION_LABELS = ["like", "comment", "repost", "send"];
+const MIN_SOCIAL_IN_BAR = 2;
+const MAX_ACTION_BAR_TEXT_LEN = 400;
+const MAX_ACTION_BAR_CHILDREN = 14;
 
-function matchesLabel(btn, label) {
-  const txt = (btn.innerText || "").trim().toLowerCase();
-  const aria = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-  return (
-    txt === label || txt.startsWith(label) || aria === label || aria.startsWith(label + " ")
-  );
+function isPlausibleActionBar(bar, postContainer, minSocial = MIN_SOCIAL_IN_BAR) {
+  if (!bar || bar === postContainer) return false;
+  if ((bar.innerText || "").length > MAX_ACTION_BAR_TEXT_LEN) return false;
+  if (bar.childElementCount > MAX_ACTION_BAR_CHILDREN) return false;
+  return queryActionCandidates(bar).length >= minSocial;
 }
 
-function isActionButton(btn) {
-  return ACTION_LABELS.some((label) => matchesLabel(btn, label));
+function findActionContainer(postContainer, candidates) {
+  const valid = [];
+  for (const btn of candidates) {
+    let node = btn.parentElement;
+    while (node && postContainer.contains(node)) {
+      const socialCount = candidates.filter((c) => node.contains(c)).length;
+      if (socialCount >= MIN_SOCIAL_IN_BAR) {
+        valid.push({ node, socialCount });
+      }
+      node = node.parentElement;
+    }
+  }
+  if (!valid.length) return null;
+
+  const maxSocial = Math.max(...valid.map((v) => v.socialCount));
+  const best = valid.filter((v) => v.socialCount === maxSocial);
+
+  // Innermost row that still contains all social buttons (not the whole post card).
+  for (const { node } of best) {
+    let isInnermost = true;
+    for (const { node: other } of best) {
+      if (other !== node && node.contains(other)) {
+        isInnermost = false;
+        break;
+      }
+    }
+    if (isInnermost && isPlausibleActionBar(node, postContainer)) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function isReactionsSlot(el, index = -1, total = 0) {
+  if (!el || el.dataset?.onetapItem) return false;
+  const hints = slotHints(el);
+  if (hints.includes("reaction")) return true;
+  if (isSendSlot(el)) return false;
+  if (el.matches("button, [role='button']")) {
+    return hints.includes("reaction") || hints.includes("insights");
+  }
+  const text = (el.innerText || "").trim();
+  if (/^\d+$/.test(text)) return false;
+  // Left-side slots (avatar, etc.) — only match explicit reaction labels.
+  if (index >= 0 && total > 0 && index < total - 3 && !hints.includes("reaction")) {
+    return false;
+  }
+  const imgs = el.querySelectorAll("img, svg, li-icon");
+  return imgs.length >= 1 && text.length < 50;
+}
+
+function slotHints(el) {
+  return [el.getAttribute("aria-label"), el.getAttribute("title"), el.innerText]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function isSendSlot(el) {
+  if (!el || el.dataset?.onetapItem) return false;
+  const hints = controlHints(el);
+  return hints.includes("send") || hints.includes("share");
+}
+
+function isSocialActionSlot(el) {
+  if (!el || el.dataset?.onetapItem) return false;
+  if (isReactionsSlot(el)) return false;
+  if (isSendSlot(el)) return true;
+  if (el.matches("button, [role='button'], a")) return true;
+  return Boolean(el.querySelector("button, [role='button'], a"));
+}
+
+function isTrailingRightRailSlot(el, index, total) {
+  if (!el || el.dataset?.onetapItem) return false;
+  if (index < total - 2) return false;
+  if (isSendSlot(el)) return false;
+
+  const text = (el.innerText || "").trim();
+  if (/^\d+$/.test(text)) return false;
+
+  if (isReactionsSlot(el, index, total)) return true;
+
+  // Trailing facepile link — often <a> with no aria/img when scanned early.
+  if (el.tagName === "A") {
+    const hints = slotHints(el);
+    if (!hints.includes("send") && !hints.includes("share")) return true;
+  }
+
+  return false;
+}
+
+function findTrailingReactionsAnchor(container) {
+  const children = Array.from(container.children).filter((c) => !c.dataset?.onetapItem);
+  const total = children.length;
+  const minIdx = Math.max(0, total - 3);
+  let startIdx = -1;
+  for (let i = total - 1; i >= 0; i--) {
+    if (isTrailingRightRailSlot(children[i], i, total)) {
+      startIdx = i;
+    } else if (startIdx >= 0) {
+      break;
+    }
+  }
+  return startIdx >= minIdx ? children[startIdx] : null;
+}
+
+function findSendAnchor(container) {
+  const children = Array.from(container.children).filter((c) => !c.dataset?.onetapItem);
+  return children.find(isSendSlot) || null;
+}
+
+function findLastSocialAnchor(container) {
+  const children = Array.from(container.children).filter((c) => !c.dataset?.onetapItem);
+  for (let i = children.length - 1; i >= 0; i--) {
+    const child = children[i];
+    if (isReactionsSlot(child)) continue;
+    if (isSocialActionSlot(child)) return child;
+  }
+  return null;
+}
+
+const WRAPPER_RAIL =
+  "display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:40px;margin-left:8px;";
+
+function findRightRailInsertAnchor(bar) {
+  const trailingInBar = findTrailingReactionsAnchor(bar);
+  if (trailingInBar) return { anchor: trailingInBar, mode: "before", source: "trailing-bar" };
+
+  const parent = bar.parentElement;
+  const trailingInParent = parent ? findTrailingReactionsAnchor(parent) : null;
+  if (trailingInParent && parent && !bar.contains(trailingInParent)) {
+    return { anchor: trailingInParent, mode: "before", source: "trailing-parent" };
+  }
+
+  const children = Array.from(bar.children).filter((c) => !c.dataset?.onetapItem);
+  const send = findSendAnchor(bar);
+  if (send && children.length >= 6) {
+    const last = children[children.length - 1];
+    if (last && last !== send && !isSendSlot(last)) {
+      return { anchor: last, mode: "before", source: "before-last" };
+    }
+  }
+
+  return null;
+}
+
+// Always insert before the right-rail anchor so flex:1 pushes the icon to the right edge.
+function insertIntoActionBar(bar, allCandidates, node) {
+  node.style.cssText = WRAPPER_RAIL;
+  const point = findRightRailInsertAnchor(bar);
+
+  if (point) {
+    point.anchor.insertAdjacentElement("beforebegin", node);
+    return;
+  }
+
+  const send = findSendAnchor(bar) || findLastSocialAnchor(bar);
+  if (send) {
+    send.insertAdjacentElement("afterend", node);
+    return;
+  }
+
+  bar.appendChild(node);
+}
+
+function removeStaleOneTapUi(container) {
+  for (const el of container.querySelectorAll("[data-onetap-item], [data-onetap-btn]")) {
+    const root = el.closest("[data-onetap-item]") || el;
+    if (root.dataset.onetapUiVersion !== ONETAP_UI_VERSION) {
+      root.remove();
+    }
+  }
 }
 
 // LinkedIn's feed is SDUI with no stable class hooks, so we locate the social
-// action bar by its action buttons (Like/Comment/Repost/Send) and return one of
-// their items to clone. Cloning inherits LinkedIn's exact flex + padding, so our
-// button slots in as an equal 5th action with matching spacing.
+// action row by its action buttons (Like/Comment/Repost/Send).
 function findActionBarInfo(container) {
-  const candidates = Array.from(container.querySelectorAll("button")).filter(
-    isActionButton
-  );
-  if (candidates.length < 3) return null;
-
-  let bar = candidates[0].parentElement;
-  while (bar && bar !== container.parentElement) {
-    if (candidates.filter((c) => bar.contains(c)).length >= 3) break;
-    bar = bar.parentElement;
+  const candidates = queryActionCandidates(container);
+  if (candidates.length >= MIN_SOCIAL_IN_BAR) {
+    const bar = findActionContainer(container, candidates);
+    if (bar) return { bar, candidates };
   }
-  if (!bar) return null;
 
-  const inBar = candidates.filter((c) => bar.contains(c));
-  if (inBar.length < 3) return null;
-
-  // Prefer a structurally simple action to clone — Send/Repost sometimes carry
-  // dropdown triggers, while Comment/Like are plain buttons.
-  const reference =
-    inBar.find((b) => matchesLabel(b, "comment")) ||
-    inBar.find((b) => matchesLabel(b, "like")) ||
-    inBar[0];
-
-  let item = reference;
-  while (item.parentElement && item.parentElement !== bar) {
-    item = item.parentElement;
+  if (candidates.length >= 1) {
+    const bar = findLooseActionBar(container, candidates);
+    if (bar) return { bar, candidates };
   }
-  if (item.parentElement !== bar) return null;
 
-  return { bar, item };
+  return null;
 }
 
-// Clone a sibling action item for exact layout parity, then swap its contents
-// for the OneTap icon + label. Only the blue circular icon hints at the brand;
-// everything else (size, padding, hover) is inherited from LinkedIn.
-function createActionButton(item, autoApply) {
-  const wrapper = item.cloneNode(true);
-  wrapper.removeAttribute("id");
-  wrapper.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+function findLooseActionBar(postContainer, candidates) {
+  const anchor =
+    candidates.find((c) => matchesLabel(c, "send")) || candidates[candidates.length - 1];
+  let row = anchor?.parentElement;
+  while (row && postContainer.contains(row)) {
+    if (row !== postContainer && isPlausibleActionBar(row, postContainer, 1)) {
+      return row;
+    }
+    row = row.parentElement;
+  }
+  return null;
+}
+
+function findLooseActionHost(postContainer, candidates) {
+  const pool = candidates.length ? candidates : queryActionCandidates(postContainer);
+  if (!pool.length) return null;
+
+  const anchor = pool.find((c) => matchesLabel(c, "send")) || pool[pool.length - 1];
+  let row = anchor.parentElement;
+  while (row && postContainer.contains(row)) {
+    const textLen = (row.innerText || "").length;
+    if (
+      row !== postContainer &&
+      textLen <= MAX_ACTION_BAR_TEXT_LEN &&
+      row.childElementCount <= MAX_ACTION_BAR_CHILDREN
+    ) {
+      return row;
+    }
+    row = row.parentElement;
+  }
+  return anchor.parentElement;
+}
+
+function insertIntoFallbackBar(container, node) {
+  const host = findLooseActionHost(container, queryActionCandidates(container));
+  if (!host) return false;
+  node.style.cssText = WRAPPER_RAIL;
+  host.appendChild(node);
+  return true;
+}
+
+const MAX_POST_CONTAINER_TEXT = 2500;
+
+function createInlineActionItem(autoApply) {
+  const wrapper = document.createElement("div");
   wrapper.dataset.onetapItem = "1";
-
-  const btn = wrapper.matches("button") ? wrapper : wrapper.querySelector("button");
-  if (!btn) return null;
-
-  wrapper.querySelectorAll("button").forEach((b) => {
-    if (b !== btn) b.remove();
-  });
-
-  btn.setAttribute("type", "button");
-  btn.dataset.onetapBtn = "1";
-  btn.classList.add("onetap-action");
-  const title = linkedInButtonTitle(autoApply);
-  btn.setAttribute("aria-label", title);
-  btn.title = title;
-  btn.removeAttribute("aria-pressed");
-  btn.innerHTML = `${ICON_SVG}<span class="onetap-label">OneTap</span>`;
-
+  wrapper.dataset.onetapUiVersion = ONETAP_UI_VERSION;
+  const btn = createStandaloneButton(autoApply);
+  wrapper.appendChild(btn);
   return { wrapper, btn };
 }
 
 async function injectButton(container, text, permalink, config) {
+  removeStaleOneTapUi(container);
   if (container.querySelector("[data-onetap-btn]")) return;
+  if ((container.innerText || "").length > MAX_POST_CONTAINER_TEXT) return;
 
   const { score, email } = scorePost(text, config);
   if (score < (config.threshold ?? 70)) return;
@@ -485,38 +816,28 @@ async function injectButton(container, text, permalink, config) {
   ensureStyles();
 
   const autoApply = isAutoApplyMode(await getApplyMode());
-  let btn = null;
   const barInfo = findActionBarInfo(container);
-  if (barInfo) {
-    const built = createActionButton(barInfo.item, autoApply);
-    if (built) {
-      barInfo.bar.appendChild(built.wrapper);
-      btn = built.btn;
-    }
+  const built = createInlineActionItem(autoApply);
+
+  if (barInfo?.bar) {
+    insertIntoActionBar(barInfo.bar, barInfo.candidates, built.wrapper);
+  } else if (!insertIntoFallbackBar(container, built.wrapper)) {
+    return;
   }
 
-  if (!btn) {
-    const row = document.createElement("div");
-    row.dataset.onetapRow = "1";
-    row.style.cssText = "padding:2px 6px 6px;";
-    btn = createStandaloneButton(autoApply);
-    row.appendChild(btn);
-    container.appendChild(row);
-  }
-
-  wireButton(btn, text, permalink, email);
+  wireButton(built.btn, text, permalink, email);
 }
 
 function wireButton(btn, text, permalink, email) {
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (contextInvalidated || !isExtensionContextValid()) return;
     if (btn.dataset.busy) return;
     btn.dataset.busy = "1";
     btn.disabled = true;
 
     const ico = btn.querySelector(".onetap-ico");
-    const label = btn.querySelector(".onetap-label");
     ico.classList.remove("is-error");
     btn.classList.remove("is-error");
     ico.classList.add("is-loading");
@@ -534,10 +855,6 @@ function wireButton(btn, text, permalink, email) {
       ico.classList.remove("is-loading");
       ico.classList.add("is-success");
       btn.dataset.onetapAdded = "1";
-      if (label) {
-        label.textContent = linkedInSuccessLabel(autoApply);
-        label.classList.add("is-subtle");
-      }
       const successTitle = linkedInSuccessTitle(autoApply);
       btn.title = successTitle;
       btn.setAttribute("aria-label", successTitle);
@@ -548,10 +865,6 @@ function wireButton(btn, text, permalink, email) {
       btn.disabled = false;
       delete btn.dataset.busy;
       const message = friendlyApplyError(err instanceof Error ? err.message : "Failed");
-      if (label) {
-        label.textContent = "Retry";
-        label.classList.add("is-subtle");
-      }
       btn.title = message;
       btn.setAttribute("aria-label", message);
       window.setTimeout(() => {
@@ -565,6 +878,7 @@ function wireButton(btn, text, permalink, email) {
 }
 
 function scanFeed(config) {
+  if (contextInvalidated) return;
   const posts = collectPostRoots();
   posts.forEach((container) => {
     const text = extractPostText(container);
@@ -574,17 +888,18 @@ function scanFeed(config) {
   });
 }
 
-let scanTimer = null;
 function scheduleScan(config) {
+  if (contextInvalidated) return;
   if (scanTimer) window.clearTimeout(scanTimer);
   scanTimer = window.setTimeout(() => scanFeed(config), SCAN_DEBOUNCE_MS);
 }
 
-let initialized = false;
-let observer = null;
-
 async function init() {
-  if (initialized) return;
+  if (contextInvalidated || initialized) return;
+  if (!isExtensionContextValid()) {
+    shutdownContentScript("invalidated");
+    return;
+  }
 
   await refreshLinkedInBanner();
 
@@ -605,18 +920,24 @@ async function init() {
     config = DEFAULT_DETECTION_CONFIG;
   }
   initialized = true;
+  console.info(`[OneTap] LinkedIn UI ${ONETAP_UI_VERSION} active`);
   scanFeed(config);
   void refreshButtonApplyModeHints();
 
   if (!observer && document.body) {
     observer = new MutationObserver(() => scheduleScan(config));
     observer.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener("scroll", () => scheduleScan(config), { passive: true });
+    scrollHandler = () => scheduleScan(config);
+    window.addEventListener("scroll", scrollHandler, { passive: true });
   }
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local") return;
+  if (contextInvalidated || area !== "local") return;
+  if (!isExtensionContextValid()) {
+    shutdownContentScript("invalidated");
+    return;
+  }
   if (changes.accessToken) {
     initialized = false;
     init().catch((err) => console.error("[OneTap] re-init failed", err));

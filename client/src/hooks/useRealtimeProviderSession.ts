@@ -27,8 +27,6 @@ type SessionArgs = {
   isResolved: boolean;
   isAuthenticated: boolean;
   session: Session | null;
-  disableRealtime: boolean;
-  disableLeaderPoll: boolean;
   getTransportState: () => ConnectionState;
 };
 
@@ -37,8 +35,6 @@ export function useRealtimeProviderSession({
   isResolved,
   isAuthenticated,
   session,
-  disableRealtime,
-  disableLeaderPoll,
   getTransportState,
 }: SessionArgs) {
   const coordinator = getSharedCoordinatorRef();
@@ -53,13 +49,6 @@ export function useRealtimeProviderSession({
       if (!isAuthenticated) {
         getRealtimeTransportManager().shutdown();
       }
-      shutdownCoordinatorSession();
-      clearConnectionListeners();
-      setIsLeader(false);
-      return removeListener;
-    }
-
-    if (disableRealtime) {
       shutdownCoordinatorSession();
       clearConnectionListeners();
       setIsLeader(false);
@@ -82,28 +71,18 @@ export function useRealtimeProviderSession({
       });
     }
 
-    const leaderPoll = disableLeaderPoll
-      ? null
-      : setInterval(() => {
-          const next = getSharedCoordinatorRef()?.isLeader() ?? false;
-          setIsLeader((prev) => (prev === next ? prev : next));
-        }, 3000);
+    const leaderPoll = setInterval(() => {
+      const next = getSharedCoordinatorRef()?.isLeader() ?? false;
+      setIsLeader((prev) => (prev === next ? prev : next));
+    }, 3000);
 
     return () => {
-      if (leaderPoll) clearInterval(leaderPoll);
+      clearInterval(leaderPoll);
       removeListener();
     };
-  }, [
-    queryClient,
-    isResolved,
-    isAuthenticated,
-    session?.access_token,
-    disableRealtime,
-    disableLeaderPoll,
-  ]);
+  }, [queryClient, isResolved, isAuthenticated, session?.access_token]);
 
   useEffect(() => {
-    if (disableRealtime) return;
     const activeCoordinator = getSharedCoordinatorRef();
     if (!session?.access_token || !activeCoordinator || isCacheSyncBound()) return;
     markCacheSyncBound();
@@ -112,12 +91,12 @@ export function useRealtimeProviderSession({
       sseConnected: getTransportState() === "connected" && activeCoordinator.isLeader(),
       connectionState: getTransportState(),
     }));
-  }, [queryClient, session?.access_token, disableRealtime, getTransportState]);
+  }, [queryClient, session?.access_token, getTransportState]);
 
   return {
     coordinator: getSharedCoordinatorRef(),
-    isLeader: disableRealtime ? false : isLeader,
-    isDegraded: disableRealtime ? false : (getSharedCoordinatorRef()?.isDegraded() ?? false),
+    isLeader,
+    isDegraded: getSharedCoordinatorRef()?.isDegraded() ?? false,
   };
 }
 

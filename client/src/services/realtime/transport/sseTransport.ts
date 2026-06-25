@@ -132,12 +132,6 @@ export function createSseTransport(options: SseTransportOptions) {
 
   async function connect() {
     if (disposed || connectInFlight) return;
-    const disableRealtime =
-      typeof window !== "undefined" && window.localStorage.getItem("debug:disableRealtime") === "1";
-    if (disableRealtime) {
-      setState("disconnected");
-      return;
-    }
 
     const now = Date.now();
     if (now - lastConnectAt < MIN_CONNECT_GAP_MS) return;

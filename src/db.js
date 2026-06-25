@@ -33,7 +33,6 @@ function attachPoolErrorHandler(pool, poolInstanceId) {
     metrics.increment("db.pool.error", { phase: "idle" });
     if (shouldLogInfraError(err)) {
       logNetworkError("postgres_pool", err, {
-        hypothesisId: "B",
         phase: "idle_client_error",
         poolInstanceId,
         pid: process.pid,

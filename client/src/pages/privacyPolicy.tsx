@@ -1,7 +1,11 @@
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
 
-const LAST_UPDATED = "June 21, 2026";
+const LAST_UPDATED = "June 25, 2026";
+
+const GOOGLE_PERMISSIONS_URL = "https://myaccount.google.com/permissions";
+const GOOGLE_API_POLICY_URL =
+  "https://developers.google.com/terms/api-services-user-data-policy";
 // Optional: set VITE_SUPPORT_EMAIL once a real inbox exists. Until then the
 // contact section points to the Support page instead of a fake address.
 const CONTACT_EMAIL =
@@ -84,8 +88,122 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: "google-user-data",
+    title: "3. Google User Data",
+    body: (
+      <>
+        <p>
+          OneTap uses Google services in two ways: signing you in, and (optionally)
+          connecting your Gmail account to send applications. This section explains
+          what Google data we access, why we access it, where it is stored, whether
+          we share it, and how you can revoke access.
+        </p>
+
+        <h3 className="mt-4 font-medium text-foreground">Sign in with Google</h3>
+        <ul>
+          <li>
+            <strong>What we access.</strong> Your Google account email address, name,
+            and profile picture (via Supabase Authentication).
+          </li>
+          <li>
+            <strong>Why.</strong> To create your OneTap account and sign you in
+            securely.
+          </li>
+          <li>
+            <strong>Where it is stored.</strong> Account identifiers are stored in our
+            database (hosted on Supabase). We do not store your Google password.
+          </li>
+          <li>
+            <strong>Sharing.</strong> We do not sell or rent this data. It is shared
+            only with Supabase as our authentication provider, solely to operate the
+            Service.
+          </li>
+          <li>
+            <strong>How to revoke access.</strong> Sign out of OneTap. You may also
+            remove OneTap&rsquo;s access under{" "}
+            <a
+              href={GOOGLE_PERMISSIONS_URL}
+              className="text-primary underline underline-offset-4"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Google Account &rarr; Third-party access
+            </a>
+            . Deleting your OneTap account removes associated data from our systems
+            (see &ldquo;Your Rights and Choices&rdquo; below).
+          </li>
+        </ul>
+
+        <h3 className="mt-4 font-medium text-foreground">Gmail connection (optional)</h3>
+        <ul>
+          <li>
+            <strong>What we access.</strong> If you choose to connect Gmail, we
+            request Google OAuth permission to send email on your behalf (
+            <code>gmail.send</code>) and to read your connected Gmail address (
+            <code>userinfo.email</code>). We do not request permission to read your
+            inbox unless you explicitly opt in to a future reply-tracking feature
+            (when that feature is enabled, <code>gmail.readonly</code> may be
+            requested). We do not read, store, or analyze the contents of your inbox
+            for advertising.
+          </li>
+          <li>
+            <strong>Why.</strong> To send job-application emails you approve from
+            your own Gmail address, without sharing your Gmail password with us.
+          </li>
+          <li>
+            <strong>Where it is stored.</strong> Gmail OAuth tokens and your connected
+            email address are stored encrypted in our application database. Message
+            content you send is processed to deliver the email and retained as part of
+            your application history in OneTap.
+          </li>
+          <li>
+            <strong>Sharing.</strong> We do not sell Gmail data. Email transmission
+            goes through Google&rsquo;s Gmail API. We do not share your Gmail data with
+            advertisers or unrelated third parties.
+          </li>
+          <li>
+            <strong>How to revoke access.</strong> In OneTap, go to{" "}
+            <strong>Setup &rarr; Email</strong> and choose{" "}
+            <strong>Disconnect Gmail</strong>. This revokes our tokens with Google and
+            deletes stored Gmail credentials from our database. You can also remove
+            access anytime at{" "}
+            <a
+              href={GOOGLE_PERMISSIONS_URL}
+              className="text-primary underline underline-offset-4"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Google Account &rarr; Third-party access
+            </a>
+            .
+          </li>
+        </ul>
+
+        <p>
+          <strong>App password alternative.</strong> If you use a Gmail app password
+          instead of OAuth, we store the encrypted app password only to send mail you
+          initiate. You can remove it in Setup and revoke the app password in your
+          Google Account security settings.
+        </p>
+
+        <p>
+          OneTap&rsquo;s use of information received from Google APIs adheres to the{" "}
+          <a
+            href={GOOGLE_API_POLICY_URL}
+            className="text-primary underline underline-offset-4"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements.
+        </p>
+      </>
+    ),
+  },
+  {
     id: "how-we-use",
-    title: "3. How We Use Your Information",
+    title: "4. How We Use Your Information",
     body: (
       <>
         <p>We use the information we collect to:</p>
@@ -114,7 +232,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "extension",
-    title: "4. The Chrome Extension",
+    title: "5. The Chrome Extension",
     body: (
       <>
         <p>
@@ -150,7 +268,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "third-parties",
-    title: "5. Third-Party Services",
+    title: "6. Third-Party Services",
     body: (
       <>
         <p>
@@ -158,6 +276,11 @@ const SECTIONS: Section[] = [
           providers process data only as needed to provide their services to us:
         </p>
         <ul>
+          <li>
+            <strong>Google</strong> &mdash; sign-in (via Supabase) and, when you
+            connect Gmail, sending email through the Gmail API. See &ldquo;Google User
+            Data&rdquo; above for details.
+          </li>
           <li>
             <strong>Supabase</strong> &mdash; authentication and database hosting.
           </li>
@@ -181,7 +304,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "storage-security",
-    title: "6. Data Storage and Security",
+    title: "7. Data Storage and Security",
     body: (
       <>
         <p>
@@ -196,7 +319,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "retention",
-    title: "7. Data Retention",
+    title: "8. Data Retention",
     body: (
       <>
         <p>
@@ -211,13 +334,29 @@ const SECTIONS: Section[] = [
   },
   {
     id: "your-rights",
-    title: "8. Your Rights and Choices",
+    title: "9. Your Rights and Choices",
     body: (
       <>
         <p>You can:</p>
         <ul>
           <li>Access and update your profile information in the dashboard.</li>
           <li>Remove uploaded resumes, AI keys, and email credentials.</li>
+          <li>
+            Disconnect Gmail in <strong>Setup &rarr; Email</strong>, which revokes
+            our Google tokens and deletes stored Gmail credentials from our database.
+          </li>
+          <li>
+            Revoke OneTap&rsquo;s Google access at any time via{" "}
+            <a
+              href={GOOGLE_PERMISSIONS_URL}
+              className="text-primary underline underline-offset-4"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Google Account &rarr; Third-party access
+            </a>
+            .
+          </li>
           <li>Disconnect the extension at any time, which clears its stored data.</li>
           <li>
             Request access to, correction of, or deletion of your personal data by
@@ -233,7 +372,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "children",
-    title: "9. Children's Privacy",
+    title: "10. Children's Privacy",
     body: (
       <p>
         OneTap is not directed to individuals under the age of 16, and we do not
@@ -245,7 +384,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "changes",
-    title: "10. Changes to This Policy",
+    title: "11. Changes to This Policy",
     body: (
       <p>
         We may update this Privacy Policy from time to time. When we make material
@@ -257,7 +396,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "contact",
-    title: "11. Contact Us",
+    title: "12. Contact Us",
     body: CONTACT_EMAIL ? (
       <p>
         If you have any questions about this Privacy Policy or how your data is
@@ -299,7 +438,7 @@ export function PrivacyPolicyPage() {
           </p>
         </header>
 
-        <div className="space-y-10 [&_a]:break-words [&_li]:mt-2 [&_p]:leading-relaxed [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6">
+        <div className="space-y-10 [&_a]:break-words [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-sm [&_h3]:text-base [&_li]:mt-2 [&_p]:leading-relaxed [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6">
           {SECTIONS.map((section) => (
             <section key={section.id} id={section.id} className="scroll-mt-24">
               <h2 className="mb-3 text-xl font-semibold tracking-tight">

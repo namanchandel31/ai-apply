@@ -28,15 +28,9 @@ function getTransportSnapshot(): ConnectionState {
   return getRealtimeTransportManager().getState();
 }
 
-function readDebugFlag(key: string) {
-  return typeof window !== "undefined" && window.localStorage.getItem(key) === "1";
-}
-
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { isResolved, isAuthenticated, session } = useAuthReady();
-  const disableRealtime = readDebugFlag("debug:disableRealtime");
-  const disableLeaderPoll = readDebugFlag("debug:disableLeaderPoll");
 
   const connectionState = useSyncExternalStore(
     subscribeTransportState,
@@ -49,21 +43,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     isResolved,
     isAuthenticated,
     session,
-    disableRealtime,
-    disableLeaderPoll,
     getTransportState: getTransportSnapshot,
   });
 
   const value = useMemo(
     () =>
       createRealtimeContextValue({
-        disableRealtime,
         connectionState,
         isLeader,
         isDegraded,
         coordinator,
       }),
-    [disableRealtime, connectionState, isLeader, isDegraded, coordinator]
+    [connectionState, isLeader, isDegraded, coordinator]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

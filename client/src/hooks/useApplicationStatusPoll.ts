@@ -58,9 +58,6 @@ export function useApplicationStatusPoll(
     isLeader?: boolean;
   }
 ) {
-  const disablePolling =
-    typeof window !== "undefined" && window.localStorage.getItem("debug:disablePolling") === "1";
-
   const appsRef = useRef(applications);
   appsRef.current = applications;
 
@@ -103,7 +100,7 @@ export function useApplicationStatusPoll(
       abortRef.current = null;
     };
 
-    if (disablePolling || !pollableIdsKey || pollIntervalMs === null) {
+    if (!pollableIdsKey || pollIntervalMs === null) {
       clearPoller();
       return;
     }

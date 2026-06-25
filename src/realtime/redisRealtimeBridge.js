@@ -22,7 +22,6 @@ function startRedisRealtimeBridge() {
 
   subscriber = new IORedis(config.redis.redisUrl, { maxRetriesPerRequest: null });
   attachRedisErrorHandler(subscriber, "redis_pubsub_subscriber", {
-    hypothesisId: "C",
     role: "subscriber",
   });
 

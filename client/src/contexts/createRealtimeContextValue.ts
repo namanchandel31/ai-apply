@@ -15,7 +15,6 @@ export type RealtimeContextValue = {
 };
 
 type BuildArgs = {
-  disableRealtime: boolean;
   connectionState: ConnectionState;
   isLeader: boolean;
   isDegraded: boolean;
@@ -23,15 +22,14 @@ type BuildArgs = {
 };
 
 export function createRealtimeContextValue({
-  disableRealtime,
   connectionState,
   isLeader,
   isDegraded,
   coordinator,
 }: BuildArgs): RealtimeContextValue {
-  const sseConnected = !disableRealtime && connectionState === "connected" && isLeader;
+  const sseConnected = connectionState === "connected" && isLeader;
 
-  if (disableRealtime || !coordinator) {
+  if (!coordinator) {
     return {
       connectionState: "disconnected",
       sseConnected: false,

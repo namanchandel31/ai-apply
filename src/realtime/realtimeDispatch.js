@@ -18,7 +18,6 @@ function getPublisher() {
   if (!redisPublisher) {
     redisPublisher = new IORedis(config.redis.redisUrl, { maxRetriesPerRequest: null });
     attachRedisErrorHandler(redisPublisher, "redis_pubsub_publisher", {
-      hypothesisId: "C",
       role: "publisher",
     });
   }

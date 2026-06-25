@@ -27,17 +27,25 @@ function openWebApp(path) {
 
 function bgRequest(type, fields = {}) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type, ...fields }, (res) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
+    try {
+      if (!chrome.runtime?.id) {
+        reject(new Error("Extension context invalidated"));
         return;
       }
-      if (!res?.ok) {
-        reject(new Error(res?.error || "Request failed"));
-        return;
-      }
-      resolve(res.data);
-    });
+      chrome.runtime.sendMessage({ type, ...fields }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!res?.ok) {
+          reject(new Error(res?.error || "Request failed"));
+          return;
+        }
+        resolve(res.data);
+      });
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error(String(err)));
+    }
   });
 }
 
