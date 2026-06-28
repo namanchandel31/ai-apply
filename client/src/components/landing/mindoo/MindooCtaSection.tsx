@@ -6,16 +6,20 @@ export function MindooCtaSection() {
       <div className="m-padding-global">
         <div className="m-container">
           <div data-reveal="" className="m-cta-card">
-            <h2 className="m-cta-card-title">Stop drafting applications at 11pm.</h2>
+            <h2 className="m-cta-card-title">
+              Apply to more jobs.
+              <br />
+              Spend less time applying.
+            </h2>
             <p className="m-cta-card-sub m-body-text">
-              Pick a plan and set up in three minutes.
+              Set up OneTap once and let it write, send, and track every application.
             </p>
             <button
               type="button"
               className="m-cta-card-btn"
               onClick={() => mindooScrollTo("pricing")}
             >
-              View plans →
+              Get Started Free
             </button>
           </div>
         </div>
