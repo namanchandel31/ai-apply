@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { HeroHeadline, HERO_LEAD } from "@/components/landing/HeroHeadline";
+import { mindooScrollTo } from "@/hooks/useMindooScroll";
 import "@/styles/mindoo.css";
 
 export function MindooHeroSection() {
@@ -21,15 +22,18 @@ export function MindooHeroSection() {
           <div className="mh-hero-intro">
             <HeroHeadline ready={ready} />
             <p data-hero="subheading" className="mh-hero-lead m-body-text">
-              <span className="mh-hero-lead-line">{HERO_LEAD.line1}</span>
-              <span className="mh-hero-lead-line">{HERO_LEAD.line2}</span>
+              {HERO_LEAD}
             </p>
             <div className={`mh-hero-actions${ready ? " is-ready" : ""}`}>
-              <Link to="/signup" className="mh-hero-btn mh-hero-btn-primary">
-                Get Started for Free
-              </Link>
+              <button
+                type="button"
+                className="mh-hero-btn mh-hero-btn-primary"
+                onClick={() => mindooScrollTo("pricing")}
+              >
+                Start for free
+              </button>
               <Link to="/support" className="mh-hero-btn mh-hero-btn-secondary">
-                Get a demo
+                Watch demo
               </Link>
             </div>
           </div>
