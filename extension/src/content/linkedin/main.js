@@ -400,8 +400,7 @@ function extractPermalink(container) {
 const ONETAP_MARK_PATH =
   "M20 44C31.0457 44 40 35.0457 40 24C40 12.9543 31.0457 4 20 4C8.95428 4 0 12.9543 0 24C0 35.0457 8.95428 44 20 44ZM26.2393 13.3168C26.543 12.2381 25.4961 11.6001 24.54 12.2813L11.1931 21.7896C10.1562 22.5283 10.3193 24 11.4381 24H14.9527V23.9728H21.8025L16.2212 25.9421L13.7607 34.6832C13.457 35.762 14.5038 36.3999 15.46 35.7187L28.8069 26.2105C29.8438 25.4718 29.6806 24 28.5619 24H23.2321L26.2393 13.3168Z";
 
-const ONETAP_UI_VERSION = "0.1.24";
-const HAND_STROKE_URL = chrome.runtime.getURL("icons/hand-stroke.png");
+const ONETAP_UI_VERSION = "0.1.26";
 
 const ONETAP_STYLE_ID = `onetap-style-${ONETAP_UI_VERSION}`;
 
@@ -416,9 +415,7 @@ function ensureStyles() {
 .onetap-standalone:hover{opacity:.9;}
 .onetap-standalone:disabled:hover{opacity:1;}
 .onetap-visual{position:relative;display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;}
-.ot-stroke{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);object-fit:contain;pointer-events:none;opacity:1;transition:opacity .2s ease;z-index:2;filter:brightness(0) saturate(100%) invert(24%) sepia(98%) saturate(4452%) hue-rotate(353deg) brightness(93%) contrast(92%);}
-.onetap-visual:has(.onetap-ico.is-loading) .ot-stroke,.onetap-visual:has(.onetap-ico.is-success) .ot-stroke,.onetap-visual:has(.onetap-ico.is-error) .ot-stroke{opacity:0;}
-.onetap-ico{display:block;overflow:visible;width:36px;height:36px;position:relative;z-index:1;}
+.onetap-ico{display:block;overflow:visible;width:36px;height:36px;position:relative;}
 .onetap-ico .ot-mark{fill:#2563eb;transition:opacity .25s ease;}
 .onetap-ico .ot-ring{fill:none;stroke:#2563eb;stroke-width:3.5;stroke-linecap:round;opacity:0;transform:rotate(-90deg);transform-box:fill-box;transform-origin:center;transition:stroke .35s ease;}
 .onetap-ico .ot-check{fill:none;stroke:#16a34a;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;opacity:0;}
@@ -454,12 +451,7 @@ const ICON_SVG = `
   `;
 
 function buttonIconHtml() {
-  return `
-    <span class="onetap-visual">
-      ${ICON_SVG.trim()}
-      <img class="ot-stroke" src="${HAND_STROKE_URL}" alt="" aria-hidden="true" />
-    </span>
-  `;
+  return `<span class="onetap-visual">${ICON_SVG.trim()}</span>`;
 }
 
 function updateButtonIdleState(btn, autoApply) {
@@ -668,63 +660,33 @@ function findTrailingReactionsAnchor(container) {
   return startIdx >= minIdx ? children[startIdx] : null;
 }
 
-function findSendAnchor(container) {
-  const children = Array.from(container.children).filter((c) => !c.dataset?.onetapItem);
-  return children.find(isSendSlot) || null;
-}
-
-function findLastSocialAnchor(container) {
-  const children = Array.from(container.children).filter((c) => !c.dataset?.onetapItem);
-  for (let i = children.length - 1; i >= 0; i--) {
-    const child = children[i];
-    if (isReactionsSlot(child)) continue;
-    if (isSocialActionSlot(child)) return child;
-  }
-  return null;
-}
-
 const WRAPPER_RAIL =
-  "display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:40px;margin-left:8px;";
+  "display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:40px;margin-left:auto;";
 
 function findRightRailInsertAnchor(bar) {
   const trailingInBar = findTrailingReactionsAnchor(bar);
-  if (trailingInBar) return { anchor: trailingInBar, mode: "before", source: "trailing-bar" };
+  if (trailingInBar) return { anchor: trailingInBar, mode: "before" };
 
   const parent = bar.parentElement;
   const trailingInParent = parent ? findTrailingReactionsAnchor(parent) : null;
   if (trailingInParent && parent && !bar.contains(trailingInParent)) {
-    return { anchor: trailingInParent, mode: "before", source: "trailing-parent" };
+    return { anchor: trailingInParent, mode: "before" };
   }
 
-  const children = Array.from(bar.children).filter((c) => !c.dataset?.onetapItem);
-  const send = findSendAnchor(bar);
-  if (send && children.length >= 6) {
-    const last = children[children.length - 1];
-    if (last && last !== send && !isSendSlot(last)) {
-      return { anchor: last, mode: "before", source: "before-last" };
-    }
-  }
-
-  return null;
+  return { anchor: bar, mode: "append" };
 }
 
-// Always insert before the right-rail anchor so flex:1 pushes the icon to the right edge.
+// Insert before trailing reactions, or append as last flex child when none exist.
 function insertIntoActionBar(bar, allCandidates, node) {
   node.style.cssText = WRAPPER_RAIL;
   const point = findRightRailInsertAnchor(bar);
 
-  if (point) {
+  if (point.mode === "before") {
     point.anchor.insertAdjacentElement("beforebegin", node);
     return;
   }
 
-  const send = findSendAnchor(bar) || findLastSocialAnchor(bar);
-  if (send) {
-    send.insertAdjacentElement("afterend", node);
-    return;
-  }
-
-  bar.appendChild(node);
+  point.anchor.appendChild(node);
 }
 
 function removeStaleOneTapUi(container) {

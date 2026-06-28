@@ -16,7 +16,7 @@
 
 // Flip to "development" for local testing (localhost:5173 / localhost:5000).
 // Use "production" for Chrome Web Store builds (onetapjob.com).
-const ENVIRONMENT = "development";  
+const ENVIRONMENT = "production";  
 
 const ENVIRONMENTS = {
   development: {
