@@ -2,44 +2,44 @@ import { useId, useState } from "react";
 
 const FAQ_ITEMS = [
   {
-    question: "Does OneTap read my inbox or train on my data?",
+    question: "What is OneTap?",
     answer:
-      "No. OneTap processes the job descriptions you submit and the emails it drafts on your behalf. It does not read unrelated Gmail threads, sell your data, or train models on your résumé. API keys are encrypted at rest and used only to run your requests.",
+      "OneTap helps you apply to jobs faster. Instead of rewriting the same application over and over, just paste a job description or use the Chrome extension. OneTap writes a tailored application, sends it from your Gmail, and keeps everything organized in one place.",
   },
   {
-    question: "How does sending from Gmail work?",
+    question: "How does OneTap work?",
     answer:
-      "You connect your Gmail account once in setup. Applications send from your real inbox so recruiters see your name and email address, not a platform no-reply address. You can review each email first or turn on Auto apply to send automatically.",
+      "Once you add a job description, OneTap compares it with your résumé to understand how well you match the role. It then writes a personalized application, sends it from your Gmail, and automatically tracks it for you.",
   },
   {
-    question: "Can I review emails before they go out?",
+    question: "Does OneTap have access to my Gmail?",
     answer:
-      "Yes. Turn Auto apply off to draft each email, edit the subject and body, and send when you are ready. Turn it on when you want OneTap to send automatically from Gmail after you add a role.",
+      "No. OneTap cannot read your inbox, emails, or conversations. It only uses the permission you grant to send job applications from your Gmail on your behalf.",
   },
   {
     question: "Do I need the Chrome extension?",
     answer:
-      "No. You can paste any job description into the Apply tab. The Chrome extension is optional: it lets you apply in one click from LinkedIn without copy-pasting.",
+      "No. You can paste any job description directly into OneTap. The Chrome extension is optional and lets you apply from LinkedIn in one click.",
   },
   {
-    question: "What do I need to get started?",
+    question: "Can I review applications before they're sent?",
     answer:
-      "Create your account, choose a plan, and complete a short setup: upload your résumé and connect Gmail. On Bring your own AI, you also add an API key from a supported provider. On OneTap AI, hosted models are included with no key setup.",
+      "Yes. You can review and edit every application before sending it. If you'd rather automate everything, you can turn on Auto Apply and let OneTap send applications for you.",
   },
   {
-    question: "How does billing work?",
+    question: "Do I need my own AI API key?",
     answer:
-      "Subscriptions are billed monthly when you choose a plan. Payments are processed securely through our checkout partner. On Bring your own AI, you also pay your AI provider directly for token usage.",
+      "Not unless you want to. You can connect your own AI provider and pay only for what you use, or use OneTap's managed AI with no API key or setup required.",
   },
   {
-    question: "Is my payment information secure?",
+    question: "How do I track my applications?",
     answer:
-      "Yes. Payments are handled by our checkout partner. OneTap never stores your card, UPI, or bank details on our servers.",
+      "Every application is automatically saved in your dashboard. You can see where you've applied, track the status, and keep your entire job search organized in one place.",
   },
   {
-    question: "What AI providers can I connect?",
+    question: "Can I use OneTap without LinkedIn?",
     answer:
-      "On Bring your own AI, connect OpenAI, Gemini, Groq, or OpenRouter and pick from certified models for that provider. On OneTap AI, applications run on OneTap-hosted models with no provider account required.",
+      "Yes. OneTap works with any job description. You can paste a job posting from any website, or use the Chrome extension to apply directly from LinkedIn.",
   },
 ] as const;
 

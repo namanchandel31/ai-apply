@@ -8,20 +8,20 @@ const SETUP_STEPS: ReadonlyArray<{
   visual: SetupVisualVariant;
 }> = [
   {
-    title: "Choose your plan",
-    body: "Pick Bring your own AI and add an API key, or OneTap AI with hosted models included.",
+    title: "Choose your AI",
+    body: "Use your own AI provider, or let OneTap manage everything for you.",
     gradient: "linear-gradient(160deg, #dcfce7 0%, #f0fdf4 100%)",
     visual: "model",
   },
   {
-    title: "Upload resume",
-    body: "OneTap tailors every email from your experience.",
+    title: "Upload your résumé",
+    body: "Upload it once. OneTap uses it to tailor every application you send.",
     gradient: "linear-gradient(160deg, #dbeafe 0%, #eff6ff 100%)",
     visual: "resume",
   },
   {
     title: "Connect Gmail",
-    body: "Connect over SMTP with a Gmail app password. Send from your inbox.",
+    body: "Connect your Gmail once so OneTap can send applications from your account.",
     gradient: "linear-gradient(160deg, #fce7f3 0%, #fdf2f8 100%)",
     visual: "smtp",
   },

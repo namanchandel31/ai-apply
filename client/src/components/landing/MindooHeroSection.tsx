@@ -22,8 +22,7 @@ export function MindooHeroSection() {
           <div className="mh-hero-intro">
             <HeroHeadline ready={ready} />
             <p data-hero="subheading" className="mh-hero-lead m-body-text">
-              <span className="mh-hero-lead-line">{HERO_LEAD.line1}</span>
-              <span className="mh-hero-lead-line">{HERO_LEAD.line2}</span>
+              {HERO_LEAD}
             </p>
             <div className={`mh-hero-actions${ready ? " is-ready" : ""}`}>
               <button
@@ -31,10 +30,10 @@ export function MindooHeroSection() {
                 className="mh-hero-btn mh-hero-btn-primary"
                 onClick={() => mindooScrollTo("pricing")}
               >
-                Get started
+                Start for free
               </button>
               <Link to="/support" className="mh-hero-btn mh-hero-btn-secondary">
-                Get a demo
+                Watch demo
               </Link>
             </div>
           </div>
