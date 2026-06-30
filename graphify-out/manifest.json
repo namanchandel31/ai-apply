@@ -390,8 +390,8 @@
     "semantic_hash": ""
   },
   "client/src/components/landing/mindoo/MindooPricingSection.tsx": {
-    "mtime": 1782848424.6060379,
-    "ast_hash": "f806f8af7e26d0b4b7e855447572f338",
+    "mtime": 1782854436.6899066,
+    "ast_hash": "59aa319842839a220c6fab76751cc5bf",
     "semantic_hash": ""
   },
   "client/src/components/landing/mindoo/MindooProblemSection.tsx": {
@@ -695,7 +695,7 @@
     "semantic_hash": ""
   },
   "client/src/lib/api.ts": {
-    "mtime": 1782848374.4874947,
+    "mtime": 1782853183.4916182,
     "ast_hash": "acda8bddbeb34e41b712a89ada88c658",
     "semantic_hash": ""
   },
@@ -800,8 +800,8 @@
     "semantic_hash": ""
   },
   "client/src/lib/postAuthDestination.ts": {
-    "mtime": 1782842391.276788,
-    "ast_hash": "c928e16f11e8baf035b0de0bc92d665a",
+    "mtime": 1782853178.317136,
+    "ast_hash": "c94f79a9ba2813ad7ec1b2a2b152a5db",
     "semantic_hash": ""
   },
   "client/src/lib/remoteProviders.ts": {
@@ -885,8 +885,8 @@
     "semantic_hash": ""
   },
   "client/src/pages/pricing.tsx": {
-    "mtime": 1782842391.2784102,
-    "ast_hash": "fdec74e2798ef6271c6e8ddfb6a37380",
+    "mtime": 1782854437.6948,
+    "ast_hash": "670cd6ff009d0d4b4c1cea4c7b6d5cb5",
     "semantic_hash": ""
   },
   "client/src/pages/privacyPolicy.tsx": {
@@ -935,8 +935,8 @@
     "semantic_hash": ""
   },
   "client/src/routes/AuthenticatedHomeRedirect.tsx": {
-    "mtime": 1782842391.2778661,
-    "ast_hash": "d40eef4c590ebdb4f20e9dacf6f22796",
+    "mtime": 1782853179.852867,
+    "ast_hash": "9ac3b2e87fbf88991cce7638ac687896",
     "semantic_hash": ""
   },
   "client/src/routes/GuestRoute.tsx": {
@@ -955,8 +955,8 @@
     "semantic_hash": ""
   },
   "client/src/routes/SubscriptionGuard.tsx": {
-    "mtime": 1782842391.2784102,
-    "ast_hash": "b9b2ab72c9ffb66b004f42b854f3c58d",
+    "mtime": 1782853181.4566383,
+    "ast_hash": "7687dadbc37a9afc900bbf66226917ab",
     "semantic_hash": ""
   },
   "client/src/services/logging/debugFlags.ts": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "client/vite.config.ts": {
-    "mtime": 1781448411.4788692,
-    "ast_hash": "8c018bbcbd6dc78cdea3d5e0483e781b",
+    "mtime": 1782852951.207681,
+    "ast_hash": "7c0cbc147004baaaf47df686b689daa7",
     "semantic_hash": ""
   },
   "extension/manifest.json": {
@@ -1335,8 +1335,8 @@
     "semantic_hash": ""
   },
   "src/config/cors.config.js": {
-    "mtime": 1779785057.35129,
-    "ast_hash": "eacda6712d3f06608c2fbddffe0591b6",
+    "mtime": 1782852946.8015733,
+    "ast_hash": "b8999f275adaa0c6518b8c080678d8e6",
     "semantic_hash": ""
   },
   "src/config/database.config.js": {
@@ -4600,8 +4600,8 @@
     "semantic_hash": ""
   },
   "client/src/lib/paywallRouting.ts": {
-    "mtime": 1782127127.9599564,
-    "ast_hash": "5b076b3bfca36511ca5ca1823a3f7a44",
+    "mtime": 1782852662.649819,
+    "ast_hash": "0a6b9bbf016a053e38d9bd6779e65050",
     "semantic_hash": ""
   },
   "client/src/components/admin/AiCostPanel.tsx": {
@@ -4775,8 +4775,8 @@
     "semantic_hash": ""
   },
   "client/src/pages/subscriptions.tsx": {
-    "mtime": 1782127128.0509207,
-    "ast_hash": "2606f453469cfa12d4d4e17818fd0c80",
+    "mtime": 1782854438.663182,
+    "ast_hash": "6819ea80bd54e14885b994592ba80dc3",
     "semantic_hash": ""
   },
   "client/src/components/SetupStatusBootstrap.tsx": {
@@ -4922,6 +4922,11 @@
   "docs/observability/posthog-events.md": {
     "mtime": 1782848388.6878273,
     "ast_hash": "76f5dd08a45cedc921d3053ba87bfd94",
+    "semantic_hash": ""
+  },
+  "client/src/components/billing/RazorpaySecuredBadge.tsx": {
+    "mtime": 1782854443.7129302,
+    "ast_hash": "2b1379a97673eb04b6d56a230581e615",
     "semantic_hash": ""
   }
 }

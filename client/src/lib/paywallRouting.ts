@@ -1,5 +1,13 @@
 import type { SetupStatusData } from "@/lib/api";
+import { isPricingEnabled } from "@/lib/featureFlags";
 import { isOnboardingFlowComplete } from "@/lib/onboardingFlow";
+
+/** Client env may show pricing UI, but server pricingEnabled is authoritative for gates. */
+export function shouldEnforceSubscriptionPaywall(status?: SetupStatusData | null): boolean {
+  if (!isPricingEnabled) return false;
+  if (status?.pricingEnabled === false) return false;
+  return true;
+}
 
 export type PaywallTrigger = "after_plan_selection" | "after_onboarding" | "before_first_apply";
 

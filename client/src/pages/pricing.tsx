@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
+import { RazorpaySecuredBadge } from "@/components/billing/RazorpaySecuredBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { loadRazorpayCheckout } from "@/lib/loadRazorpayCheckout";
@@ -236,6 +237,8 @@ export function PricingPage() {
             );
           })}
         </div>
+
+        <RazorpaySecuredBadge />
       </div>
     </div>
   );
