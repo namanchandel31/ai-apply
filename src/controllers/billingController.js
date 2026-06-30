@@ -173,6 +173,29 @@ const verifyBillingPaymentController = async (req, res) => {
     ]);
 
     logInfo("BILLING_PAYMENT_VERIFIED", { userId, reqId: req.requestId, orderId: razorpayOrderId, paymentId: razorpayPaymentId, idempotent });
+
+    try {
+      const {
+        trackCheckoutCompleted,
+        trackSubscriptionActivated,
+      } = require("../observability/posthogAnalytics");
+      trackCheckoutCompleted(userId, {
+        plan_id: plan?.slug,
+        razorpay_order_id: razorpayOrderId,
+        idempotent,
+        workflow_id: req.analyticsMeta?.workflow_id,
+      });
+      if (!idempotent) {
+        trackSubscriptionActivated(userId, {
+          plan_id: plan?.slug,
+          source: "checkout",
+          workflow_id: req.analyticsMeta?.workflow_id,
+        });
+      }
+    } catch {
+      /* non-blocking */
+    }
+
     return ok(res, { user: me, entitlement }, { idempotent });
   } catch (err) {
     logError("BILLING_VERIFY_PAYMENT_ERROR", err, { userId, reqId: req.requestId, orderId: razorpayOrderId });

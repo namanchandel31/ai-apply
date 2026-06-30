@@ -171,6 +171,17 @@ async function transitionApplicationState(client, params) {
           triggeringTransition: `${expected[0]}_to_${nextStatus}`,
         });
 
+  if (row.user_id && expected[0] !== nextStatus) {
+    try {
+      const { trackApplicationStatusTransition } = require("../observability/posthogAnalytics");
+      trackApplicationStatusTransition(row.user_id, expected[0], nextStatus, {
+        application_id: applicationId,
+      });
+    } catch {
+      /* analytics must not break transitions */
+    }
+  }
+
   if (row.user_id) {
     const enteringTerminal = isTerminalApplicationStatus(nextStatus);
     const publishSource = orchestrationBump === "revive_with_transition" ? "revive" : "app_transition";

@@ -388,28 +388,28 @@ async function executeWithFallback({
 // =============================================================================
 
 async function recordTelemetry(payload) {
-  try {
-    const {
-      userId,
-      provider,
-      model,
-      endpoint,
-      credentialSource,
-      usage,
-      estimatedCost,
-      latencyMs,
-      retries,
-      success,
-      errorCode,
-      reqId,
-      promptVersion,
-      promptHash,
-      featureKey,
-      applicationId,
-      certifiedModelId,
-      platformCredentialId,
-    } = payload;
+  const {
+    userId,
+    provider,
+    model,
+    endpoint,
+    credentialSource,
+    usage,
+    estimatedCost,
+    latencyMs,
+    retries,
+    success,
+    errorCode,
+    reqId,
+    promptVersion,
+    promptHash,
+    featureKey,
+    applicationId,
+    certifiedModelId,
+    platformCredentialId,
+  } = payload;
 
+  try {
     await pool.query(
       `INSERT INTO llm_usage_logs (
         user_id, provider, model, endpoint, credential_source,
@@ -442,6 +442,29 @@ async function recordTelemetry(payload) {
     );
   } catch (err) {
     logError("LLM_TELEMETRY_WRITE_FAILED", err, { provider: payload.provider, model: payload.model });
+  }
+
+  if (userId) {
+    try {
+      const { trackAiRequest } = require("../observability/posthogAnalytics");
+      const eventName = success ? "ai_request_completed" : "ai_request_failed";
+      trackAiRequest(userId, eventName, {
+        provider,
+        model,
+        latency_ms: latencyMs,
+        prompt_tokens: usage?.promptTokens || 0,
+        completion_tokens: usage?.completionTokens || 0,
+        total_tokens: usage?.totalTokens || 0,
+        estimated_cost: estimatedCost,
+        retry_count: retries || 0,
+        request_type: featureKey || endpoint,
+        application_id: applicationId,
+        request_id: reqId,
+        error_code: errorCode || null,
+      });
+    } catch {
+      /* non-blocking */
+    }
   }
 }
 

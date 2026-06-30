@@ -2,6 +2,7 @@ import { ApplicationsIsometricVisual } from "./ApplicationsIsometricVisual";
 import { LinkedInFeedScroll } from "./LinkedInFeedScroll";
 import { ModelProviderVisual } from "./ModelProviderVisual";
 import { CHROME_EXTENSION_URL } from "@/lib/extensionPrompt";
+import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 
 const CHROME_WEB_STORE_ICON = "/chrome-web-store-icon.png";
 
@@ -112,6 +113,9 @@ export function MindooFeatureShowcaseSection() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mh-hero-btn mh-hero-btn-primary"
+                        onClick={() =>
+                          trackLandingCtaEngaged("extension_install", CHROME_EXTENSION_URL)
+                        }
                       >
                         Install Extension
                       </a>

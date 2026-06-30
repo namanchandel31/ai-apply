@@ -139,6 +139,12 @@ async function handleCallback({ code, state }) {
   });
 
   logInfo("GMAIL_CONNECTED", { userId, accountId: account.id, canSend, canRead });
+  try {
+    const { trackGmailConnected } = require("../observability/posthogAnalytics");
+    trackGmailConnected(userId, { connection_method: "oauth", can_send: canSend });
+  } catch {
+    /* non-blocking */
+  }
   return { userId, email: identity.email, canSend, canRead, returnTo: returnTo || "setup" };
 }
 

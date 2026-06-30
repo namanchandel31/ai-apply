@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { BILLING_PLANS } from "@/lib/billingPlans";
+import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
+import { trackProduct } from "@/lib/analytics/track";
 
 export function MindooPricingSection() {
   return (
@@ -42,6 +44,10 @@ export function MindooPricingSection() {
                 <Link
                   to="/signup"
                   className={`m-pricing-cta${plan.highlighted ? " is-primary" : ""}`}
+                  onClick={() => {
+                    trackProduct("plan_engaged", { plan_id: plan.id, source: "landing" });
+                    trackLandingCtaEngaged("pricing_subscribe", `/signup?plan=${plan.id}`);
+                  }}
                 >
                   Subscribe →
                 </Link>

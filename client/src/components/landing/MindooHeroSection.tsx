@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { HeroHeadline, HERO_LEAD } from "@/components/landing/HeroHeadline";
 import { mindooScrollTo } from "@/hooks/useMindooScroll";
+import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 import "@/styles/mindoo.css";
 
 export function MindooHeroSection() {
@@ -28,11 +29,18 @@ export function MindooHeroSection() {
               <button
                 type="button"
                 className="mh-hero-btn mh-hero-btn-primary"
-                onClick={() => mindooScrollTo("pricing")}
+                onClick={() => {
+                  trackLandingCtaEngaged("hero_start_free", "#pricing");
+                  mindooScrollTo("pricing");
+                }}
               >
                 Start for free
               </button>
-              <Link to="/support" className="mh-hero-btn mh-hero-btn-secondary">
+              <Link
+                to="/support"
+                className="mh-hero-btn mh-hero-btn-secondary"
+                onClick={() => trackLandingCtaEngaged("hero_watch_demo", "/support")}
+              >
                 Watch demo
               </Link>
             </div>

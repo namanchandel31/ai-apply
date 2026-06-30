@@ -194,6 +194,19 @@ const processor = async (job) => {
 
     await referralService.consumeApplicationQuotaAfterSend({ userId, applicationId });
     await referralService.recordSuccessfulSendForReferral(userId);
+
+    try {
+      const { trackApplicationSent } = require("../observability/posthogAnalytics");
+      await trackApplicationSent(userId, {
+        application_id: applicationId,
+        source_platform: application.source_platform || "dashboard",
+        match_score: application.match_score,
+        job_id: jobRowId,
+        request_id: reqId,
+      });
+    } catch {
+      /* analytics must not break send */
+    }
   } catch (rawErr) {
     let err = rawErr;
     if (rawErr.code === "QUOTA_EXCEEDED") {

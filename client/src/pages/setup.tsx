@@ -10,7 +10,7 @@ import { SetupPageShell } from "@/components/layout/SetupPageShell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useActivationTracking } from "@/hooks/useActivationTracking";
+import { useSetupReadyTracking } from "@/hooks/useSetupReadyTracking";
 
 const SETUP_DESCRIPTION =
   "Manage your resume, email, and AI provider credentials. Use the tabs below to configure each area.";
@@ -46,7 +46,7 @@ export function Setup() {
     resolveInitialTab(searchParams, canUseByok)
   );
 
-  useActivationTracking(status, "setup");
+  useSetupReadyTracking(status);
 
   const handleUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ["setup-status"] });

@@ -36,6 +36,10 @@ describe("supabaseJwtVerifier profile extraction", () => {
   });
 });
 
+jest.mock("../src/observability/posthogAnalytics", () => ({
+  trackUserSignedUp: jest.fn(),
+}));
+
 describe("userSyncService.ensureLocalUser", () => {
   const claims = {
     sub: "660e8400-e29b-41d4-a716-446655440001",
@@ -62,7 +66,7 @@ describe("userSyncService.ensureLocalUser", () => {
     findBySupabaseUserId.mockResolvedValue(linkedRow);
     updateUserProfileFromSupabase.mockResolvedValue(linkedRow);
 
-    const row = await ensureLocalUser(claims);
+    const { user: row } = await ensureLocalUser(claims);
 
     expect(findBySupabaseUserId).toHaveBeenCalledWith(claims.sub);
     expect(updateUserProfileFromSupabase).toHaveBeenCalledWith(linkedRow.id, {
@@ -93,9 +97,10 @@ describe("userSyncService.ensureLocalUser", () => {
     insertNewUserFromSupabase.mockResolvedValue({
       ...linkedRow,
       id: "770e8400-e29b-41d4-a716-446655440002",
+      created_at: new Date().toISOString(),
     });
 
-    const row = await ensureLocalUser(claims);
+    const { user: row } = await ensureLocalUser(claims);
 
     expect(insertNewUserFromSupabase).toHaveBeenCalled();
     expect(row.id).toBe("770e8400-e29b-41d4-a716-446655440002");

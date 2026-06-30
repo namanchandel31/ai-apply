@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/apiBase";
+import { getAttribution, getWorkflowId } from "@/lib/analytics";
 import { getSupabaseAccessToken } from "@/lib/supabaseClient";
 
 const debugAuth =
@@ -26,6 +27,13 @@ export async function buildAuthorizedHeaders(init?: HeadersInit): Promise<{
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+
+  headers.set("X-Workflow-Id", getWorkflowId());
+  const attribution = getAttribution();
+  if (attribution.utm_source) headers.set("X-Utm-Source", attribution.utm_source);
+  if (attribution.utm_medium) headers.set("X-Utm-Medium", attribution.utm_medium);
+  if (attribution.utm_campaign) headers.set("X-Utm-Campaign", attribution.utm_campaign);
+  if (attribution.referral_code) headers.set("X-Referral-Code", attribution.referral_code);
 
   return { headers, hasToken: Boolean(token) };
 }

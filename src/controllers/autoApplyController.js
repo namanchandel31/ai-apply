@@ -110,6 +110,26 @@ const autoApplyController = async (req, res) => {
       sourcePostId: typeof sourcePostId === "string" ? sourcePostId.trim() || undefined : undefined,
     });
 
+    const resolvedPlatform =
+      typeof sourcePlatform === "string" && sourcePlatform.trim()
+        ? sourcePlatform.trim()
+        : hasCustomEmail
+          ? DASHBOARD_SOURCE_PLATFORM
+          : "dashboard";
+
+    try {
+      const { trackApplicationStarted } = require("../observability/posthogAnalytics");
+      trackApplicationStarted(userId, {
+        application_id: result.applicationId,
+        source_platform: resolvedPlatform,
+        job_id: result.jobId,
+        request_id: reqId,
+        workflow_id: req.analyticsMeta?.workflow_id,
+      });
+    } catch {
+      /* non-blocking */
+    }
+
     return res.status(202).json({
       success: true,
       applicationId: result.applicationId,

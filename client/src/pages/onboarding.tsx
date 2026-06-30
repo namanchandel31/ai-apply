@@ -12,7 +12,9 @@ import { api, type SetupStatusData } from "@/lib/api";
 
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 
-import { useActivationTracking } from "@/hooks/useActivationTracking";
+import { useSetupReadyTracking } from "@/hooks/useSetupReadyTracking";
+import { useOnboardingStepAnalytics, trackOnboardingStepSkipped } from "@/hooks/useOnboardingStepAnalytics";
+import { trackProduct } from "@/lib/analytics";
 
 import { trackOnboardingEvent } from "@/lib/onboardingEvents";
 
@@ -222,9 +224,7 @@ export function Onboarding() {
 
   const { data: status, isLoading, refetch } = useSetupStatus();
 
-  useActivationTracking(status, "onboarding");
-
-
+  useSetupReadyTracking(status);
 
   const [resumeUi, setResumeUi] = useState<ResumeUiState>("idle");
 
@@ -257,7 +257,7 @@ export function Onboarding() {
 
   );
 
-
+  useOnboardingStepAnalytics(flow.step);
 
   const hasResume = !!status?.hasResume;
   const hasValidResume = !!status?.hasValidResume;
@@ -294,6 +294,15 @@ export function Onboarding() {
     }
     markExtensionPromptDismissed();
     setExtensionDone(true);
+    if (!hasEmailSetup && !emailStepResolved) {
+      trackOnboardingStepSkipped("gmail");
+    }
+    trackOnboardingStepSkipped("extension");
+    trackProduct("onboarding_flow_completed", {
+      email_skipped: !hasEmailSetup && !emailStepResolved,
+      extension_skipped: true,
+      onboarding_version: "v1",
+    });
     trackOnboardingEvent("onboarding_completed");
     finishOnboarding();
   }, [hasEmailSetup, emailStepResolved, finishOnboarding]);

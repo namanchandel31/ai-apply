@@ -38,6 +38,9 @@ function createApp() {
 
   app.use(cors(config.cors.buildCorsMiddlewareOptions()));
 
+  const { posthogIngestProxy } = require("../middlewares/posthogIngestProxy");
+  app.use("/ingest", express.raw({ type: "*/*", limit: "2mb" }), posthogIngestProxy);
+
   // Razorpay webhook needs the raw body for signature verification, so it must
   // be mounted BEFORE the global JSON body parser.
   const { razorpayWebhookController } = require("../controllers/billingWebhookController");

@@ -11,11 +11,17 @@ const {
 } = require('../models/userModel');
 const { isValidApplyMode } = require('../services/applyModeService');
 const { deriveNameFromEmail } = require('../utils/deriveNameFromEmail');
+const { trackOnboardingCompletedOnce } = require('../observability/posthogAnalytics');
 
 const getSetupStatusController = async (req, res) => {
   const userId = req.user.id;
   try {
     const status = await buildSetupStatus(userId);
+    if (!status.onboardingRequired && status.hasValidResume) {
+      trackOnboardingCompletedOnce(userId, {
+        workflow_id: req.analyticsMeta?.workflow_id,
+      });
+    }
     return ok(res, status);
   } catch (err) {
     logError("GET_SETUP_STATUS_ERROR", err, { userId, reqId: req.requestId });

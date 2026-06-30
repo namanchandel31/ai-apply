@@ -1,3 +1,6 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/ingest/:path*", "destination": "https://eu.i.posthog.com/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

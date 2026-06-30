@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { OneTapBrand } from "@/components/OneTapLogomark";
 import { mindooScrollTo } from "@/hooks/useMindooScroll";
+import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 
 const NAV_LINKS = [
   { label: "Features", id: "features" },
@@ -45,7 +46,11 @@ export function MindooNav() {
             <Link to="/login" className="m-btn m-btn-secondary m-nav-sign-in">
               Sign in
             </Link>
-            <Link to="/signup" className="m-btn m-btn-primary m-nav-cta">
+            <Link
+              to="/signup"
+              className="m-btn m-btn-primary m-nav-cta"
+              onClick={() => trackLandingCtaEngaged("nav_get_started", "/signup")}
+            >
               Get Started for Free
             </Link>
           </div>
@@ -84,7 +89,10 @@ export function MindooNav() {
             <Link to="/login" className="m-btn m-btn-secondary" onClick={() => setOpen(false)}>
               Sign in
             </Link>
-            <Link to="/signup" className="m-btn m-btn-primary" onClick={() => setOpen(false)}>
+            <Link to="/signup" className="m-btn m-btn-primary" onClick={() => {
+              trackLandingCtaEngaged("nav_get_started", "/signup");
+              setOpen(false);
+            }}>
               Get Started for Free
             </Link>
           </div>

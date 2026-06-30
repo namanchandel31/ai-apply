@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { resolvePostAuthPath, type PostAuthPath } from "@/lib/postAuthDestination";
+import { trackProduct } from "@/lib/analytics";
 
 const CALLBACK_TIMEOUT_MS = 15_000;
 
@@ -35,6 +36,7 @@ export function AuthCallbackPage() {
       if (!session) return;
       stripOAuthHashFromUrl();
       const path = await resolvePostAuthPath(queryClient);
+      trackProduct("signup_completed", { destination_path: path, signup_method: "google" });
       if (!mounted || redirectedRef.current) return;
       redirect(path);
     };
