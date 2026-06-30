@@ -5,6 +5,7 @@ import {
   type AuthErrorContext,
 } from "@/lib/authErrors";
 import { apiUrl } from "@/lib/apiBase";
+import { trackOperational } from "@/lib/analytics";
 import { buildAuthorizedHeaders, logAuthRequest } from "@/lib/authRequest";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -175,6 +176,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (res.status === 429) {
       err.retryAfterMs = parseRetryAfterMs(res, body) ?? 60_000;
     }
+    trackOperational("api_error", {
+      endpoint: path,
+      status: res.status,
+      error_code: code ?? "unknown",
+    });
     throw err;
   }
 

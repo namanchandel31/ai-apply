@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { api } from "@/lib/api";
 import { notifyExtensionApplyModeSync } from "@/lib/extensionBridge";
 import { isApplyMode, readStoredAutoApplyEnabled, storeAutoApplyEnabled } from "@/lib/applyMode";
+import { trackProduct } from "@/lib/analytics";
 import { toast } from "sonner";
 
 export function useAutoApply() {
@@ -30,6 +31,10 @@ export function useAutoApply() {
       setPending(true);
       try {
         await api.patchApplyMode(applyMode);
+        trackProduct("apply_mode_changed", {
+          apply_mode: applyMode,
+          previous_mode: enabled ? "review_apply" : "auto_apply",
+        });
         await refreshUser();
         void notifyExtensionApplyModeSync();
       } catch (err) {

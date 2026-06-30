@@ -24,6 +24,14 @@ const postConnectExchangeController = async (req, res) => {
   try {
     const connectToken = req.body?.connectToken;
     const session = await exchangeConnectToken(connectToken);
+    if (req.user?.id) {
+      try {
+        const { trackExtensionConnected } = require("../observability/posthogAnalytics");
+        trackExtensionConnected(req.user.id, { workflow_id: req.analyticsMeta?.workflow_id });
+      } catch {
+        /* non-blocking */
+      }
+    }
     return ok(res, session);
   } catch (err) {
     if (err.code === "BAD_REQUEST") {

@@ -2,6 +2,21 @@ const { verifySupabaseAccessToken, authReasonToResponseCode } = require("../serv
 const { ensureLocalUser, touchLastLogin } = require("../services/userSyncService");
 const { logAuthRejected, logAuthSyncFailed } = require("../services/authObservability");
 const { logError } = require("../utils/logger");
+const { getRequestMeta } = require("../observability/posthog");
+
+function readAttribution(req) {
+  const h = req.headers || {};
+  const pick = (key) => {
+    const v = h[key] || h[key.toLowerCase()];
+    return typeof v === "string" && v.trim() ? v.trim() : undefined;
+  };
+  return {
+    utm_source: pick("x-utm-source"),
+    utm_medium: pick("x-utm-medium"),
+    utm_campaign: pick("x-utm-campaign"),
+    referral_code: pick("x-referral-code"),
+  };
+}
 
 function unauthorized(res, message, code) {
   return res.status(401).json({
@@ -129,7 +144,9 @@ async function supabaseAuthMiddleware(req, res, next) {
   }
 
   try {
-    const localUser = await ensureLocalUser(claims);
+    const { user: localUser } = await ensureLocalUser(claims, {
+      attribution: readAttribution(req),
+    });
     await touchLastLogin(localUser.id);
 
     req.user = {
@@ -139,6 +156,7 @@ async function supabaseAuthMiddleware(req, res, next) {
       fullName: localUser.full_name ?? null,
       avatarUrl: localUser.avatar_url ?? null,
     };
+    req.analyticsMeta = getRequestMeta(req);
 
     return next();
   } catch (err) {

@@ -9,11 +9,13 @@ import { MindooCtaSection } from "@/components/landing/mindoo/MindooCtaSection";
 import { MindooFooter } from "@/components/landing/mindoo/MindooFooter";
 import { useMindooScroll } from "@/hooks/useMindooScroll";
 import { useMindooReveal } from "@/hooks/useMindooReveal";
+import { useLandingAnalytics } from "@/hooks/useLandingAnalytics";
 import "@/styles/mindoo.css";
 
 export function LandingPage() {
   useMindooScroll();
   useMindooReveal();
+  useLandingAnalytics();
 
   return (
     <div className="mindoo-site">

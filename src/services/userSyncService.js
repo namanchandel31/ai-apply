@@ -6,6 +6,7 @@ const {
   touchUserLastLogin,
 } = require("../models/userModel");
 const { logAuthSyncFailed } = require("./authObservability");
+const { trackUserSignedUp } = require("../observability/posthogAnalytics");
 
 const LOGIN_TOUCH_DEBOUNCE_MS = 5 * 60 * 1000;
 const lastTouchByUserId = new Map();
@@ -15,8 +16,10 @@ const lastTouchByUserId = new Map();
  * Does not create a duplicate when a legacy row awaits manual mapping (same email).
  *
  * @param {{ sub: string, email: string, fullName?: string|null, avatarUrl?: string|null }} claims
+ * @param {{ attribution?: Record<string, string> }} [opts]
+ * @returns {Promise<{ user: object, isNewSignup: boolean }>}
  */
-async function ensureLocalUser(claims) {
+async function ensureLocalUser(claims, opts = {}) {
   try {
     const profile = {
       email: claims.email,
@@ -26,7 +29,8 @@ async function ensureLocalUser(claims) {
 
     const linked = await findBySupabaseUserId(claims.sub);
     if (linked) {
-      return updateUserProfileFromSupabase(linked.id, profile);
+      const user = await updateUserProfileFromSupabase(linked.id, profile);
+      return { user, isNewSignup: false };
     }
 
     const unmapped = await findUnmappedUsersByEmail(claims.email);
@@ -45,10 +49,21 @@ async function ensureLocalUser(claims) {
       throw err;
     }
 
-    return insertNewUserFromSupabase({
+    const user = await insertNewUserFromSupabase({
       supabaseUserId: claims.sub,
       ...profile,
     });
+
+    const createdMs = user.created_at ? Date.now() - new Date(user.created_at).getTime() : Infinity;
+    const isNewSignup = createdMs >= 0 && createdMs < 10_000;
+    if (isNewSignup) {
+      trackUserSignedUp(user.id, {
+        signup_method: "google",
+        ...opts.attribution,
+      });
+    }
+
+    return { user, isNewSignup };
   } catch (err) {
     if (err.code !== "LEGACY_USER_PENDING_MANUAL_LINK" && err.code !== "LEGACY_USER_AMBIGUOUS_EMAIL") {
       logAuthSyncFailed({

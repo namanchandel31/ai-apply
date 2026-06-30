@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { trackLandingFaqExpanded } from "@/lib/analytics/landing";
 
 const FAQ_ITEMS = [
   {
@@ -60,7 +61,13 @@ function FaqItem({
         className="m-faq-question"
         aria-expanded={open}
         aria-controls={answerId}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => {
+            const next = !current;
+            if (next) trackLandingFaqExpanded(question);
+            return next;
+          });
+        }}
       >
         {question}
       </button>

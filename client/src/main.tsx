@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { BootstrapErrorBoundary } from "@/components/BootstrapErrorBoundary";
 import { installBootstrapDiagnostics } from "@/bootstrapDebug";
 import { AuthProvider } from "@/auth/AuthContext";
+import { AnalyticsProvider } from "@/lib/analytics";
 import App from "./App";
 import "./index.css";
 
@@ -33,8 +34,10 @@ try {
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
             <AuthProvider>
-              <App />
-              <Toaster position="bottom-right" richColors />
+              <AnalyticsProvider>
+                <App />
+                <Toaster position="bottom-right" richColors />
+              </AnalyticsProvider>
             </AuthProvider>
           </BrowserRouter>
         </QueryClientProvider>

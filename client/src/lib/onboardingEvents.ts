@@ -1,4 +1,3 @@
-const ACTIVATION_KEY = "onetap_activation_completed";
 
 export type OnboardingEventName =
   | "onboarding_started"
@@ -8,7 +7,6 @@ export type OnboardingEventName =
   | "ai_key_validation_failed"
   | "resume_uploaded"
   | "resume_parsed"
-  | "activation_completed"
   | "gmail_setup_clicked"
   | "email_setup_skipped"
   | "dashboard_entered"
@@ -17,8 +15,6 @@ export type OnboardingEventName =
   | "extension_install_clicked"
   | "extension_installed_detected"
   | "extension_prompt_skipped";
-
-export type ActivationSource = "onboarding" | "setup";
 
 export function trackOnboardingEvent(
   name: OnboardingEventName,
@@ -30,17 +26,6 @@ export function trackOnboardingEvent(
   window.dispatchEvent(
     new CustomEvent("onetap:onboarding", { detail: { name, props } })
   );
-}
-
-export function hasFiredActivationCompleted(): boolean {
-  return sessionStorage.getItem(ACTIVATION_KEY) === "true";
-}
-
-export function markActivationCompleted(source: ActivationSource) {
-  if (hasFiredActivationCompleted()) return false;
-  sessionStorage.setItem(ACTIVATION_KEY, "true");
-  trackOnboardingEvent("activation_completed", { activationSource: source });
-  return true;
 }
 
 export const WELCOME_SEEN_KEY = "onetap_onboarding_welcome_seen";

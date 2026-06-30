@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { trackProduct } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { OneTapBrand } from "@/components/OneTapLogomark";
@@ -47,6 +48,7 @@ export function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    trackProduct("signup_started", { signup_method: "google" });
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({

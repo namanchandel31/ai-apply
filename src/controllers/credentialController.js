@@ -69,6 +69,16 @@ const saveEmailCredentialsController = async (req, res) => {
 
     logInfo("credential_save_success", { reqId, userId, email: normalizedEmail });
 
+    try {
+      const { trackGmailConnected } = require("../observability/posthogAnalytics");
+      trackGmailConnected(userId, {
+        connection_method: "app_password",
+        workflow_id: req.analyticsMeta?.workflow_id,
+      });
+    } catch {
+      /* non-blocking */
+    }
+
     return ok(res, {
       userId: rows[0].user_id,
       email: rows[0].email,

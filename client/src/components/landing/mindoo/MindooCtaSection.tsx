@@ -1,4 +1,5 @@
 import { mindooScrollTo } from "@/hooks/useMindooScroll";
+import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 
 export function MindooCtaSection() {
   return (
@@ -17,7 +18,10 @@ export function MindooCtaSection() {
             <button
               type="button"
               className="m-cta-card-btn"
-              onClick={() => mindooScrollTo("pricing")}
+              onClick={() => {
+                trackLandingCtaEngaged("hero_start_free", "#pricing");
+                mindooScrollTo("pricing");
+              }}
             >
               Get Started Free
             </button>

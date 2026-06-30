@@ -226,6 +226,13 @@ const uploadResumeController = async (req, res) => {
 
       logInfo("RESUME_UPLOAD_ASYNC", { reqId, jobId, fileHash, userId, context, source: "resume" });
 
+      try {
+        const { trackResumeUploaded } = require("../observability/posthogAnalytics");
+        trackResumeUploaded(userId, { context, workflow_id: req.analyticsMeta?.workflow_id });
+      } catch {
+        /* non-blocking */
+      }
+
       return res.status(202).json({
         success: true,
         data: {
