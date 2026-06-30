@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { RazorpaySecuredBadge } from "@/components/billing/RazorpaySecuredBadge";
 import { BILLING_PLANS } from "@/lib/billingPlans";
 import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 import { trackProduct } from "@/lib/analytics/track";
@@ -55,9 +56,7 @@ export function MindooPricingSection() {
             ))}
           </div>
 
-          <p data-reveal="" className="m-pricing-trust m-body-text">
-            Payments are handled through a secure checkout partner.
-          </p>
+          <RazorpaySecuredBadge data-reveal="" variant="landing" />
         </div>
       </div>
     </section>

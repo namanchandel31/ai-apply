@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": apiProxyTarget,
         "/health": apiProxyTarget,
+        "/ingest": apiProxyTarget,
       },
     },
   };

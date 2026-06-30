@@ -10,6 +10,12 @@ function buildCorsMiddlewareOptions() {
     "If-None-Match",
     "Last-Event-ID",
     "x-internal-api-key",
+    // Client analytics attribution (see client/src/lib/authRequest.ts)
+    "X-Workflow-Id",
+    "X-Utm-Source",
+    "X-Utm-Medium",
+    "X-Utm-Campaign",
+    "X-Referral-Code",
   ];
 
   if (allowedOrigins.length === 0) {

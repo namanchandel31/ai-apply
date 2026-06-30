@@ -3,6 +3,7 @@ import { Check, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
+import { RazorpaySecuredBadge } from "@/components/billing/RazorpaySecuredBadge";
 import { SetupPageShell } from "@/components/layout/SetupPageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -496,8 +497,11 @@ export function SubscriptionsPage() {
                     />
                   ))}
                 </div>
+                <RazorpaySecuredBadge />
               </section>
-            ) : null}
+            ) : (
+              <RazorpaySecuredBadge />
+            )}
           </TabsContent>
 
           <TabsContent value="orders" className="mt-0">

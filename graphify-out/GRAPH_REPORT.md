@@ -1,16 +1,16 @@
 # Graph Report - ai-apply  (2026-07-01)
 
 ## Corpus Check
-- 960 files · ~302,261 words
+- 961 files · ~302,444 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 7648 nodes · 14876 edges · 506 communities (388 shown, 118 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 1108 edges (avg confidence: 0.8)
+- 7653 nodes · 14884 edges · 518 communities (404 shown, 114 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 1111 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `be1a5cf3`
+- Built from commit: `2896b110`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -300,6 +300,7 @@
 - [[_COMMUNITY_Community 290|Community 290]]
 - [[_COMMUNITY_Community 291|Community 291]]
 - [[_COMMUNITY_Community 292|Community 292]]
+- [[_COMMUNITY_Community 293|Community 293]]
 - [[_COMMUNITY_Community 294|Community 294]]
 - [[_COMMUNITY_Community 295|Community 295]]
 - [[_COMMUNITY_Community 296|Community 296]]
@@ -323,6 +324,7 @@
 - [[_COMMUNITY_Community 314|Community 314]]
 - [[_COMMUNITY_Community 315|Community 315]]
 - [[_COMMUNITY_Community 316|Community 316]]
+- [[_COMMUNITY_Community 317|Community 317]]
 - [[_COMMUNITY_Community 318|Community 318]]
 - [[_COMMUNITY_Community 319|Community 319]]
 - [[_COMMUNITY_Community 320|Community 320]]
@@ -342,6 +344,7 @@
 - [[_COMMUNITY_Community 335|Community 335]]
 - [[_COMMUNITY_Community 336|Community 336]]
 - [[_COMMUNITY_Community 337|Community 337]]
+- [[_COMMUNITY_Community 338|Community 338]]
 - [[_COMMUNITY_Community 339|Community 339]]
 - [[_COMMUNITY_Community 340|Community 340]]
 - [[_COMMUNITY_Community 341|Community 341]]
@@ -381,6 +384,7 @@
 - [[_COMMUNITY_Community 376|Community 376]]
 - [[_COMMUNITY_Community 377|Community 377]]
 - [[_COMMUNITY_Community 378|Community 378]]
+- [[_COMMUNITY_Community 379|Community 379]]
 - [[_COMMUNITY_Community 381|Community 381]]
 - [[_COMMUNITY_Community 382|Community 382]]
 - [[_COMMUNITY_Community 383|Community 383]]
@@ -432,6 +436,7 @@
 - [[_COMMUNITY_Community 452|Community 452]]
 - [[_COMMUNITY_Community 454|Community 454]]
 - [[_COMMUNITY_Community 455|Community 455]]
+- [[_COMMUNITY_Community 459|Community 459]]
 - [[_COMMUNITY_Community 460|Community 460]]
 - [[_COMMUNITY_Community 464|Community 464]]
 - [[_COMMUNITY_Community 465|Community 465]]
@@ -463,8 +468,15 @@
 - [[_COMMUNITY_Community 505|Community 505]]
 - [[_COMMUNITY_Community 506|Community 506]]
 - [[_COMMUNITY_Community 507|Community 507]]
+- [[_COMMUNITY_Community 508|Community 508]]
 - [[_COMMUNITY_Community 509|Community 509]]
-- [[_COMMUNITY_Community 518|Community 518]]
+- [[_COMMUNITY_Community 510|Community 510]]
+- [[_COMMUNITY_Community 511|Community 511]]
+- [[_COMMUNITY_Community 512|Community 512]]
+- [[_COMMUNITY_Community 513|Community 513]]
+- [[_COMMUNITY_Community 514|Community 514]]
+- [[_COMMUNITY_Community 515|Community 515]]
+- [[_COMMUNITY_Community 517|Community 517]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `#_()` - 1065 edges
@@ -485,19 +497,19 @@
   client/src/services/realtime/cache/partialHydrationScheduler.ts → public/assets/index-cYMorXD6.js
 - `startPruneLoop()` --calls--> `setInterval()`  [INFERRED]
   src/utils/logDedupe.js → public/assets/index-cYMorXD6.js
+- `main()` --calls--> `getPoolMetrics()`  [INFERRED]
+  scripts/checkDbContention.js → src/db/queryInstrumentation.js
 - `runTests()` --calls--> `parseJobDescription()`  [INFERRED]
   tests/jdParser.integration.test.js → src/services/jdParseService.js
-- `pageWindow()` --calls--> `add()`  [INFERRED]
-  client/src/components/applications/ApplicationsTableFooter.tsx → public/assets/index-cYMorXD6.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (506 total, 118 thin omitted)
+## Communities (518 total, 114 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (158): #_(), activateAiCredential(), Ad(), ajax(), Ak(), appendParams(), applyTransformOptsToQuery(), autoApply() (+150 more)
+Nodes (174): #_(), activateAiCredential(), ajax(), Ak(), appendParams(), applyTransformOptsToQuery(), autoApply(), Av() (+166 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
@@ -508,93 +520,36 @@ Cohesion: 0.01
 Nodes (178): 2026-06-12 — Applications stuck in sending, 2026-06-12 — Applications stuck in sending (fix), 2026-06-12 — Cannot GET / on port 5001, 2026-06-12 — Full local project setup, 2026-06-12 — Restart all dev terminals, 2026-06-12 — Start local dev server, 2026-06-12 — Supabase project filesystem search, 2026-06-14 — 13px text bumped to 14px (+170 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.16
-Nodes (17): assertConfigured(), config, consumeState(), { createEphemeralRedisClient }, createState(), crypto, effectiveTier(), emailAccountModel (+9 more)
+Cohesion: 0.05
+Nodes (45): getUserApplyMode(), attachWorkerLifecycle(), { buildLogContext }, jobLogContext(), { logInfo, logError }, { willBullMqRetry }, isDashboardSubmission(), isValidApplyMode() (+37 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (36): acquirePgClient(), attachPgClientErrorHandler(), clearClientTransaction(), isInTransactionContext(), { logError, logInfo }, { metrics }, { shouldLogInfraError }, txnContext (+28 more)
+Cohesion: 0.04
+Nodes (31): { pool }, detectPoolOwner(), { pool }, { pool }, { pool }, createFeature(), getFeatureById(), getFeatureByKey() (+23 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.08
-Nodes (82): Al(), Ao(), ba(), bc(), bi(), bl(), C(), Ca() (+74 more)
+Cohesion: 0.06
+Nodes (124): Ac(), Al(), Ao(), ba(), bc(), bf(), bi(), bl() (+116 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.08
-Nodes (51): Au(), bindMethods(), bu(), constructor(), Cu(), dd(), Du(), Dv() (+43 more)
+Nodes (52): Au(), bindMethods(), bu(), constructor(), contains(), Cu(), dd(), Du() (+44 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.03
-Nodes (89): { buildLogContext }, { isQuotaError, sendQuotaExceeded }, { logInfo, logError }, { ok, ERROR_CODES }, processApplication(), { processApplyJob }, { sendError }, autoApplyController() (+81 more)
+Cohesion: 0.04
+Nodes (74): { buildLogContext }, { isQuotaError, sendQuotaExceeded }, { logInfo, logError }, { ok, ERROR_CODES }, processApplication(), { processApplyJob }, { sendError }, autoApplyController() (+66 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.04
-Nodes (88): cancel(), _cancelPendingDisconnect(), cancelRefEvent(), cancelTimeout(), canPush(), channel(), clearGcTimeout(), clearHeartbeats() (+80 more)
+Cohesion: 0.05
+Nodes (83): _cancelPendingDisconnect(), cancelRefEvent(), cancelTimeout(), canPush(), channel(), clearHeartbeats(), clearTimeout(), close() (+75 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.05
-Nodes (98): _acquireLock(), _adminDeletePasskey(), _adminListPasskeys(), _approveAuthorization(), _authenticate(), _autoRefreshTokenTick(), _callRefreshToken(), _challenge() (+90 more)
+Nodes (99): _acquireLock(), _adminDeletePasskey(), _adminListPasskeys(), _approveAuthorization(), _authenticate(), _autoRefreshTokenTick(), _callRefreshToken(), _challenge() (+91 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.22
-Nodes (13): { mapJobsFromListRow }, parseJsonField(), { serializeApplication }, serializeApplicationDetail(), truncateField(), mapJobsFromListRow(), { serializeApplication }, serializeApplicationListItem() (+5 more)
-
-### Community 11 - "Community 11"
-Cohesion: 0.09
-Nodes (58): at(), bd(), be(), bn(), cn(), ct(), D(), De() (+50 more)
-
-### Community 12 - "Community 12"
 Cohesion: 0.04
-Nodes (120): add(), addObserver(), af(), ap(), applyAcceptedEvent(), Bm(), Bp(), canRun() (+112 more)
-
-### Community 13 - "Community 13"
-Cohesion: 0.13
-Nodes (23): buildEmailGenerationContext(), { buildPersonalizationContext }, { inferToneContext }, {
-  resolveEmailPreferences,
-  blendToneContext,
-  buildGenerationSnapshot,
-}, deriveTargetWordRange(), inferSeniorityBand(), JUNIOR_TITLE_PATTERNS, RANGE_TABLE (+15 more)
-
-### Community 14 - "Community 14"
-Cohesion: 0.06
-Nodes (43): Ac(), ae(), Bv(), Ce(), cloneRequestState(), componentDidCatch(), containedBy(), contains() (+35 more)
-
-### Community 15 - "Community 15"
-Cohesion: 0.06
-Nodes (51): {
-  addConnection,
-  removeConnection,
-  touchHeartbeat,
-  getConnectionCount,
-}, { HEARTBEAT_MS }, { logInfo, logError }, { metrics }, { readReplayAfter }, { safeSseWrite }, streamRealtimeController(), { writeHeartbeat, writeSseEvent, writeReplayEnd } (+43 more)
-
-### Community 16 - "Community 16"
-Cohesion: 0.08
-Nodes (30): { EventEmitter }, RealtimeBus, { attachRedisErrorHandler }, config, ensureRealtimePublisher(), { EVENT_APPLICATION_UPDATED }, fanOutRealtimePayload(), getPublisher() (+22 more)
-
-### Community 17 - "Community 17"
-Cohesion: 0.06
-Nodes (87): A(), ai(), apply(), ar(), as(), bf(), Bo(), bs() (+79 more)
-
-### Community 18 - "Community 18"
-Cohesion: 0.13
-Nodes (18): createEmptyLlmContract(), JdEnrichedSchema, JdLlmOutputSchema, { PARSE_OUTCOMES }, ParseArtifactsSchema, ParseOutcomeSchema, ReviewHintsSchema, { z } (+10 more)
-
-### Community 19 - "Community 19"
-Cohesion: 0.13
-Nodes (33): baseProperties(), capture(), captureBusiness(), captureOperational(), captureProduct(), captureTier(), getPostHogClient(), identifyUser() (+25 more)
-
-### Community 20 - "Community 20"
-Cohesion: 0.14
-Nodes (27): AnalyticsProvider(), OnboardingBusDetail, Attribution, captureAttributionFromUrl(), getAttribution(), getWorkflowId(), readStored(), resetWorkflowId() (+19 more)
-
-### Community 21 - "Community 21"
-Cohesion: 0.08
-Nodes (42): b(), copy(), createBucket(), createIndex(), createSignedUploadUrl(), createSignedUrl(), createSignedUrls(), createTable() (+34 more)
-
-### Community 22 - "Community 22"
-Cohesion: 0.02
-Nodes (150): { pool }, { buildLogContext }, {
+Nodes (67): { buildLogContext }, {
   buildStatusFingerprint,
   buildSnapshotFingerprint,
   computeStatusEtag,
@@ -606,7 +561,72 @@ Nodes (150): { pool }, { buildLogContext }, {
   cancelApplication,
   patchApplicationEmail,
   patchApplicationCompany,
-}, continueApplicationController(), getApplicationController() (+142 more)
+}, continueApplicationController(), getApplicationController(), getApplicationJobController() (+59 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.05
+Nodes (100): A(), ae(), af(), ar(), at(), bd(), be(), Bm() (+92 more)
+
+### Community 12 - "Community 12"
+Cohesion: 0.05
+Nodes (76): Ad(), add(), addObserver(), ap(), Bp(), cf(), clear(), clearGcTimeout() (+68 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.10
+Nodes (30): buildEmailGenerationContext(), { buildPersonalizationContext }, { inferToneContext }, {
+  resolveEmailPreferences,
+  blendToneContext,
+  buildGenerationSnapshot,
+}, deriveTargetWordRange(), inferSeniorityBand(), JUNIOR_TITLE_PATTERNS, RANGE_TABLE (+22 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.06
+Nodes (38): {
+  QUEUE_NAMES,
+  assertQueueConfiguration,
+}, ALL_BULLMQ_QUEUES, assertQueueConfiguration(), bullmqQueueForJobType(), JOB_TYPE_TO_BULLMQ_QUEUE, QUEUE_NAMES, collectRuntimeDiagnostics(), getBullmqConnectionOptions() (+30 more)
+
+### Community 15 - "Community 15"
+Cohesion: 0.07
+Nodes (41): {
+  addConnection,
+  removeConnection,
+  touchHeartbeat,
+  getConnectionCount,
+}, { HEARTBEAT_MS }, { logInfo, logError }, { metrics }, { readReplayAfter }, { safeSseWrite }, streamRealtimeController(), { writeHeartbeat, writeSseEvent, writeReplayEnd } (+33 more)
+
+### Community 16 - "Community 16"
+Cohesion: 0.06
+Nodes (39): { EventEmitter }, RealtimeBus, { attachRedisErrorHandler }, config, ensureRealtimePublisher(), { EVENT_APPLICATION_UPDATED }, fanOutRealtimePayload(), getPublisher() (+31 more)
+
+### Community 17 - "Community 17"
+Cohesion: 0.06
+Nodes (26): entitlementService, { logError }, paywallService, requireEntitlement(), requirePaidAccess(), { sendError }, usageService, { buildLogContext } (+18 more)
+
+### Community 18 - "Community 18"
+Cohesion: 0.13
+Nodes (18): createEmptyLlmContract(), JdEnrichedSchema, JdLlmOutputSchema, { PARSE_OUTCOMES }, ParseArtifactsSchema, ParseOutcomeSchema, ReviewHintsSchema, { z } (+10 more)
+
+### Community 19 - "Community 19"
+Cohesion: 0.15
+Nodes (28): captureBusiness(), captureOperational(), captureProduct(), identifyUser(), {
+  captureBusiness,
+  captureProduct,
+  captureOperational,
+  identifyUser,
+}, countSentApplications(), LIFECYCLE, onboardingCompletedOnce (+20 more)
+
+### Community 20 - "Community 20"
+Cohesion: 0.08
+Nodes (46): AnalyticsProvider(), OnboardingBusDetail, Attribution, captureAttributionFromUrl(), getAttribution(), getWorkflowId(), readStored(), resetWorkflowId() (+38 more)
+
+### Community 21 - "Community 21"
+Cohesion: 0.04
+Nodes (84): ai(), apply(), as(), b(), Bo(), bs(), co(), copy() (+76 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.05
+Nodes (57): { pool }, createJob(), findRecoverableStuckProcessingJobs(), findRecoverableStuckQueuedJobs(), findStuckProcessingJobs(), findStuckQueuedJobs(), getLatestJobsForApplication(), hasActiveJob() (+49 more)
 
 ### Community 23 - "Community 23"
 Cohesion: 0.06
@@ -617,121 +637,119 @@ Cohesion: 0.13
 Nodes (49): ab(), ax(), bb(), bx(), by(), cb(), cx(), Db() (+41 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.08
-Nodes (37): estimateCost(), getModelPricing(), PRICING_TABLE, logNetworkError(), anthropicFetch(), {
+Cohesion: 0.07
+Nodes (45): estimateCost(), getModelPricing(), PRICING_TABLE, anthropicFetch(), {
   createOperationTimeout,
   classifyHealthCheckError,
-}, { estimateCost }, extractText() (+29 more)
+}, { estimateCost }, extractText(), generateStructuredJson() (+37 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.02
-Nodes (211): isValidFeatureKey(), auditService, campaignModel, comparePlansController(), createCampaignController(), createFeatureController(), createPlanController(), createPricePointController() (+203 more)
+Cohesion: 0.11
+Nodes (38): isValidFeatureKey(), auditService, campaignModel, comparePlansController(), createCampaignController(), createFeatureController(), createPlanController(), createPricePointController() (+30 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.10
-Nodes (21): shutdown(), registerProcessLifecycleHandlers(), closeBullmqQueues(), { markBullmqShuttingDown }, markBullmqShuttingDown(), hooks, { logInfo, logError }, registerGracefulShutdown() (+13 more)
+Cohesion: 0.39
+Nodes (7): baseProperties(), capture(), captureTier(), getPostHogClient(), getRequestMeta(), getWorkflowId(), { PostHog }
 
 ### Community 28 - "Community 28"
-Cohesion: 0.08
-Nodes (29): isDebugAiEnabled(), crypto, jdParseFailureHash(), { logInfo, logError }, persistJdParseFailure(), { saveFailedParse }, { buildContentValidationDiagnostics }, { enrichParsedJd } (+21 more)
+Cohesion: 0.06
+Nodes (31): isDebugAiEnabled(), crypto, jdParseFailureHash(), { logInfo, logError }, persistJdParseFailure(), { saveFailedParse }, { buildContentValidationDiagnostics }, { enrichParsedJd } (+23 more)
 
 ### Community 29 - "Community 29"
 Cohesion: 0.06
-Nodes (67): an(), br(), build(), cancelQueries(), catch(), continue(), cr(), createResult() (+59 more)
+Nodes (61): an(), br(), bt(), build(), cancel(), cancelQueries(), catch(), cr() (+53 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.13
-Nodes (21): resetPostCommitQueueForTests(), clearPublishCache(), resetPublishStateForTests(), emitted, evictExpired(), { logInfo }, { metrics }, publishKey() (+13 more)
+Cohesion: 0.07
+Nodes (35): { createClient }, storage, supabase, { autoPopulateDefaultResume }, crypto, enqueueBackgroundResumeParse(), { enqueueResumeJob }, entitlementService (+27 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.06
-Nodes (41): discoverMigrations(), fs, path, applyMigrationInTransaction(), crypto, ensureSchemaMigrationsTable(), isMigrationApplied(), migrationChecksum() (+33 more)
+Cohesion: 0.07
+Nodes (39): discoverMigrations(), fs, path, applyMigrationInTransaction(), crypto, ensureSchemaMigrationsTable(), isMigrationApplied(), migrationChecksum() (+31 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.03
 Nodes (57): AdminCampaign, AdminFeature, AdminPayment, AdminPlan, AdminPlanEntitlement, AdminReferralData, AdminSubscription, AdminUserRow (+49 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.17
-Nodes (7): buildContentValidationDiagnostics(), { nullifyEmpty }, mockCreate, { normalizeSkills, nullifyEmpty }, { buildContentValidationDiagnostics }, normalizeSkills(), nullifyEmpty()
+Cohesion: 0.13
+Nodes (41): applyAcceptedEvent(), canRun(), checkImpossibleApply(), clearPollError(), clearPollMetadata(), df(), ff(), get() (+33 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.13
-Nodes (28): apiFetch(), AUTH_STORAGE_KEYS, clearAuthStorage(), exchangeConnectToken(), fetchApplyMode(), fetchDetectionConfig(), fetchPopupStatus(), fetchPopupStatusFromApi() (+20 more)
+Cohesion: 0.15
+Nodes (27): apiFetch(), AUTH_STORAGE_KEYS, clearAuthStorage(), exchangeConnectToken(), fetchApplyMode(), fetchDetectionConfig(), fetchPopupStatus(), fetchPopupStatusFromApi() (+19 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.09
-Nodes (21): clearInterval(), stopPoolMetricsLogging(), collectRuntimeDiagnostics(), containRecoverableError(), fatalExit(), inferSubsystemFromStack(), {
-  isRecoverableInfraError,
-  isFatalApplicationError,
-  isFatalBootstrapError,
-}, { logger, logError, logInfo } (+13 more)
+Nodes (22): aiCredentialModel, { canAutoRecoverHealth, isTerminalHealth }, config, { DEFAULT_MODELS }, { encrypt, decrypt }, entitlementService, { getProvider }, { logInfo } (+14 more)
 
 ### Community 36 - "Community 36"
 Cohesion: 0.06
-Nodes (46): { logInfo, logError }, { pool }, { sanitizeTextForStorage, sanitizeErrorMessage }, saveFailedParse(), VALID_SOURCES, createResumeWithParsedData(), saveParsedDataForResume(), { callOpenAIJson } (+38 more)
+Nodes (46): { logInfo, logError }, { pool }, { sanitizeTextForStorage, sanitizeErrorMessage }, saveFailedParse(), VALID_SOURCES, { callOpenAIJson }, { createJDWithParsedData }, { createResumeWithParsedData, saveParsedDataForResume } (+38 more)
 
 ### Community 37 - "Community 37"
 Cohesion: 0.07
 Nodes (17): BENEFITS, FEATURES, SETUP_STEPS, BENTO_FEATURES, STEPS, TRUST_CARDS, BrowserTab, ProblemBrowserBar() (+9 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.02
-Nodes (148): requireEnv(), validateStartup(), {
-  QUEUE_NAMES,
-  assertQueueConfiguration,
-}, ALL_BULLMQ_QUEUES, assertQueueConfiguration(), bullmqQueueForJobType(), JOB_TYPE_TO_BULLMQ_QUEUE, QUEUE_NAMES (+140 more)
+Cohesion: 0.04
+Nodes (80): patchApplicationCompanyController(), { APPLICATION_STATUS }, { buildLogContext }, { bullmqQueueForJobType }, { enqueueProcessApplicationJob }, { enqueueSendJob }, {
+  findRecoverableStuckQueuedJobs,
+  findRecoverableStuckProcessingJobs,
+  createJob,
+}, {
+  inspectBullmqJob,
+  bullmqIsTerminalFailure,
+  maxAttemptsForJobType,
+} (+72 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.12
-Nodes (20): { buildResolverContext }, caps(), { resolveUiStatus }, { UI_STATUS, APPLICATION_STATUS }, { buildResolverContext }, ctx(), { resolveUiStatus }, { UI_STATUS, APPLICATION_STATUS } (+12 more)
+Cohesion: 0.13
+Nodes (24): ENVIRONMENTS, applyPopupStatus(), autoToggleBtn, bgRequest(), closePanelBtn, connectedContentEl, connectExtensionBtn, connectionStatusEl (+16 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.05
-Nodes (59): APPLY_ELIGIBLE_OUTCOMES, isApplyEligible(), PARSE_OUTCOMES, collapseKey(), fuzzyAliasLookup(), levenshtein(), normalizeRoleTitle(), ROLE_ALIASES (+51 more)
+Cohesion: 0.07
+Nodes (35): APPLY_ELIGIBLE_OUTCOMES, FAILURE_OUTCOMES, isApplyEligible(), PARSE_OUTCOMES, ROLE_SKILL_MAP, skillsForRole(), skillsForRoles(), assignParseOutcome() (+27 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.13
-Nodes (20): isDebugEnabled(), OrchestrationComponent, Bucket, bucketKey(), buckets, DedupeFlushHandler, ensureCapacity(), evictOldest() (+12 more)
+Cohesion: 0.08
+Nodes (29): isDebugEnabled(), OrchestrationComponent, Bucket, bucketKey(), buckets, DedupeFlushHandler, ensureCapacity(), evictOldest() (+21 more)
 
 ### Community 42 - "Community 42"
-Cohesion: 0.10
-Nodes (31): ResumeSchema, { z }, aggregateCertificationResults(), averageSuccessfulRuns(), computeAttemptCertificationScore(), computeOverallScore(), computeReliabilityScore(), computeValueScore() (+23 more)
+Cohesion: 0.11
+Nodes (30): ResumeSchema, { z }, aggregateCertificationResults(), averageSuccessfulRuns(), computeAttemptCertificationScore(), computeOverallScore(), computeReliabilityScore(), computeValueScore() (+22 more)
 
 ### Community 43 - "Community 43"
-Cohesion: 0.17
-Nodes (21): flushRealtimeAfterDbCommit(), {
+Cohesion: 0.09
+Nodes (35): clearInterval(), stopPoolMetricsLogging(), resetRuntimeDiagnosticsForTests(), flushRealtimeAfterDbCommit(), {
   markApplicationPublishCommitted,
   markAllPendingCommitted,
   flushPostCommitPublishes,
-}, computePriorityScore(), dropEntry(), enqueuePostCommitPublish(), { enqueuePublishBatch }, evictForOverflow(), flushOne() (+13 more)
+}, computePriorityScore(), dropEntry(), enqueuePostCommitPublish() (+27 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.11
-Nodes (16): startApiRuntime(), setInterval(), startPoolMetricsLogging(), startSubscriptionExpiryJob(), startPostCommitSweep(), startSseZombieReaper(), API_PID_FILE, config (+8 more)
+Cohesion: 0.15
+Nodes (19): startApiRuntime(), setInterval(), startPoolMetricsLogging(), startSubscriptionExpiryJob(), startPostCommitSweep(), redisRealtimeEnabled(), startRedisRealtimeBridge(), startSseGateway() (+11 more)
 
 ### Community 45 - "Community 45"
-Cohesion: 0.06
-Nodes (45): activeParams, getActiveListParams(), ACTIVE_UI, applyPatchToPaginatedList(), applyPollStatusToCache(), ApplyRealtimeCacheOptions, applyRealtimeEventsToCache(), applyRealtimeEventToCache() (+37 more)
+Cohesion: 0.08
+Nodes (28): activeParams, getActiveListParams(), ACTIVE_UI, applyPatchToPaginatedList(), applyPollStatusToCache(), ApplyRealtimeCacheOptions, applyRealtimeEventsToCache(), applyRealtimeEventToCache() (+20 more)
 
 ### Community 46 - "Community 46"
-Cohesion: 0.13
-Nodes (28): { buildLogContext }, logAuthConfigReady(), logAuthEmailRejected(), logAuthVerifyDebug(), logAuthVerifyFailed(), { logInfo }, audienceMatches(), AUTH_DEBUG (+20 more)
+Cohesion: 0.12
+Nodes (29): supabaseAuth, { buildLogContext }, logAuthConfigReady(), logAuthEmailRejected(), logAuthVerifyDebug(), logAuthVerifyFailed(), { logInfo }, audienceMatches() (+21 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.06
-Nodes (51): { buildLogContext }, bulkDeleteApplicationsController(), {
-  bulkSetApplicationTrackerStatus,
-  bulkDeleteApplications,
-}, bulkSetTrackerStatusController(), handleBulkError(), { logError }, { ok, ERROR_CODES }, { sendError } (+43 more)
+Cohesion: 0.10
+Nodes (33): assertOwnedApplicationIds(), bulkDeleteApplications(), bulkSetApplicationTrackerStatus(), { getTrackerStatusOptions }, normalizeApplicationIds(), { pool }, { recordEvent }, autoAssignEmailReadyTrackerStatus() (+25 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.06
 Nodes (34): 10. Business model & pricing, 11. Constraints, risks & out of scope, 12. Glossary, 13. References, 1. Document overview, 2. Executive summary, 3. Positioning & moat, 4. North Star metrics (+26 more)
 
 ### Community 49 - "Community 49"
-Cohesion: 0.04
-Nodes (62): billingService, { buildUserMeResponse }, campaignModel, campaignService, entitlementService, { logError, logInfo }, { ok, error, ERROR_CODES }, paymentModel (+54 more)
+Cohesion: 0.05
+Nodes (52): { buildSetupStatus }, { buildUserMeResponse }, { deriveNameFromEmail }, getMeController(), { isTransientPgError }, { isValidApplyMode }, { logError, logInfo }, { ok, error, ERROR_CODES } (+44 more)
 
 ### Community 50 - "Community 50"
 Cohesion: 0.07
@@ -746,12 +764,12 @@ Cohesion: 0.08
 Nodes (29): buildRetryUserPrompt(), buildSystemPrompt(), initialEmailFeedbackSignals(), { pool }, recordEmailFeedback(), buildEmailMetadata(), config, emailResponseSchema (+21 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (20): { ensureLocalUser, touchLastLogin }, { getRequestMeta }, { logAuthRejected, logAuthSyncFailed }, { logError }, mapJwtErrorToResponse(), readAttribution(), reject(), supabaseAuthMiddleware() (+12 more)
 
 ### Community 55 - "Community 55"
-Cohesion: 0.10
-Nodes (26): app, {
+Cohesion: 0.13
+Nodes (21): app, {
     createValidPdfBuffer,
     createInvalidPdfBuffer,
     createNoEofPdfBuffer,
@@ -764,39 +782,42 @@ Nodes (26): app, {
     createPdfWithMultipleEof,
     createValidPdfVersion17,
     createValidPdfWithPaddingBeforeEof
-}, express, request, uploadMiddleware, isMultipartRequest(), multer, upload (+18 more)
+}, express, request, uploadMiddleware, isMultipartRequest(), multer, upload (+13 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.07
-Nodes (27): DEFAULT_CAPABILITIES, LOCAL_STUB_CAPABILITIES, REMOTE_PARSE_CAPABILITIES, { createOpenAICompatibleProvider }, { REMOTE_PARSE_CAPABILITIES }, { createOpenAICompatibleProvider }, { REMOTE_PARSE_CAPABILITIES }, { createOpenAICompatibleProvider } (+19 more)
+Cohesion: 0.09
+Nodes (23): DEFAULT_CAPABILITIES, LOCAL_STUB_CAPABILITIES, REMOTE_PARSE_CAPABILITIES, { createOpenAICompatibleProvider }, { REMOTE_PARSE_CAPABILITIES }, { createOpenAICompatibleProvider }, { REMOTE_PARSE_CAPABILITIES }, { createOpenAICompatibleProvider } (+15 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.06
-Nodes (44): CERTIFICATION_PARSED_JD, { pool }, { aggregateCertificationResults }, { executeCertificationAttempt, formatAttemptError }, { logCertificationDebug }, mergeProviderMetadata(), modelCertificationConfig, modelCertificationRunModel (+36 more)
+Cohesion: 0.11
+Nodes (27): { aggregateCertificationResults }, { executeCertificationAttempt, formatAttemptError }, { logCertificationDebug }, mergeProviderMetadata(), modelCertificationConfig, modelCertificationRunModel, { NonRetryableError }, { resolveCertificationResumeText } (+19 more)
 
 ### Community 58 - "Community 58"
-Cohesion: 0.14
-Nodes (15): anthropic, gemini, grok, groq, listAllProviders(), listLocalProviders(), listRemoteProviders(), lmstudio (+7 more)
+Cohesion: 0.05
+Nodes (64): activateCredentialController(), aiCredentialModel, aiCredentialService, applyVerificationResult(), curatedAiModelModel, deleteCredentialController(), { getProvider }, { healthCheck } (+56 more)
 
 ### Community 59 - "Community 59"
-Cohesion: 0.09
-Nodes (22): getApplicationByResumeAndJD(), createJobDescription(), createPlaceholderJobDescription(), getJDById(), { pool }, saveParsedJD(), updateJobDescriptionFromParsed(), { buildEmailGenerationContext } (+14 more)
+Cohesion: 0.03
+Nodes (90): withPgTransaction(), upsertCredential(), { APPLICATION_STATUS }, { buildApplicationsListSql }, createApplication(), findRecentDuplicate(), getApplicationByResumeAndJD(), listApplicationsPaginated() (+82 more)
 
 ### Community 60 - "Community 60"
-Cohesion: 0.04
-Nodes (65): { logInfo, logError }, runOnce(), subscriptionService, { logInfo }, runShutdown(), extractText(), config, llmProtection (+57 more)
+Cohesion: 0.07
+Nodes (38): markApplicationFailed(), markSentFromGenerated(), { APPLICATION_STATUS }, assertMonotonicBump(), bumpOrchestrationEpoch(), bumpVersionForJobTransition(), incrementOrchestrationVersion(), loadOrchestrationMeta() (+30 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.10
 Nodes (10): createTransportOptions(), GMAIL_TRANSPORT, EmailProvider, { createTransportOptions }, { EmailProvider }, nodemailer, SmtpProvider, { getProvider } (+2 more)
 
 ### Community 62 - "Community 62"
-Cohesion: 0.07
-Nodes (34): ROLE_SKILL_MAP, skillsForRole(), skillsForRoles(), findRecentDuplicate(), autoApply(), { buildEmailGenerationContext }, { computeMatch }, { createApplication, findRecentDuplicate } (+26 more)
+Cohesion: 0.13
+Nodes (23): circuit, executeWithPgRetry(), {
+  isTransientPgError,
+  isNonRetryablePgError,
+}, jitteredDelay(), { logInfo }, { metrics }, sleep(), { executeWithPgRetry: retry } (+15 more)
 
 ### Community 63 - "Community 63"
-Cohesion: 0.12
-Nodes (16): getActiveOrchestrationController(), { getActiveOrchestrationForUser }, { logDebug }, { metrics }, { ok }, { performance }, { getActiveOrchestrationForUser }, { pool } (+8 more)
+Cohesion: 0.18
+Nodes (11): getActiveOrchestrationController(), { getActiveOrchestrationForUser }, { logDebug }, { metrics }, { ok }, { performance }, express, { getActiveOrchestrationController } (+3 more)
 
 ### Community 64 - "Community 64"
 Cohesion: 0.11
@@ -804,7 +825,7 @@ Nodes (17): ai, { createOperationTimeout, classifyHealthCheckError }, healthChec
 
 ### Community 65 - "Community 65"
 Cohesion: 0.11
-Nodes (13): aiCredentialModel, { canAutoRecoverHealth, isTerminalHealth }, config, { DEFAULT_MODELS }, { encrypt, decrypt }, entitlementService, { getProvider }, { logInfo } (+5 more)
+Nodes (29): collapseKey(), fuzzyAliasLookup(), levenshtein(), normalizeRoleTitle(), ROLE_ALIASES, singularizeRole(), titleCaseFallback(), classifyNonRoleBullet() (+21 more)
 
 ### Community 66 - "Community 66"
 Cohesion: 0.18
@@ -833,12 +854,12 @@ Cohesion: 0.07
 Nodes (25): createEventBatchProcessor(), EventBatchProcessor, ChannelHandler, createChannelRouter(), normalizeApplicationEvent(), createTabLeader(), canRunCatastrophicRecovery(), GuardState (+17 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.08
-Nodes (31): { logWarn }, { orchestrationDedupe, resetForTests }, { logDebug, logError }, { orchestrationDedupe }, {
+Cohesion: 0.07
+Nodes (33): { logWarn }, { orchestrationDedupe, resetForTests }, { logDebug, logError }, { orchestrationDedupe }, {
   surfaceRegression,
   classifyClientStale,
   REPEATED_THRESHOLD,
-}, isDebugEnabled(), logging, bucketKey() (+23 more)
+}, isDebugEnabled(), logging, bucketKey() (+25 more)
 
 ### Community 72 - "Community 72"
 Cohesion: 0.12
@@ -861,8 +882,8 @@ Cohesion: 0.08
 Nodes (26): dependencies, canvas-confetti, class-variance-authority, clsx, echarts, echarts-for-react, lucide-react, next-themes (+18 more)
 
 ### Community 77 - "Community 77"
-Cohesion: 0.24
-Nodes (11): checkApplicationQuota(), entitlementService, { FEATURE_KEYS }, getAdminBonusTotal(), getBaseApplicationLimit(), getEffectiveApplicationLimit(), getReferralBonusTotal(), isUnlimited() (+3 more)
+Cohesion: 0.10
+Nodes (22): FEATURE_KEYS, FEATURE_TYPES, { FEATURE_KEYS }, LIFETIME, { logError }, QUOTA_FEATURE_KEYS, trialLimitService, usageService (+14 more)
 
 ### Community 78 - "Community 78"
 Cohesion: 0.13
@@ -873,16 +894,16 @@ Cohesion: 0.11
 Nodes (15): buildRawMime(), config, { EmailProvider }, GmailProvider, { google }, MailComposer, newOAuthClient(), { GmailProvider, buildRawMime } (+7 more)
 
 ### Community 80 - "Community 80"
-Cohesion: 0.15
-Nodes (12): FAILURE_OUTCOMES, classifyJdParseFailure(), FAILURE_ACTION, { FAILURE_OUTCOMES }, { isNonRetryableApplicationError }, { RetryableError, NonRetryableError }, { classifyJdParseFailure, FAILURE_ACTION }, { RetryableError, NonRetryableError } (+4 more)
+Cohesion: 0.17
+Nodes (15): callbackController(), config, connectController(), disconnectController(), { getUserId }, gmailIntegrationService, { logError }, { ok, error, ERROR_CODES } (+7 more)
 
 ### Community 81 - "Community 81"
 Cohesion: 0.09
 Nodes (21): aliases, components, hooks, lib, ui, utils, iconLibrary, menuAccent (+13 more)
 
 ### Community 82 - "Community 82"
-Cohesion: 0.20
-Nodes (9): admin, adminGuard, adminUsers, aiCost, express, platformAi, referrals, router (+1 more)
+Cohesion: 0.05
+Nodes (54): adminUserModel, auditService, blockUserController(), grantApplicationsController(), listAdminUsersController(), { logError }, { ok, error, ERROR_CODES }, { pool } (+46 more)
 
 ### Community 83 - "Community 83"
 Cohesion: 0.09
@@ -893,8 +914,8 @@ Cohesion: 0.10
 Nodes (20): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, jsx, lib, module, moduleDetection, moduleResolution (+12 more)
 
 ### Community 85 - "Community 85"
-Cohesion: 0.08
-Nodes (22): ai, auth, billing, config, cors, database, google, logging (+14 more)
+Cohesion: 0.11
+Nodes (17): ai, auth, billing, config, cors, database, google, logging (+9 more)
 
 ### Community 86 - "Community 86"
 Cohesion: 0.13
@@ -905,12 +926,16 @@ Cohesion: 0.11
 Nodes (13): ApplicationsBulkActionsBar(), Props, StatusMenuItem(), ApplicationTrackerStatusCell(), Props, StatusLabel(), TRACKER_STATUSES_QUERY_KEY, useTrackerStatuses() (+5 more)
 
 ### Community 88 - "Community 88"
-Cohesion: 0.07
-Nodes (18): AuthContext, AuthContextValue, AuthUser, useAuth(), useAuthReady(), useAuthSession(), useAuthUserEmail(), SessionHandlers() (+10 more)
+Cohesion: 0.09
+Nodes (13): AuthContext, AuthContextValue, AuthUser, useAuth(), useAuthSession(), useAuthUserEmail(), SessionHandlers(), SetupStatusBootstrap() (+5 more)
 
 ### Community 89 - "Community 89"
 Cohesion: 0.10
 Nodes (19): After 5–8 sessions — synthesis template, Before the call (send 24h ahead), Call structure, Facilitation do's & don'ts, Intro script (read verbatim), Live task (pick ONE per participant), OneTap MVP — User Research Script & Scorecard, OneTap-specific things to watch (+11 more)
+
+### Community 90 - "Community 90"
+Cohesion: 0.13
+Nodes (3): { pool }, platformAiConfigModel, platformAiConfigService
 
 ### Community 91 - "Community 91"
 Cohesion: 0.12
@@ -925,16 +950,19 @@ Cohesion: 0.16
 Nodes (17): buildPlatformCredential(), cache, config, curatedAiModelModel, { decrypt }, { DEFAULT_MODELS }, envBootstrapCredential(), invalidateCache() (+9 more)
 
 ### Community 94 - "Community 94"
-Cohesion: 0.17
-Nodes (13): clearStep(), getStepDurationMs(), markStepStarted(), ONBOARDING_STEP_INDEX, OnboardingStepName, stepEventName(), StepEventSuffix, stepKey() (+5 more)
+Cohesion: 0.16
+Nodes (12): acquirePgClient(), attachPgClientErrorHandler(), clearClientTransaction(), isInTransactionContext(), { logError, logInfo }, { metrics }, { shouldLogInfraError }, txnContext (+4 more)
 
 ### Community 95 - "Community 95"
 Cohesion: 0.13
 Nodes (14): 10. AI cost & performance, 1. Acquisition, 2. Landing, 3. Signup, 4. Onboarding, 5. Activation, 6. Product usage, 7. Billing (+6 more)
 
 ### Community 96 - "Community 96"
-Cohesion: 0.13
-Nodes (10): resolveDraftState, resolveFailedState, resolveGeneratedState, resolveProcessingState, resolveRetryState, resolveReviewState, resolveSendingState, resolveTerminalState (+2 more)
+Cohesion: 0.08
+Nodes (23): getAiCostMetricsController(), { logError }, { ok, error, ERROR_CODES }, { pool }, { buildLogContext }, bulkDeleteApplicationsController(), {
+  bulkSetApplicationTrackerStatus,
+  bulkDeleteApplications,
+}, bulkSetTrackerStatusController() (+15 more)
 
 ### Community 97 - "Community 97"
 Cohesion: 0.11
@@ -945,8 +973,8 @@ Cohesion: 0.18
 Nodes (12): logEventForReason(), rejectEventCode(), repeatTrack, staleByFromReason(), ACTIVE_UI, orchPatchFromEvent(), RejectReason, RowRejectReason (+4 more)
 
 ### Community 99 - "Community 99"
-Cohesion: 0.27
-Nodes (11): publishImmediately(), computePriority(), enqueuePublishBatch(), flushBatch(), flushPublishBatchNow(), mergeEntry(), pending, resetPublishBatchForTests() (+3 more)
+Cohesion: 0.04
+Nodes (50): billingDisabled(), billingService, { buildUserMeResponse }, campaignModel, campaignService, createCheckoutController(), entitlementService, getBillingOrdersController() (+42 more)
 
 ### Community 100 - "Community 100"
 Cohesion: 0.11
@@ -957,8 +985,8 @@ Cohesion: 0.12
 Nodes (16): devDependencies, eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, globals, tailwindcss, @tailwindcss/vite (+8 more)
 
 ### Community 102 - "Community 102"
-Cohesion: 0.27
-Nodes (11): recordProviderEvent(), disconnect(), handleCallback(), fetchSmtpCredentials(), refreshAndPersist(), config, crypto, decrypt() (+3 more)
+Cohesion: 0.10
+Nodes (20): attachRedisErrorHandler(), { attachRedisErrorHandler }, config, createEphemeralRedisClient(), getRedisHealthStatus(), IORedis, pingRedis(), config (+12 more)
 
 ### Community 103 - "Community 103"
 Cohesion: 0.14
@@ -969,23 +997,23 @@ Cohesion: 0.20
 Nodes (14): dispatchAuthFailure(), dispatchQuotaExceeded(), parseApiErrorBody(), parseRetryAfterMs(), request(), requestApplicationStatus(), tryRefreshSupabaseSession(), apiUrl() (+6 more)
 
 ### Community 105 - "Community 105"
-Cohesion: 0.03
-Nodes (75): { createClient }, storage, supabase, { buildExtensionPopupStatus }, getExtensionPopupStatusController(), { isTransientPgError }, { logError }, { ok, error, ERROR_CODES } (+67 more)
+Cohesion: 0.07
+Nodes (33): { buildExtensionPopupStatus }, getExtensionPopupStatusController(), { isTransientPgError }, { logError }, { ok, error, ERROR_CODES }, { sendError }, getSetupStatusController(), adminGuard() (+25 more)
 
 ### Community 106 - "Community 106"
-Cohesion: 0.11
-Nodes (24): FEATURE_KEYS, FEATURE_TYPES, periodTypeForFeatureKey(), { FEATURE_KEYS }, LIFETIME, { logError }, QUOTA_FEATURE_KEYS, trialLimitService (+16 more)
+Cohesion: 0.27
+Nodes (13): periodTypeForFeatureKey(), checkQuota(), consume(), enforceQuota(), entitlementService, getLimit(), getUsageSummary(), isUnlimited() (+5 more)
 
 ### Community 108 - "Community 108"
-Cohesion: 0.08
-Nodes (32): { logError }, { ok, error, ERROR_CODES }, postConnectInitController(), {
+Cohesion: 0.10
+Nodes (26): { logError }, { ok, error, ERROR_CODES }, postConnectExchangeController(), postConnectInitController(), {
   validateConnectInitBody,
   createConnectToken,
   exchangeConnectToken,
 }, {
   getDetectionConfig,
   updateDetectionConfig,
-}, { logError }, { ok, error, ERROR_CODES }, putAdminDetectionConfigController() (+24 more)
+}, getDetectionConfigController(), { logError } (+18 more)
 
 ### Community 109 - "Community 109"
 Cohesion: 0.16
@@ -999,12 +1027,12 @@ Nodes (12): buildJudgeUserPrompt(), buildCandidateSummary(), buildJobSummary(), 
 }, judgeCertificationEmail(), judgeSchema (+4 more)
 
 ### Community 111 - "Community 111"
-Cohesion: 0.09
-Nodes (19): getEntitlement(), getEntitlements(), hasEntitlement(), planModel, settingsService, subscriptionModel, subscriptionService, DEFAULT_STEPS (+11 more)
+Cohesion: 0.16
+Nodes (10): getEntitlement(), getEntitlements(), hasEntitlement(), planModel, settingsService, subscriptionModel, subscriptionService, ACTION_TRIGGERS (+2 more)
 
 ### Community 112 - "Community 112"
-Cohesion: 0.21
-Nodes (8): counters, gauge(), gauges, histogram(), histograms, increment(), metricKey(), backendMetrics
+Cohesion: 0.26
+Nodes (15): bgRequest(), getCachedConfig(), getSetupStatus(), importExtensionModule(), init(), isConnected(), isContextInvalidatedError(), isExtensionContextValid() (+7 more)
 
 ### Community 113 - "Community 113"
 Cohesion: 0.25
@@ -1019,8 +1047,8 @@ Cohesion: 0.15
 Nodes (12): AI Apply — Engineering Documentation, Backend engineer (~75 min), DevOps / on-call (~45 min), Documentation map, Four-layer truth model, Frontend engineer (~60 min), Governance, New contributor (~45 min) (+4 more)
 
 ### Community 116 - "Community 116"
-Cohesion: 0.29
-Nodes (4): EntitlementSnapshot, PaywallTrigger, shouldRequireSubscriptionForPath(), SubscriptionGuard()
+Cohesion: 0.17
+Nodes (11): isOnboardingFlowComplete(), EntitlementSnapshot, PaywallTrigger, postAuthPathWithoutSubscription(), shouldEnforceSubscriptionPaywall(), shouldRequireSubscriptionForPath(), loadSetupStatus(), PostAuthPath (+3 more)
 
 ### Community 117 - "Community 117"
 Cohesion: 0.15
@@ -1035,8 +1063,8 @@ Cohesion: 0.15
 Nodes (12): 10. Dependencies, 11. Output, 1. OpenAI API Usage, 2. Function Contract, 3. Output Structure (STRICT), 4. System Prompt (IMPORTANT), 5. Retry Logic (MANDATORY), 6. JSON Parsing Safety (+4 more)
 
 ### Community 120 - "Community 120"
-Cohesion: 0.10
-Nodes (16): { pool }, attachReferralOnSignup(), countCompletedRewards(), crypto, displayReferredUser(), ensureReferralCode(), { FEATURE_KEYS }, getReferralSettings() (+8 more)
+Cohesion: 0.09
+Nodes (19): { pool }, attachReferralOnSignup(), consumeApplicationQuotaAfterSend(), countCompletedRewards(), crypto, displayReferredUser(), ensureReferralCode(), { FEATURE_KEYS } (+11 more)
 
 ### Community 121 - "Community 121"
 Cohesion: 0.17
@@ -1047,16 +1075,19 @@ Cohesion: 0.17
 Nodes (11): 1. Supabase (for token refresh), 1b. Environment (dev vs production), 2. Website connect, Auth (Phase 0.5b), Configuration, Features, LinkedIn button, OneTap Chrome Extension (MVP) (+3 more)
 
 ### Community 123 - "Community 123"
-Cohesion: 0.24
-Nodes (8): createFeature(), getFeatureById(), getFeatureByKey(), mapRow(), { pool }, updateFeature(), featureDefinitionModel, planModel
+Cohesion: 0.16
+Nodes (23): {
+  attachPgClientErrorHandler,
+  isInTransactionContext,
+}, buildQueryConfig(), connectWithTiming(), crypto, execQuery(), { executeWithPgRetry }, getPoolMetrics(), instrumentedQuery() (+15 more)
 
 ### Community 124 - "Community 124"
 Cohesion: 0.17
 Nodes (11): Acceptance tests, Auth flow, Chrome Web Store, Dev setup, Exchange response, Extension Auth — Phase 0.5b, Lifecycle decisions, Logout (+3 more)
 
 ### Community 125 - "Community 125"
-Cohesion: 0.19
-Nodes (12): addDays(), adminGrant(), ensureAutoTimeTrial(), expireElapsed(), grantAccessPeriod(), grantTrial(), { logInfo }, paymentModel (+4 more)
+Cohesion: 0.10
+Nodes (17): config, llmProtection, LlmProtectionLayer, { logInfo, logError }, addDays(), adminGrant(), ensureAutoTimeTrial(), expireElapsed() (+9 more)
 
 ### Community 126 - "Community 126"
 Cohesion: 0.24
@@ -1075,8 +1106,8 @@ Cohesion: 0.27
 Nodes (6): useLogout(), UserAvatarProps, UserMenu(), deriveNameFromEmail(), getDisplayFirstName(), getUserInitials()
 
 ### Community 130 - "Community 130"
-Cohesion: 0.18
-Nodes (10): 1. PIPELINE STATUS, 4. REQUIRED ARCHITECTURAL CHANGES, 5. CURRENT SYSTEM RATING, 6. FINAL DIAGNOSIS, AI Resume Parsing Failure Logbook, Immediate, Long-Term, Mid-Term (+2 more)
+Cohesion: 0.20
+Nodes (9): 1. PIPELINE STATUS, 3. RECOMMENDED MODEL STACK, 5. CURRENT SYSTEM RATING, 6. FINAL DIAGNOSIS, AI Resume Parsing Failure Logbook, Primary, Secondary, Session Info (+1 more)
 
 ### Community 131 - "Community 131"
 Cohesion: 0.18
@@ -1088,15 +1119,15 @@ Nodes (5): getTabId(), OrchestrationBroadcastMessage, OrchestrationBroadcastPost
 
 ### Community 133 - "Community 133"
 Cohesion: 0.14
-Nodes (19): appendReplayEvent(), { attachRedisErrorHandler }, config, getRedis(), IORedis, { logDebug, logInfo }, memoryBuffers, { metrics } (+11 more)
+Nodes (20): appendReplayEvent(), { attachRedisErrorHandler }, config, getRedis(), IORedis, { logDebug, logInfo }, memoryBuffers, { metrics } (+12 more)
 
 ### Community 134 - "Community 134"
 Cohesion: 0.18
 Nodes (10): AI, Current architecture (summary), Data, Future architecture, Future directions, Platform, Queues, Realtime (+2 more)
 
 ### Community 135 - "Community 135"
-Cohesion: 0.15
-Nodes (15): createCampaign(), getByCode(), getById(), mapRow(), { pool }, updateCampaign(), appliesToPlan(), campaignModel (+7 more)
+Cohesion: 0.27
+Nodes (9): appliesToPlan(), campaignModel, claimSlot(), claimTrial(), evaluate(), isWithinWindow(), listEligibleForUser(), { pool } (+1 more)
 
 ### Community 136 - "Community 136"
 Cohesion: 0.20
@@ -1155,24 +1186,24 @@ Cohesion: 0.20
 Nodes (9): AI, Core entities, Glossary, Infrastructure, Operations, Realtime & orchestration, Related Documentation, State layers (+1 more)
 
 ### Community 150 - "Community 150"
-Cohesion: 0.09
-Nodes (17): ResumeParseBackgroundPoller(), BACKOFF_MS, useResumeParsePolling(), useSetupReadyTracking(), useSetupStatus(), getWelcomeDescription(), Onboarding(), OnboardingStep (+9 more)
+Cohesion: 0.13
+Nodes (12): ResumeParseBackgroundPoller(), BACKOFF_MS, useResumeParsePolling(), useSetupStatus(), getWelcomeDescription(), Onboarding(), OnboardingStep, ResumeUiState (+4 more)
 
 ### Community 151 - "Community 151"
 Cohesion: 0.24
 Nodes (6): computeBackoffMs(), isAppInBackoff(), isTerminalStatus(), PollableApp, shouldPollCore(), TERMINAL_UI
 
 ### Community 152 - "Community 152"
-Cohesion: 0.05
-Nodes (74): bgRequest(), buttonIconHtml(), collectPostRoots(), controlHints(), countDistinctEmails(), countSocialButtons(), createInlineActionItem(), createStandaloneButton() (+66 more)
+Cohesion: 0.14
+Nodes (23): buttonIconHtml(), collectPostRoots(), controlHints(), countDistinctEmails(), countSocialButtons(), createInlineActionItem(), createStandaloneButton(), ensureStyles() (+15 more)
 
 ### Community 154 - "Community 154"
 Cohesion: 0.20
 Nodes (9): AI Apply, API, Architecture (summary), Documentation, Environment, License, Quick start, Scripts (+1 more)
 
 ### Community 155 - "Community 155"
-Cohesion: 0.48
-Nodes (6): LandingCtaId, trackLandingCtaEngaged(), trackLandingFaqExpanded(), trackLandingScrollDepth(), trackLandingSectionViewed(), trackProduct()
+Cohesion: 0.18
+Nodes (9): DEFAULT_STEPS, entitlementService, ONBOARDING_ONLY_STEPS, planModel, resolveOnboarding(), STEP_META, entitlementService, planModel (+1 more)
 
 ### Community 156 - "Community 156"
 Cohesion: 0.22
@@ -1203,8 +1234,8 @@ Cohesion: 0.25
 Nodes (5): APPLY_WALKTHROUGH_STEPS, ApplyWalkthroughStep, hasSeenApplyWalkthrough(), shouldStartApplyWalkthrough(), consumeOnboardingWalkthroughPending()
 
 ### Community 165 - "Community 165"
-Cohesion: 0.13
-Nodes (14): clearEmailStepSkipped(), clearOnboardingExtensionPending(), hasDismissedExtensionPrompt(), hasEmailStepSkipped(), markExtensionPromptDismissed(), computeOnboardingFlow(), isOnboardingFlowComplete(), ONBOARDING_STEPS (+6 more)
+Cohesion: 0.17
+Nodes (9): clearEmailStepSkipped(), clearOnboardingExtensionPending(), hasDismissedExtensionPrompt(), hasEmailStepSkipped(), markExtensionPromptDismissed(), computeOnboardingFlow(), ONBOARDING_STEPS, OnboardingFlowStep (+1 more)
 
 ### Community 166 - "Community 166"
 Cohesion: 0.22
@@ -1215,8 +1246,8 @@ Cohesion: 0.22
 Nodes (8): After rollback verification, Before migration, If `018` was applied (`password_hash` dropped), If `018` was **not** applied, If a destructive `017` deleted users, Roll back application code, Roll back database, Supabase auth migration — rollback
 
 ### Community 168 - "Community 168"
-Cohesion: 0.29
-Nodes (6): admin, adminGuard, c, express, router, supabaseAuthMiddleware
+Cohesion: 0.14
+Nodes (21): publishApplicationUpdate(), resetPublishStateForTests(), resetPublishBatchForTests(), emitted, evictExpired(), { logInfo }, { metrics }, publishKey() (+13 more)
 
 ### Community 169 - "Community 169"
 Cohesion: 0.31
@@ -1234,9 +1265,13 @@ Nodes (8): author, description, keywords, license, main, name, type, version
 Cohesion: 0.22
 Nodes (8): Adapter versioning (P1+), Adding or changing an adapter, Future patterns, Model identifier policy, Normalization contract (stable), Provider adapters, Remote vs local, Testing
 
+### Community 173 - "Community 173"
+Cohesion: 0.10
+Nodes (3): { pool }, curatedAiModelModel, platformAiConfigModel
+
 ### Community 174 - "Community 174"
-Cohesion: 0.18
-Nodes (12): canRetry(), getCooldownMs(), isOpen(), { logInfo }, { metrics }, pruneFailures(), recordProbeFailure(), recordTransientFailure() (+4 more)
+Cohesion: 0.19
+Nodes (11): canRetry(), getCooldownMs(), isOpen(), { logInfo }, { metrics }, pruneFailures(), recordProbeFailure(), recordTransientFailure() (+3 more)
 
 ### Community 175 - "Community 175"
 Cohesion: 0.22
@@ -1346,6 +1381,13 @@ Nodes (6): Business transitions, Idempotency, Jobs, Related Documentation, Send 
 Cohesion: 0.29
 Nodes (3): BootstrapErrorBoundary, Props, State
 
+### Community 204 - "Community 204"
+Cohesion: 0.12
+Nodes (21): CERTIFICATION_PARSED_JD, buildAttemptError(), buildCredentialOverride(), { buildEmailGenerationContext }, {
+  CERTIFICATION_SAMPLE_JD_TEXT,
+  CERTIFICATION_PARSED_JD,
+}, { computeAttemptCertificationScore }, { computeMatch }, executeCertificationAttempt() (+13 more)
+
 ### Community 205 - "Community 205"
 Cohesion: 0.29
 Nodes (6): Application recovery candidates, Indexes and recovery, Query guidance, Recovery (012), Related Documentation, Status poll (013)
@@ -1403,12 +1445,12 @@ Cohesion: 0.29
 Nodes (6): Backoff, LLM retries, Max attempts, Related Documentation, Retry and backoff, Unrecoverable errors
 
 ### Community 220 - "Community 220"
-Cohesion: 0.40
-Nodes (4): express, router, supabaseAuthMiddleware, { uploadJDController }
+Cohesion: 0.13
+Nodes (21): accessTokenIsFresh(), { createEphemeralRedisClient }, crypto, emailAccountModel, { encryptSecret, decryptSecret }, getFreshAccessToken(), { getProvider }, isInvalidGrant() (+13 more)
 
 ### Community 221 - "Community 221"
-Cohesion: 0.50
-Nodes (4): 3. RECOMMENDED MODEL STACK, Primary, Secondary, Tertiary
+Cohesion: 0.13
+Nodes (18): config, emailAccountModel, { fetchSmtpCredentials }, { getProvider }, { logInfo }, oauthTokenService, resolveSendingAccount(), send() (+10 more)
 
 ### Community 222 - "Community 222"
 Cohesion: 0.29
@@ -1523,8 +1565,8 @@ Cohesion: 0.33
 Nodes (5): ETag, Intervals, Related Documentation, Rules, Status and polling
 
 ### Community 253 - "Community 253"
-Cohesion: 0.29
-Nodes (5): clientId, clientSecret, redirectUri, SCOPES, { str, bool }
+Cohesion: 0.14
+Nodes (10): { str }, str(), normalizeRedisUrl(), resolveRedisUrl(), { str }, { str }, audience, issuerOverride (+2 more)
 
 ### Community 255 - "Community 255"
 Cohesion: 0.33
@@ -1571,11 +1613,8 @@ Cohesion: 0.33
 Nodes (5): Future, JWT replay limitation, Mitigations today, Related Documentation, Risk
 
 ### Community 267 - "Community 267"
-Cohesion: 0.39
-Nodes (6): isPublishWorthy(), isUserVisibleTransition(), isVisibleUiStatus(), { UI_STATUS }, {
-  isPublishWorthy,
-  isVisibleUiStatus,
-}, VISIBLE_UI
+Cohesion: 0.20
+Nodes (6): getApplyMode(), refreshButtonApplyModeHints(), updateButtonIdleState(), autoApplyToggleDescription(), isAutoApplyMode(), linkedInButtonTitle()
 
 ### Community 268 - "Community 268"
 Cohesion: 0.33
@@ -1598,11 +1637,11 @@ Cohesion: 0.40
 Nodes (4): Common codes, Error body shape, Errors and status codes, Related Documentation
 
 ### Community 273 - "Community 273"
-Cohesion: 0.08
-Nodes (36): circuit, executeWithPgRetry(), {
-  isTransientPgError,
-  isNonRetryablePgError,
-}, jitteredDelay(), { logInfo }, { metrics }, sleep(), BENIGN_NETWORK_CODES (+28 more)
+Cohesion: 0.11
+Nodes (23): BENIGN_NETWORK_CODES, isBenignNetworkError(), {
+  isRecoverableInfraError,
+  shouldLogInfraError,
+}, { logError, logInfo }, logNetworkError(), containRecoverableError(), fatalExit(), handleUncaughtError() (+15 more)
 
 ### Community 275 - "Community 275"
 Cohesion: 0.40
@@ -1629,8 +1668,8 @@ Cohesion: 0.40
 Nodes (3): { execSync }, fs, path
 
 ### Community 282 - "Community 282"
-Cohesion: 0.50
-Nodes (3): normalizeRedisUrl(), resolveRedisUrl(), { str }
+Cohesion: 0.11
+Nodes (7): { pool }, { withPgTransaction }, emailAccountModel, { getProvider }, mockStore, { recordProviderEvent }, service
 
 ### Community 284 - "Community 284"
 Cohesion: 0.40
@@ -1667,6 +1706,10 @@ Nodes (4): buildTrackerStatusSankey(), chartHex(), TRACKER_STATUS_CHART_HEX, Tra
 ### Community 292 - "Community 292"
 Cohesion: 0.40
 Nodes (4): Code / security, Database (phased), Per legacy user (×2), Supabase auth pre-merge audit checklist
+
+### Community 293 - "Community 293"
+Cohesion: 0.22
+Nodes (5): useAuthReady(), AiProviderStatusCard(), Props, REMOTE_PROVIDERS, useAiCredentials()
 
 ### Community 294 - "Community 294"
 Cohesion: 0.40
@@ -1748,6 +1791,10 @@ Nodes (3): Middleware, Rate limits, Related Documentation
 Cohesion: 0.50
 Nodes (3): Breaking deploy checklist, Configuration migration, Removed variables
 
+### Community 317 - "Community 317"
+Cohesion: 0.15
+Nodes (17): counts, InvalidatePolicy, isInvalidateSuppressed(), POLICIES, PolicyConfig, recordInvalidateStorm(), resetInvalidatePolicyForTests(), scheduleListInvalidation() (+9 more)
+
 ### Community 318 - "Community 318"
 Cohesion: 0.50
 Nodes (3): BILLING_PLANS, BillingPlan, PlanId
@@ -1761,8 +1808,8 @@ Cohesion: 0.50
 Nodes (3): fs, path, root
 
 ### Community 327 - "Community 327"
-Cohesion: 0.11
-Nodes (8): billingService, handleOrderPaid(), { logError, logInfo }, paymentModel, planModel, razorpayWebhookController(), subscriptionService, { pool }
+Cohesion: 0.08
+Nodes (13): billingService, handleOrderPaid(), { logError, logInfo }, paymentModel, planModel, razorpayWebhookController(), subscriptionService, { pool } (+5 more)
 
 ### Community 330 - "Community 330"
 Cohesion: 0.50
@@ -1796,9 +1843,13 @@ Nodes (3): Queue map, Queues, Related Documentation
 Cohesion: 0.50
 Nodes (3): path, result, { spawnSync }
 
+### Community 338 - "Community 338"
+Cohesion: 0.36
+Nodes (6): createCampaign(), getByCode(), getById(), mapRow(), { pool }, updateCampaign()
+
 ### Community 339 - "Community 339"
-Cohesion: 0.10
-Nodes (18): {
+Cohesion: 0.05
+Nodes (48): {
   APPLICATION_STATUS,
   JOB_STATUS,
 }, isExecutionAttemptFailed(), isWorkflowFailed(), {
@@ -1807,7 +1858,7 @@ Nodes (18): {
 }, {
   isWorkflowFailed,
   isExecutionAttemptFailed,
-}, ACTIVE_POLL_UI, { isDashboardSubmission }, { UI_STATUS, TERMINAL_UI_STATUSES, APPLICATION_STATUS } (+10 more)
+}, { buildResolverContext }, caps(), { resolveUiStatus } (+40 more)
 
 ### Community 340 - "Community 340"
 Cohesion: 0.67
@@ -1825,9 +1876,17 @@ Nodes (3): SelectContent, SelectItem, SelectTrigger
 Cohesion: 0.50
 Nodes (3): Entry, Related Documentation, Workers
 
+### Community 379 - "Community 379"
+Cohesion: 0.22
+Nodes (6): baseline, { enrichParsedJd }, FIXTURES_DIR, fs, manifest, path
+
 ### Community 393 - "Community 393"
 Cohesion: 0.67
 Nodes (3): Accepted ADRs, ADRs & conventions, Code conventions
+
+### Community 459 - "Community 459"
+Cohesion: 0.15
+Nodes (15): config, cors, createApp(), express, { logger, logError }, pinoHttp, tracingMiddleware, config (+7 more)
 
 ### Community 480 - "Community 480"
 Cohesion: 0.15
@@ -1838,64 +1897,73 @@ Cohesion: 0.50
 Nodes (3): createPanelController(), getPanelController(), POPUP_URL
 
 ### Community 482 - "Community 482"
-Cohesion: 0.06
-Nodes (35): AI_PLATFORM_FALLBACK_PROVIDERS, DEFAULT_MODELS, HEALTH_CHECK_TIMEOUT_MS, { str, int }, { str }, currency, { int, str }, plans (+27 more)
+Cohesion: 0.13
+Nodes (15): { isProduction }, { str, int }, bool(), DEBUG_SCOPES_ALLOWLIST, int(), requireEnv(), validateStartup(), fs (+7 more)
 
 ### Community 483 - "Community 483"
 Cohesion: 0.16
 Nodes (17): FALLBACK_PLAN_NAMES, formatBillingPeriod(), formatMoney(), formatSubscriptionDate(), getPlanDisplayName(), getRecommendedPlanSlug(), getSubscriptionMenuBadge(), getSubscriptionStatusLabel() (+9 more)
 
 ### Community 484 - "Community 484"
-Cohesion: 0.10
-Nodes (22): config, emailAccountModel, { fetchSmtpCredentials }, { getProvider }, { logInfo }, oauthTokenService, resolveSendingAccount(), send() (+14 more)
+Cohesion: 0.29
+Nodes (5): useSetupReadyTracking(), Setup(), SETUP_TABS, SetupTab, visibleSetupTabs()
 
 ### Community 485 - "Community 485"
-Cohesion: 0.08
-Nodes (27): EVENT_TYPES, { pool }, attachRedisErrorHandler(), { attachRedisErrorHandler }, config, createEphemeralRedisClient(), getRedisHealthStatus(), IORedis (+19 more)
+Cohesion: 0.13
+Nodes (22): EVENT_TYPES, { pool }, recordProviderEvent(), assertConfigured(), config, consumeState(), { createEphemeralRedisClient }, createState() (+14 more)
 
 ### Community 486 - "Community 486"
-Cohesion: 0.20
-Nodes (9): { parseJobDescription }, { performance }, runTests(), testCases, { parseJobDescription }, { performance }, runStressTest(), runWorker() (+1 more)
+Cohesion: 0.18
+Nodes (9): allowedOrigins, { csv, str }, csv(), parseDebugScopes(), { isDevelopment }, { str, bool, parseDebugScopes }, debugScopes, hasDebugScope() (+1 more)
 
 ### Community 487 - "Community 487"
 Cohesion: 0.25
 Nodes (6): AiProviderCredentialFields(), CuratedModelOption, Props, AI_PROVIDER_API_KEY_LINKS, AiProviderApiKeyLink, getAiProviderApiKeyLink()
 
 ### Community 488 - "Community 488"
-Cohesion: 0.06
-Nodes (43): crypto, { runWithTrace }, tracingMiddleware(), { AsyncLocalStorage }, getTraceFields(), getTraceStore(), mergeTraceIntoPayload(), runWithTrace() (+35 more)
+Cohesion: 0.08
+Nodes (34): { appendReplayEvent }, buildRealtimePayload(), bundleCache, clearPublishCache(), {
+  EVENT_APPLICATION_UPDATED,
+  CHANNEL_APPLICATIONS,
+}, { fanOutRealtimePayload }, {
+  getApplicationStatusBundle,
+  getApplicationStatusSnapshot,
+}, getCachedSerialized() (+26 more)
 
 ### Community 489 - "Community 489"
-Cohesion: 0.21
-Nodes (9): counters, gauge(), gauges, histogram(), histograms, increment(), metricKey(), metrics (+1 more)
+Cohesion: 0.43
+Nodes (7): findActionBarInfo(), findActionContainer(), findLooseActionBar(), findLooseActionHost(), insertIntoFallbackBar(), isPlausibleActionBar(), queryActionCandidates()
 
 ### Community 490 - "Community 490"
 Cohesion: 0.25
 Nodes (5): QUOTA_HELP, QUOTA_KEYS, QUOTA_LABELS, Settings, TrialMode
 
 ### Community 491 - "Community 491"
-Cohesion: 0.07
-Nodes (29): config, cors, createApp(), express, { logger, logError }, pinoHttp, tracingMiddleware, config (+21 more)
+Cohesion: 0.06
+Nodes (38): app, { createApp }, { registerGracefulShutdown, registerShutdownHook }, {
+  registerProcessLifecycleHandlers,
+  startRuntimeDiagnostics,
+}, { startApi, stopApi }, shutdown(), markBootPhaseComplete(), registerProcessLifecycleHandlers() (+30 more)
 
 ### Community 494 - "Community 494"
 Cohesion: 0.40
 Nodes (4): ADMIN_PROVIDERS, deriveDraftFromServer(), hasActiveKeysForProvider(), PROVIDERS
 
 ### Community 496 - "Community 496"
-Cohesion: 0.40
-Nodes (4): installSupabaseAuthTestMocks(), app, { installSupabaseAuthTestMocks }, request
+Cohesion: 0.14
+Nodes (15): anthropic, gemini, grok, groq, listAllProviders(), listLocalProviders(), listRemoteProviders(), lmstudio (+7 more)
 
 ### Community 497 - "Community 497"
-Cohesion: 0.20
-Nodes (8): { APPLICATION_STATUS }, DATE_PRESETS, listQuerySchema, PAGE_SIZES, SORT_FIELDS, statusEnum, validateApplicationsListQuery(), { z }
+Cohesion: 0.23
+Nodes (10): crypto, { runWithTrace }, tracingMiddleware(), { AsyncLocalStorage }, getTraceFields(), getTraceStore(), mergeTraceIntoPayload(), runWithTrace() (+2 more)
 
 ### Community 501 - "Community 501"
-Cohesion: 0.07
-Nodes (14): detectPoolOwner(), { pool }, { pool }, { pool }, { pool }, attachPoolErrorHandler(), buildPoolConfig(), config (+6 more)
+Cohesion: 0.21
+Nodes (8): counters, gauge(), gauges, histogram(), histograms, increment(), metricKey(), backendMetrics
 
 ### Community 502 - "Community 502"
-Cohesion: 0.07
-Nodes (31): classifyProviderError(), crypto, isProviderJsonValidationFailure(), { logNetworkError }, OpenAI, { RetryableError, NonRetryableError }, { safeParseJSON }, classifyExecutionFailure() (+23 more)
+Cohesion: 0.06
+Nodes (29): classifyJdParseFailure(), FAILURE_ACTION, { FAILURE_OUTCOMES }, { isNonRetryableApplicationError }, { RetryableError, NonRetryableError }, { RetryableError, NonRetryableError }, { shouldPersistTerminalFailure }, { classifyJdParseFailure, FAILURE_ACTION } (+21 more)
 
 ### Community 504 - "Community 504"
 Cohesion: 0.43
@@ -1909,27 +1977,62 @@ Cohesion: 0.27
 Nodes (9): explainQuery(), flagPlanIssues(), fs, main(), path, { pool }, QUERIES, resolveSampleIds() (+1 more)
 
 ### Community 506 - "Community 506"
-Cohesion: 0.28
-Nodes (5): config, createOrder(), crypto, getClient(), isEnabled()
+Cohesion: 0.20
+Nodes (9): { parseJobDescription }, { performance }, runTests(), testCases, { parseJobDescription }, { performance }, runStressTest(), runWorker() (+1 more)
+
+### Community 507 - "Community 507"
+Cohesion: 0.39
+Nodes (6): isPublishWorthy(), isUserVisibleTransition(), isVisibleUiStatus(), { UI_STATUS }, {
+  isPublishWorthy,
+  isVisibleUiStatus,
+}, VISIBLE_UI
+
+### Community 508 - "Community 508"
+Cohesion: 0.21
+Nodes (5): app, crypto, request, app, request
+
+### Community 510 - "Community 510"
+Cohesion: 0.29
+Nodes (6): currency, { int, str }, plans, razorpayKeyId, razorpayKeySecret, razorpayWebhookSecret
+
+### Community 511 - "Community 511"
+Cohesion: 0.29
+Nodes (5): clientId, clientSecret, redirectUri, SCOPES, { str, bool }
+
+### Community 512 - "Community 512"
+Cohesion: 0.40
+Nodes (4): installSupabaseAuthTestMocks(), app, { installSupabaseAuthTestMocks }, request
+
+### Community 513 - "Community 513"
+Cohesion: 0.40
+Nodes (4): AI_PLATFORM_FALLBACK_PROVIDERS, DEFAULT_MODELS, HEALTH_CHECK_TIMEOUT_MS, { str, int }
+
+### Community 514 - "Community 514"
+Cohesion: 0.40
+Nodes (5): 4. REQUIRED ARCHITECTURAL CHANGES, Immediate, Long-Term, Mid-Term, Short-Term
+
+### Community 515 - "Community 515"
+Cohesion: 0.40
+Nodes (4): fs, { mapBundleRow, STATUS_BUNDLE_SQL }, path, queryService
 
 ## Knowledge Gaps
-- **3448 isolated node(s):** `{ Pool }`, `{ Pool }`, `{ pool }`, `$schema`, `style` (+3443 more)
+- **3449 isolated node(s):** `{ Pool }`, `{ Pool }`, `{ pool }`, `$schema`, `style` (+3444 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **118 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **114 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `#_()` connect `Community 0` to `Community 35`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 11`, `Community 12`, `Community 44`, `Community 14`, `Community 17`, `Community 21`, `Community 24`, `Community 29`?**
-  _High betweenness centrality (0.167) - this node is a cross-community bridge._
-- **Why does `fetch()` connect `Community 29` to `Community 0`, `Community 64`, `Community 34`, `Community 5`, `Community 6`, `Community 165`, `Community 8`, `Community 104`, `Community 12`, `Community 17`, `Community 116`, `Community 150`, `Community 23`, `Community 25`, `Community 26`?**
-  _High betweenness centrality (0.101) - this node is a cross-community bridge._
-- **Why does `logInfo()` connect `Community 60` to `Community 3`, `Community 4`, `Community 133`, `Community 7`, `Community 15`, `Community 16`, `Community 273`, `Community 22`, `Community 23`, `Community 25`, `Community 26`, `Community 27`, `Community 28`, `Community 30`, `Community 35`, `Community 36`, `Community 38`, `Community 43`, `Community 44`, `Community 174`, `Community 46`, `Community 49`, `Community 53`, `Community 54`, `Community 56`, `Community 57`, `Community 59`, `Community 62`, `Community 64`, `Community 65`, `Community 327`, `Community 484`, `Community 485`, `Community 102`, `Community 488`, `Community 105`, `Community 491`, `Community 501`, `Community 120`, `Community 125`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+- **Why does `#_()` connect `Community 0` to `Community 33`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 11`, `Community 12`, `Community 43`, `Community 44`, `Community 21`, `Community 24`, `Community 29`?**
+  _High betweenness centrality (0.169) - this node is a cross-community bridge._
+- **Why does `fetch()` connect `Community 29` to `Community 0`, `Community 64`, `Community 34`, `Community 5`, `Community 6`, `Community 165`, `Community 8`, `Community 104`, `Community 11`, `Community 12`, `Community 82`, `Community 116`, `Community 150`, `Community 23`, `Community 25`, `Community 58`?**
+  _High betweenness centrality (0.102) - this node is a cross-community bridge._
+- **Why does `logError()` connect `Community 82` to `Community 3`, `Community 4`, `Community 7`, `Community 10`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 273`, `Community 22`, `Community 23`, `Community 25`, `Community 26`, `Community 28`, `Community 30`, `Community 36`, `Community 38`, `Community 168`, `Community 44`, `Community 49`, `Community 53`, `Community 54`, `Community 56`, `Community 58`, `Community 59`, `Community 60`, `Community 327`, `Community 71`, `Community 459`, `Community 77`, `Community 80`, `Community 220`, `Community 94`, `Community 96`, `Community 99`, `Community 485`, `Community 488`, `Community 105`, `Community 491`, `Community 108`, `Community 120`, `Community 123`, `Community 125`?**
+  _High betweenness centrality (0.073) - this node is a cross-community bridge._
 - **What connects `{ Pool }`, `{ Pool }`, `{ pool }` to the rest of the system?**
-  _3448 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _3449 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.010908805525035316 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.010706437888634344 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.005988023952095809 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
