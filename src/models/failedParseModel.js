@@ -19,11 +19,11 @@ const saveFailedParse = async (fileHash, sourceType, rawText, errorMessage) => {
   const safeText = sanitizeTextForStorage(rawText ?? "");
   const safeError = sanitizeErrorMessage(errorMessage);
 
-  if (!safeText) {
+  if (!safeText && !safeError) {
     logInfo("fallback_storage_skipped", {
       fileHash,
       sourceType,
-      reason: "empty_text_after_sanitize",
+      reason: "empty_text_and_error",
     });
     return null;
   }
@@ -44,7 +44,7 @@ const saveFailedParse = async (fileHash, sourceType, rawText, errorMessage) => {
     const { rows } = await pool.query(query, [
       fileHash,
       sourceType,
-      safeText,
+      safeText || null,
       safeError,
     ]);
 
@@ -68,4 +68,11 @@ const saveFailedParse = async (fileHash, sourceType, rawText, errorMessage) => {
 
 module.exports = {
   saveFailedParse,
+  getFailedParseByHash: async (fileHash, sourceType = "resume") => {
+    const { rows } = await pool.query(
+      `SELECT error_message FROM failed_parses WHERE file_hash = $1 AND source_type = $2 LIMIT 1`,
+      [fileHash, sourceType]
+    );
+    return rows[0] ?? null;
+  },
 };

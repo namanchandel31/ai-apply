@@ -25,7 +25,9 @@ export function Dashboard() {
   const hasValidResume = !!status?.hasValidResume;
   const hasEmailSetup = !!status?.hasEmailSetup;
   const hasAiSetup = !!status?.hasAiSetup;
-  const resumeParsing = setupLoaded && hasResume && !hasValidResume;
+  const resumeParseFailed = setupLoaded && status?.resumeParseStatus === "failed";
+  const resumeParsing =
+    setupLoaded && hasResume && !hasValidResume && !resumeParseFailed;
   const canApply = setupLoaded && hasValidResume && hasEmailSetup && hasAiSetup;
 
   useEffect(() => {
@@ -52,7 +54,9 @@ export function Dashboard() {
 
   const applyDisabledReason = !setupLoaded
     ? null
-    : resumeParsing
+    : resumeParseFailed
+      ? status?.resumeParseError ?? "Resume parsing failed. Replace your resume in Setup."
+      : resumeParsing
       ? null
       : !hasValidResume
         ? "Upload and parse a resume in Setup before using auto apply"
@@ -84,6 +88,8 @@ export function Dashboard() {
             canApply={canApply}
             applyDisabledReason={applyDisabledReason}
             resumeParsing={resumeParsing}
+            resumeParseFailed={resumeParseFailed}
+            resumeParseError={status?.resumeParseError ?? null}
           />
         </div>
       </PageShell>
