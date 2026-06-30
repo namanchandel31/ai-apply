@@ -33,6 +33,10 @@ registerShutdownHook("postgres", async () => {
   const { pool } = require("./db");
   await pool.end();
 }, { priority: 10 });
+registerShutdownHook("posthog", async () => {
+  const { shutdown } = require("./observability/posthog");
+  await shutdown();
+}, { priority: 5 });
 
 async function startAll() {
   const workersEnabled = process.env.ENABLE_WORKERS !== "false";
