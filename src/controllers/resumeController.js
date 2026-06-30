@@ -114,27 +114,7 @@ const uploadResumeController = async (req, res) => {
 
     // Deduplication check
     const existing = await findResumeByHash(fileHash, userId);
-    if (existing) {
-      if (context === "onboarding" && !existing.parsedResumeId) {
-        enqueueBackgroundResumeParse({
-          reqId,
-          jobId,
-          req,
-          fileHash,
-          userId,
-          filePath,
-          existingResumeId: existing.resumeId,
-        });
-        return res.status(202).json({
-          success: true,
-          data: {
-            jobId,
-            status: "processing",
-            resumeId: existing.resumeId,
-            message: "Resume found. Parsing will continue in the background.",
-          },
-        });
-      }
+    if (existing?.parsedResumeId) {
       return respondWithDuplicateResume(res, {
         reqId,
         jobId,
@@ -145,64 +125,88 @@ const uploadResumeController = async (req, res) => {
       });
     }
 
-    // Wrap the handler with a 90s timeout guard (profile_update only)
-    // TODO(async-migration): migrate profile_update to the same async path when UI polls status.
+    const existingResumeId = existing?.resumeId ?? null;
+    const resolvedFilePath = existing?.filePath ?? filePath;
+
+    if (existingResumeId && context === "onboarding") {
+      enqueueBackgroundResumeParse({
+        reqId,
+        jobId,
+        req,
+        fileHash,
+        userId,
+        filePath: resolvedFilePath,
+        existingResumeId,
+      });
+      return res.status(202).json({
+        success: true,
+        data: {
+          jobId,
+          status: "processing",
+          resumeId: existingResumeId,
+          message: "Resume found. Parsing will continue in the background.",
+        },
+      });
+    }
+
     logInfo("DEBUG_DUPLICATE_CHECK", {
       userId,
       fileHash,
       context,
-      existingResumeFound: !!existing
+      existingResumeFound: !!existingResumeId,
     });
 
-    // Upload to Supabase Storage
-    try {
-      const { error: storageError } = await supabase.storage
-        .from('resumes')
-        .upload(filePath, req.file.buffer, {
-          contentType: 'application/pdf',
-          upsert: false
-        });
-
-      if (storageError) {
-        const msg = storageError.message || '';
-        if (msg.includes('The resource already exists')) {
-          const doubleCheck = await findResumeByHash(fileHash, userId);
-          if (doubleCheck) {
-            return respondWithDuplicateResume(res, {
-              reqId,
-              jobId,
-              fileHash,
-              userId,
-              context,
-              existing: doubleCheck,
-            });
-          }
-
-          // DB row DOES NOT exist: Storage object existed without DB row
-          // We swallow the error and proceed to processResumeJob to recreate the DB metadata row.
-          logInfo("RESUME_STORAGE_DB_RECONCILED", {
-            reqId, jobId, fileHash, userId, filePath, source: "resume",
-            message: "Storage object existed without DB row, metadata reconciled successfully"
+    if (!existingResumeId) {
+      // Upload to Supabase Storage
+      try {
+        const { error: storageError } = await supabase.storage
+          .from('resumes')
+          .upload(resolvedFilePath, req.file.buffer, {
+            contentType: 'application/pdf',
+            upsert: false
           });
-        } else {
-          throw new Error(`Supabase upload failed: ${storageError.message}`);
-        }
-      }
 
-      logInfo("supabase_upload_success", { reqId, jobId, fileHash, userId, filePath });
-    } catch (uploadError) {
-      logError("supabase_upload_failed", uploadError, { reqId, jobId, fileHash, userId, filePath });
-      return sendError(res, 500, 'Failed to upload file to storage', ERROR_CODES.INTERNAL_ERROR);
+        if (storageError) {
+          const msg = storageError.message || '';
+          if (msg.includes('The resource already exists')) {
+            const doubleCheck = await findResumeByHash(fileHash, userId);
+            if (doubleCheck?.parsedResumeId) {
+              return respondWithDuplicateResume(res, {
+                reqId,
+                jobId,
+                fileHash,
+                userId,
+                context,
+                existing: doubleCheck,
+              });
+            }
+
+            logInfo("RESUME_STORAGE_DB_RECONCILED", {
+              reqId, jobId, fileHash, userId, filePath: resolvedFilePath, source: "resume",
+              message: "Storage object existed without DB row, metadata reconciled successfully"
+            });
+          } else {
+            throw new Error(`Supabase upload failed: ${storageError.message}`);
+          }
+        }
+
+        logInfo("supabase_upload_success", { reqId, jobId, fileHash, userId, filePath: resolvedFilePath });
+      } catch (uploadError) {
+        logError("supabase_upload_failed", uploadError, { reqId, jobId, fileHash, userId, filePath: resolvedFilePath });
+        return sendError(res, 500, 'Failed to upload file to storage', ERROR_CODES.INTERNAL_ERROR);
+      }
     }
 
     if (context === "onboarding") {
-      const resume = await createResumeRecord(
-        req.file.originalname,
-        req.file.size,
-        fileHash,
-        userId,
-        filePath
-      );
+      const resume = existingResumeId
+        ? { id: existingResumeId }
+        : await createResumeRecord(
+            req.file.originalname,
+            req.file.size,
+            fileHash,
+            userId,
+            resolvedFilePath
+          );
 
       try {
         await autoPopulateDefaultResume(userId, resume.id);
@@ -216,7 +220,7 @@ const uploadResumeController = async (req, res) => {
         req,
         fileHash,
         userId,
-        filePath,
+        filePath: resolvedFilePath,
         existingResumeId: resume.id,
       });
 
@@ -233,7 +237,7 @@ const uploadResumeController = async (req, res) => {
       });
     }
 
-    // profile_update: keep synchronous parse so Setup/profile sees parsed data immediately
+    // profile_update: synchronous parse (new upload or re-parse of a previously failed duplicate)
     const abortController = new AbortController();
     let timeoutId;
     const timeoutPromise = new Promise((_, reject) => {
@@ -252,7 +256,8 @@ const uploadResumeController = async (req, res) => {
       size: req.file.size,
       fileHash,
       userId: req.user.id,
-      filePath,
+      filePath: resolvedFilePath,
+      existingResumeId,
       signal: abortController.signal
     });
 

@@ -451,10 +451,10 @@ html:has(.mindoo-site) {
 
 @media (min-width: 992px) {
   [data-scrolling-started="true"] .m-nav-wrap--hero .m-nav-cta {
-    max-width: 9rem;
+    max-width: 11rem;
     opacity: 1;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
     border-width: 1px;
     pointer-events: auto;
   }

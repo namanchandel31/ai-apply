@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Send, ChevronDown } from "lucide-react";
+import { AlertCircle, Loader2, Send, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { api, type ApiError } from "@/lib/api";
 import { useEmailPreferences } from "@/hooks/useEmailPreferences";
@@ -27,11 +28,56 @@ const PREVIEW_TEXT_PRIMARY = "text-base font-medium text-foreground";
 const PREVIEW_TEXT_SECONDARY = "text-base font-normal text-muted-foreground";
 const APPLY_BOX_RADIUS = "rounded-sm";
 
+function ResumeParseGate({
+  state,
+  errorMessage,
+}: {
+  state: "parsing" | "failed";
+  errorMessage?: string | null;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex h-full flex-col items-center justify-center gap-3 border border-dashed border-border bg-muted/10 px-6 text-center",
+        APPLY_BOX_RADIUS
+      )}
+    >
+      {state === "parsing" ? (
+        <>
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+          <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
+            Please wait - your resume is being parsed
+          </p>
+          <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
+            Email copy will appear here once parsing finishes.
+          </p>
+        </>
+      ) : (
+        <>
+          <AlertCircle className="h-6 w-6 text-destructive" aria-hidden />
+          <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
+            Resume parsing failed
+          </p>
+          <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
+            {errorMessage ??
+              "We couldn't parse your resume. Replace it in Setup with a text-based PDF."}
+          </p>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/setup?tab=resume">Replace resume in Setup</Link>
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 type Props = {
   autoApplyEnabled: boolean;
   canApply: boolean;
   applyDisabledReason: string | null;
   resumeParsing?: boolean;
+  resumeParseFailed?: boolean;
+  resumeParseError?: string | null;
 };
 
 export function ApplyComposer({
@@ -39,6 +85,8 @@ export function ApplyComposer({
   canApply,
   applyDisabledReason,
   resumeParsing = false,
+  resumeParseFailed = false,
+  resumeParseError = null,
 }: Props) {
   const isAutoMode = autoApplyEnabled;
   const queryClient = useQueryClient();
@@ -228,10 +276,10 @@ export function ApplyComposer({
       return;
     }
 
-    if (!canApply && !resumeParsing) return;
+    if (!canApply && !resumeParsing && !resumeParseFailed) return;
 
     const timer = setTimeout(() => {
-      if (resumeParsing) return;
+      if (resumeParsing || resumeParseFailed) return;
       const reqId = ++previewRequestRef.current;
       setGenerating(true);
 
@@ -260,7 +308,7 @@ export function ApplyComposer({
     }, PREVIEW_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmedJd, canApply, resumeParsing, prefs.toneLevel, prefs.structureLevel]);
+  }, [trimmedJd, canApply, resumeParsing, resumeParseFailed, prefs.toneLevel, prefs.structureLevel]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -290,7 +338,7 @@ export function ApplyComposer({
             disabled={busy}
             required
           />
-          {isAutoMode && !canApply && applyDisabledReason && !resumeParsing && (
+          {isAutoMode && !canApply && applyDisabledReason && !resumeParsing && !resumeParseFailed && (
             <p className={PREVIEW_TEXT_SECONDARY}>{applyDisabledReason}</p>
           )}
         </div>
@@ -325,21 +373,10 @@ export function ApplyComposer({
                     Paste a job description. We'll prepare and send your application automatically
                   </p>
                 </div>
+              ) : resumeParseFailed ? (
+                <ResumeParseGate state="failed" errorMessage={resumeParseError} />
               ) : resumeParsing ? (
-                <div
-                  className={cn(
-                    "flex h-full flex-col items-center justify-center gap-3 border border-dashed border-border bg-muted/10 px-6 text-center",
-                    APPLY_BOX_RADIUS
-                  )}
-                >
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
-                  <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
-                    Please wait - your resume is being parsed
-                  </p>
-                  <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
-                    Email copy will appear here once parsing finishes.
-                  </p>
-                </div>
+                <ResumeParseGate state="parsing" />
               ) : (
                 <div
                   className={cn(
@@ -397,21 +434,10 @@ export function ApplyComposer({
               ) : (
                 <>
                   <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-                    {resumeParsing ? (
-                      <div
-                        className={cn(
-                          "flex flex-1 min-h-32 flex-col items-center justify-center gap-3 border border-dashed border-border bg-muted/10 px-6 py-6 text-center",
-                          APPLY_BOX_RADIUS
-                        )}
-                      >
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
-                        <p className={cn("max-w-sm font-medium", PREVIEW_TEXT_PRIMARY)}>
-                          Please wait - your resume is being parsed
-                        </p>
-                        <p className={cn("max-w-sm", PREVIEW_TEXT_SECONDARY)}>
-                          Email copy will appear here once parsing finishes.
-                        </p>
-                      </div>
+                    {resumeParseFailed ? (
+                      <ResumeParseGate state="failed" errorMessage={resumeParseError} />
+                    ) : resumeParsing ? (
+                      <ResumeParseGate state="parsing" />
                     ) : (
                       <>
                     {showEmailStyle && (
@@ -519,7 +545,7 @@ export function ApplyComposer({
                       type="submit"
                       size="lg"
                       className={cn("h-12 w-full font-medium", APPLY_BOX_RADIUS)}
-                      disabled={!canApply || busy || !hasPreview || previewStale || resumeParsing}
+                      disabled={!canApply || busy || !hasPreview || previewStale || resumeParsing || resumeParseFailed}
                     >
                       {sending ? (
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />

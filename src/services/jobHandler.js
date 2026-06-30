@@ -1,4 +1,3 @@
-const pdfParse = require("pdf-parse");
 const fs = require("fs");
 const path = require("path");
 
@@ -9,6 +8,7 @@ const { RetryableError, NonRetryableError } = require("../utils/errors");
 const { normalizeSkills, nullifyEmpty } = require("../utils/normalise");
 const { isValidEmail, isValidPhone } = require("../utils/validators");
 const { sanitizeTextForLlm, sanitizeTextForStorage, sanitizeErrorMessage } = require("../utils/textSanitize");
+const { extractTextFromPdf } = require("../utils/pdfTextExtract");
 const { callOpenAIJson } = require("./llmClient");
 const { SYSTEM_PROMPT: JD_SYSTEM_PROMPT } = require("../prompts/jdParsePrompt");
 const { RESUME_SYSTEM_PROMPT } = require("../prompts/resumeParsePrompt");
@@ -31,29 +31,21 @@ const { saveFailedParse } = require("../models/failedParseModel");
 
 const extractText = async (buffer) => {
   try {
-    const startTime = Date.now();
-    let text = "";
-
-    const data = await pdfParse(buffer);
-    text = data.text || "";
+    const extractResult = await extractTextFromPdf(buffer);
+    const rawText = extractResult.raw;
 
     logInfo("PDF_TEXT_EXTRACTED", {
-      extractedTextChars: text.length,
-      first200CharsPreview: text.substring(0, 500).replace(/\n/g, " ").trim()
+      extractedTextChars: rawText.length,
+      sanitizedTextChars: extractResult.sanitized.length,
+      extractionMethod: extractResult.method,
+      first200CharsPreview: rawText.substring(0, 500).replace(/\n/g, " ").trim(),
     });
 
-    const extractDurationMs = Date.now() - startTime;
-
-    const sanitizeStart = Date.now();
-    const sanitized = sanitizeTextForStorage(text);
-    const sanitizationDurationMs = Date.now() - sanitizeStart;
-
-    return { raw: text, sanitized, extractDurationMs, sanitizationDurationMs };
+    return extractResult;
   } catch (error) {
     logError("PDF_EXTRACTION_ERROR", error, {
-      message: error.message
+      message: error.message,
     });
-    // Preserve original error message and stack trace for debugging
     throw new NonRetryableError(`PDF Text Extraction Failed: ${error.message}`);
   }
 };
@@ -133,11 +125,13 @@ const processResumeJob = async ({
 
   const jobPromise = (async () => {
     let sanitizedRaw = null;
+    let extractedRawText = null;
 
     try {
       logInfo("PDF_EXTRACTION_STARTED", { reqId, jobId, fileHash });
       const extractResult = await extractText(buffer);
       const rawText = extractResult.raw;
+      extractedRawText = rawText;
       sanitizedRaw = extractResult.sanitized;
 
       logInfo("PDF_EXTRACTION_COMPLETED", { reqId, jobId, fileHash, elapsedMs: extractResult.extractDurationMs });
@@ -337,6 +331,14 @@ const processResumeJob = async ({
 
       if (sanitizedRaw) {
         await persistFailedParse(fileHash, "resume", sanitizedRaw, err, { reqId, jobId, stage: "fallback" });
+      } else {
+        await persistFailedParse(
+          fileHash,
+          "resume",
+          extractedRawText || "",
+          err,
+          { reqId, jobId, stage: "fallback" }
+        );
       }
 
       throw err;

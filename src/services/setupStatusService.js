@@ -5,6 +5,51 @@ const aiCredentialModel = require("../models/aiCredentialModel");
 const settingsService = require("./settingsService");
 const entitlementService = require("./entitlementService");
 const onboardingService = require("./onboardingService");
+const { getFailedParseByHash } = require("../models/failedParseModel");
+
+function formatResumeParseError(errorMessage) {
+  const msg = String(errorMessage || "");
+  if (msg.includes("Extraction Failed") || msg.includes("too weak to parse")) {
+    return "We couldn't read enough text from this PDF. Try re-exporting it from Word or Google Docs, or upload a standard text-based PDF.";
+  }
+  if (msg.includes("invalid_parsed_content")) {
+    return "We couldn't extract a name, email address, and skills from this resume. Try a clearer PDF or re-export it.";
+  }
+  if (msg.includes("Schema validation failed")) {
+    return "We couldn't parse this resume into a usable format. Try re-exporting the PDF or upload a different version.";
+  }
+  if (msg.includes("PDF Text Extraction Failed")) {
+    return "This PDF couldn't be opened for text extraction. Try re-saving or re-exporting the file.";
+  }
+  return "Resume parsing failed. Replace your resume in Setup with a text-based PDF.";
+}
+
+async function resolveResumeParseStatus(hasResume, hasValidResume, fileHash, uploadedAt = null) {
+  if (!hasResume) return { resumeParseStatus: "missing", resumeParseError: null };
+  if (hasValidResume) return { resumeParseStatus: "ready", resumeParseError: null };
+
+  if (fileHash) {
+    const failed = await getFailedParseByHash(fileHash, "resume");
+    if (failed) {
+      return {
+        resumeParseStatus: "failed",
+        resumeParseError: formatResumeParseError(failed.error_message),
+      };
+    }
+  }
+
+  const uploadedMs = uploadedAt ? new Date(uploadedAt).getTime() : NaN;
+  const staleMs = 15 * 60 * 1000;
+  if (Number.isFinite(uploadedMs) && Date.now() - uploadedMs > staleMs) {
+    return {
+      resumeParseStatus: "failed",
+      resumeParseError:
+        "Resume parsing did not complete. Replace your resume in Setup with a text-based PDF exported from Word or Google Docs.",
+    };
+  }
+
+  return { resumeParseStatus: "processing", resumeParseError: null };
+}
 
 async function computeHasValidResume(userId) {
   const { rows: resumeRows } = await pool.query(
@@ -87,6 +132,13 @@ async function buildSetupStatus(userId) {
     hasEmailSetup,
   });
 
+  const parseState = await resolveResumeParseStatus(
+    hasResume,
+    hasValidResume,
+    resumeRows[0]?.fileHash ?? null,
+    resumeRows[0]?.uploadedAt ?? null,
+  );
+
   return {
     pricingEnabled,
     paywallTrigger,
@@ -98,6 +150,7 @@ async function buildSetupStatus(userId) {
     subscriptionState: entitlement.status,
     hasResume,
     hasValidResume,
+    ...parseState,
     hasEmailSetup,
     hasAiSetup,
     hasVerifiedAiCredential,
@@ -122,4 +175,6 @@ module.exports = {
   buildSetupStatus,
   userHasVerifiedAiCredential,
   computeHasValidResume,
+  formatResumeParseError,
+  resolveResumeParseStatus,
 };

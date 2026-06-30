@@ -274,6 +274,8 @@ export type SetupStatusData = {
   subscriptionState?: string;
   hasResume: boolean;
   hasValidResume?: boolean;
+  resumeParseStatus?: "missing" | "processing" | "failed" | "ready";
+  resumeParseError?: string | null;
   hasEmailSetup: boolean;
   hasAiSetup?: boolean;
   canUseManagedAi?: boolean;

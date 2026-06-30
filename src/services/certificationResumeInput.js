@@ -1,8 +1,8 @@
-const pdfParse = require("pdf-parse");
 const supabase = require("../config/supabase");
 const { MAX_LLM_INPUT_CHARS } = require("../config/parsingConfig");
 const { getLatestParsedResumeForUser } = require("../models/resumeModel");
 const { sanitizeTextForLlm } = require("../utils/textSanitize");
+const { extractTextFromPdf } = require("../utils/pdfTextExtract");
 const { NonRetryableError } = require("../utils/errors");
 const { logCertificationDebug } = require("./certificationDebug");
 
@@ -73,14 +73,15 @@ async function extractTextFromPdfBuffer(buffer) {
     throw new NonRetryableError("Resume PDF buffer is empty");
   }
 
-  const data = await pdfParse(buffer);
-  const raw = data?.text || "";
+  const { raw, sanitized, method } = await extractTextFromPdf(buffer);
   logCertificationDebug("resume_pdf_extracted", {
     source: "upload",
     extractedTextLength: String(raw).length,
+    sanitizedTextLength: sanitized.length,
+    extractionMethod: method,
   });
 
-  const cleanedText = prepareResumeText(raw);
+  const cleanedText = prepareResumeText(sanitized || raw);
   return assertUsableResumeText(cleanedText, { source: "upload" });
 }
 

@@ -11,10 +11,19 @@ const SETUP_BOX_RADIUS = "rounded-sm";
 
 interface Props {
   activeResume: { filename: string; uploadedAt: string; fileHash: string } | null | undefined;
+  hasValidResume?: boolean;
+  resumeParseStatus?: "missing" | "processing" | "failed" | "ready";
+  resumeParseError?: string | null;
   onUpdate: () => void;
 }
 
-export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
+export function ResumeStatusCard({
+  activeResume,
+  hasValidResume = false,
+  resumeParseStatus,
+  resumeParseError,
+  onUpdate,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,36 +64,53 @@ export function ResumeStatusCard({ activeResume, onUpdate }: Props) {
           </CardDescription>
         </div>
         {activeResume && (
-          <Badge variant="success">
-            <CheckCircle2 className="mr-1 h-3 w-3" /> Ready
+          <Badge
+            variant={
+              hasValidResume ? "success" : resumeParseStatus === "failed" ? "destructive" : "secondary"
+            }
+          >
+            {hasValidResume ? (
+              <>
+                <CheckCircle2 className="mr-1 h-3 w-3" /> Ready
+              </>
+            ) : resumeParseStatus === "failed" ? (
+              "Parse failed"
+            ) : (
+              "Parsing…"
+            )}
           </Badge>
         )}
       </CardHeader>
       <CardContent>
         {activeResume ? (
-          <div className={cn("flex items-center justify-between border border-input-border bg-input p-3", SETUP_BOX_RADIUS)}>
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-muted-foreground" />
+          <div className="space-y-3">
+            <div className={cn("flex items-center justify-between border border-input-border bg-input p-3", SETUP_BOX_RADIUS)}>
+              <div className="flex items-center gap-3">
+                <FileText className="h-8 w-8 text-muted-foreground" />
+                <div>
+                  <p className="text-base font-medium">{activeResume.filename}</p>
+                  <p className="text-base text-muted-foreground">
+                    Uploaded {new Date(activeResume.uploadedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
               <div>
-                <p className="text-base font-medium">{activeResume.filename}</p>
-                <p className="text-base text-muted-foreground">
-                  Uploaded {new Date(activeResume.uploadedAt).toLocaleDateString()}
-                </p>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="application/pdf"
+                  onChange={handleUpload}
+                />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Replace
+                </Button>
               </div>
             </div>
-            <div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="application/pdf"
-                onChange={handleUpload}
-              />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Replace
-              </Button>
-            </div>
+            {resumeParseStatus === "failed" && resumeParseError ? (
+              <p className="text-sm text-destructive">{resumeParseError}</p>
+            ) : null}
           </div>
         ) : (
           <div className={cn("flex flex-col items-center justify-center border border-dashed border-border bg-muted/10 p-6 text-center", SETUP_BOX_RADIUS)}>

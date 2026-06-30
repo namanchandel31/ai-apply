@@ -108,7 +108,13 @@ export function Setup() {
         )}
 
         {activeTab === "resume" && (
-          <ResumeStatusCard activeResume={status?.activeResume} onUpdate={handleUpdate} />
+          <ResumeStatusCard
+            activeResume={status?.activeResume}
+            hasValidResume={status?.hasValidResume}
+            resumeParseStatus={status?.resumeParseStatus}
+            resumeParseError={status?.resumeParseError}
+            onUpdate={handleUpdate}
+          />
         )}
 
         {activeTab === "email" && (
