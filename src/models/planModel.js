@@ -29,6 +29,7 @@ function mapPricePoint(row) {
     currency: row.currency,
     isActive: row.is_active,
     interval: row.interval,
+    sortOrder: row.sort_order ?? 0,
     razorpayPlanId: row.razorpay_plan_id,
   };
 }
@@ -59,12 +60,21 @@ async function getPlanBySlug(slug) {
   return mapPlan(rows[0]);
 }
 
-async function createPlan({ slug, displayName, description, tier, sortOrder = 0, popular = false, metadata = {} }) {
+async function createPlan({
+  slug,
+  displayName,
+  description,
+  tier,
+  sortOrder = 0,
+  popular = false,
+  isActive = true,
+  metadata = {},
+}) {
   const { rows } = await pool.query(
-    `INSERT INTO plans (slug, display_name, description, tier, sort_order, popular, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+    `INSERT INTO plans (slug, display_name, description, tier, sort_order, popular, is_active, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
      RETURNING ${PLAN_COLUMNS}`,
-    [slug, displayName, description ?? null, tier ?? null, sortOrder, popular, JSON.stringify(metadata)]
+    [slug, displayName, description ?? null, tier ?? null, sortOrder, popular, isActive, JSON.stringify(metadata)]
   );
   return mapPlan(rows[0]);
 }
@@ -106,7 +116,7 @@ async function updatePlan(id, fields) {
 async function listPricePoints(planId, { activeOnly = false } = {}) {
   const { rows } = await pool.query(
     `SELECT * FROM plan_price_points WHERE plan_id = $1
-     ${activeOnly ? "AND is_active = TRUE" : ""} ORDER BY amount_paise`,
+     ${activeOnly ? "AND is_active = TRUE" : ""} ORDER BY sort_order, duration_days, amount_paise`,
     [planId]
   );
   return rows.map(mapPricePoint);
@@ -119,11 +129,55 @@ async function getPricePointById(id) {
   return mapPricePoint(rows[0]);
 }
 
-async function createPricePoint({ planId, label, durationDays, amountPaise, currency = "INR", interval = null }) {
+async function createPricePoint({
+  planId,
+  label,
+  durationDays,
+  amountPaise,
+  currency = "INR",
+  interval = null,
+  isActive = true,
+  sortOrder = 0,
+}) {
   const { rows } = await pool.query(
-    `INSERT INTO plan_price_points (plan_id, label, duration_days, amount_paise, currency, interval)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [planId, label ?? null, durationDays, amountPaise, currency, interval]
+    `INSERT INTO plan_price_points (plan_id, label, duration_days, amount_paise, currency, interval, is_active, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [planId, label ?? null, durationDays, amountPaise, currency, interval, isActive, sortOrder]
+  );
+  return mapPricePoint(rows[0]);
+}
+
+async function updatePricePoint(id, fields, planId = null) {
+  const map = {
+    label: "label",
+    durationDays: "duration_days",
+    amountPaise: "amount_paise",
+    currency: "currency",
+    interval: "interval",
+    isActive: "is_active",
+    sortOrder: "sort_order",
+  };
+  const sets = [];
+  const values = [];
+  let i = 1;
+  for (const [k, col] of Object.entries(map)) {
+    if (fields[k] === undefined) continue;
+    sets.push(`${col} = $${i}`);
+    values.push(fields[k]);
+    i += 1;
+  }
+  if (!sets.length) return getPricePointById(id);
+  sets.push("updated_at = NOW()");
+  values.push(id);
+  let where = `id = $${i}`;
+  if (planId) {
+    i += 1;
+    values.push(planId);
+    where += ` AND plan_id = $${i}`;
+  }
+  const { rows } = await pool.query(
+    `UPDATE plan_price_points SET ${sets.join(", ")} WHERE ${where} RETURNING *`,
+    values
   );
   return mapPricePoint(rows[0]);
 }
@@ -131,11 +185,20 @@ async function createPricePoint({ planId, label, durationDays, amountPaise, curr
 // ----- Marketing features -----
 async function listPlanFeatures(planId) {
   const { rows } = await pool.query(
-    `SELECT id, label, included, sort_order FROM plan_features
-     WHERE plan_id = $1 ORDER BY sort_order`,
+    `SELECT pf.id, pf.label, pf.included, pf.sort_order, pf.feature_id, fd.key AS feature_key
+     FROM plan_features pf
+     LEFT JOIN feature_definitions fd ON fd.id = pf.feature_id
+     WHERE pf.plan_id = $1 ORDER BY pf.sort_order`,
     [planId]
   );
-  return rows.map((r) => ({ id: r.id, label: r.label, included: r.included, sortOrder: r.sort_order }));
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    included: r.included,
+    sortOrder: r.sort_order,
+    featureId: r.feature_id,
+    featureKey: r.feature_key ?? null,
+  }));
 }
 
 async function replacePlanFeatures(planId, features) {
@@ -145,9 +208,18 @@ async function replacePlanFeatures(planId, features) {
     await client.query(`DELETE FROM plan_features WHERE plan_id = $1`, [planId]);
     let order = 0;
     for (const f of features) {
+      let featureId = f.featureId ?? null;
+      if (!featureId && f.featureKey) {
+        const { rows } = await client.query(
+          `SELECT id FROM feature_definitions WHERE key = $1 LIMIT 1`,
+          [f.featureKey]
+        );
+        featureId = rows[0]?.id ?? null;
+      }
       await client.query(
-        `INSERT INTO plan_features (plan_id, label, included, sort_order) VALUES ($1, $2, $3, $4)`,
-        [planId, f.label, f.included !== false, f.sortOrder ?? order]
+        `INSERT INTO plan_features (plan_id, feature_id, label, included, sort_order)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [planId, featureId, f.label, f.included !== false, f.sortOrder ?? order]
       );
       order += 1;
     }
@@ -261,6 +333,7 @@ module.exports = {
   listPricePoints,
   getPricePointById,
   createPricePoint,
+  updatePricePoint,
   listPlanFeatures,
   replacePlanFeatures,
   listPlanEntitlements,

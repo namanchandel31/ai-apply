@@ -51,7 +51,7 @@ export async function logout({ queryClient, navigate, clearAuthState }: LogoutOp
     queryClient.clear();
     resetOrchestrationRegistry();
     await signOutWithTimeout();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
     logAuthLifecycle("LOGOUT_COMPLETE");
   })();
 

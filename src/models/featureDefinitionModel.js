@@ -12,18 +12,23 @@ function mapRow(row) {
     enumOptions: row.enum_options,
     category: row.category,
     isActive: row.is_active,
+    showInPlanPicker: row.show_in_plan_picker ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 const COLUMNS = `id, key, display_name, description, type, default_value,
-                 enum_options, category, is_active, created_at, updated_at`;
+                 enum_options, category, is_active, show_in_plan_picker, created_at, updated_at`;
 
-async function listFeatures({ includeInactive = true } = {}) {
+async function listFeatures({ includeInactive = true, pickerOnly = false } = {}) {
+  const clauses = [];
+  if (!includeInactive) clauses.push("is_active = TRUE");
+  if (pickerOnly) clauses.push("show_in_plan_picker = TRUE");
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const { rows } = await pool.query(
     `SELECT ${COLUMNS} FROM feature_definitions
-     ${includeInactive ? "" : "WHERE is_active = TRUE"}
+     ${where}
      ORDER BY category NULLS LAST, key`
   );
   return rows.map(mapRow);
@@ -45,11 +50,20 @@ async function getFeatureById(id) {
   return mapRow(rows[0]);
 }
 
-async function createFeature({ key, displayName, description, type, defaultValue, enumOptions, category }) {
+async function createFeature({
+  key,
+  displayName,
+  description,
+  type,
+  defaultValue,
+  enumOptions,
+  category,
+  showInPlanPicker = false,
+}) {
   const { rows } = await pool.query(
     `INSERT INTO feature_definitions
-      (key, display_name, description, type, default_value, enum_options, category)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)
+      (key, display_name, description, type, default_value, enum_options, category, show_in_plan_picker)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
      RETURNING ${COLUMNS}`,
     [
       key,
@@ -59,13 +73,22 @@ async function createFeature({ key, displayName, description, type, defaultValue
       defaultValue === undefined ? null : JSON.stringify(defaultValue),
       enumOptions === undefined ? null : JSON.stringify(enumOptions),
       category ?? null,
+      showInPlanPicker,
     ]
   );
   return mapRow(rows[0]);
 }
 
 /** Editable fields only — key and type are immutable once created. */
-async function updateFeature(id, { displayName, description, defaultValue, enumOptions, category, isActive }) {
+async function updateFeature(id, {
+  displayName,
+  description,
+  defaultValue,
+  enumOptions,
+  category,
+  isActive,
+  showInPlanPicker,
+}) {
   const sets = [];
   const values = [];
   let i = 1;
@@ -80,6 +103,7 @@ async function updateFeature(id, { displayName, description, defaultValue, enumO
   if (enumOptions !== undefined) push("enum_options", enumOptions, true);
   if (category !== undefined) push("category", category);
   if (isActive !== undefined) push("is_active", isActive);
+  if (showInPlanPicker !== undefined) push("show_in_plan_picker", showInPlanPicker);
   if (!sets.length) return getFeatureById(id);
   sets.push("updated_at = NOW()");
   values.push(id);

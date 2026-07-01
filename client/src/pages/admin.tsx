@@ -8,7 +8,7 @@ import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
 import { ReferralsPanel } from "@/components/admin/ReferralsPanel";
 import { BillingSettingsPanel } from "@/components/admin/BillingSettingsPanel";
 import { TrialConfigPanel } from "@/components/admin/TrialConfigPanel";
-import { PlansPanel } from "@/components/admin/PlansPanel";
+import { PlansPanel } from "@/components/admin/plans/PlansPanel";
 import { CampaignsPanel } from "@/components/admin/CampaignsPanel";
 import { SubscriptionsPanel } from "@/components/admin/SubscriptionsPanel";
 

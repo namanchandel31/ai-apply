@@ -11,6 +11,7 @@ import { loadRazorpayCheckout } from "@/lib/loadRazorpayCheckout";
 import { mergeSetupStatusWithEntitlement } from "@/lib/paywallRouting";
 import { isOnboardingFlowComplete } from "@/lib/onboardingFlow";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
+import { pickPrimaryPricePoint, pricingQueryOptions } from "@/queries/pricingQueries";
 import { api, type BillingEntitlement, type PricingPlan, type SetupStatusData } from "@/lib/api";
 
 function formatAmount(amountPaise: number, currency: string) {
@@ -32,10 +33,7 @@ export function PricingPage() {
   const { user, refreshUser } = useAuth();
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
 
-  const pricingQuery = useQuery({
-    queryKey: ["pricing"],
-    queryFn: () => api.getPricing(),
-  });
+  const pricingQuery = useQuery(pricingQueryOptions);
 
   const prefillName = useMemo(() => {
     if (user?.fullName?.trim()) return user.fullName.trim();
@@ -80,7 +78,7 @@ export function PricingPage() {
   };
 
   const handleSubscribe = async (plan: PricingPlan) => {
-    const pricePoint = plan.pricePoints[0];
+    const pricePoint = pickPrimaryPricePoint(plan.pricePoints);
     if (!pricePoint) {
       toast.error("This plan has no price configured yet");
       return;
@@ -159,7 +157,7 @@ export function PricingPage() {
         <div className="grid gap-5 md:grid-cols-2">
           {plans.map((plan) => {
             const isLoading = activeSlug === plan.slug;
-            const pricePoint = plan.pricePoints[0];
+            const pricePoint = pickPrimaryPricePoint(plan.pricePoints);
             const trial = trialCampaign(plan);
             const discount = plan.campaigns.find((c) => c.type === "discount");
             return (

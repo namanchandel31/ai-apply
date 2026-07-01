@@ -3,7 +3,6 @@ import { RealtimeProvider } from "@/contexts/RealtimeProvider";
 import { Layout } from "@/components/layout";
 import { LandingPage } from "@/pages/landing";
 import { LoginPage } from "@/pages/login";
-import { PricingPage } from "@/pages/pricing";
 import { ForgotPasswordPage } from "@/pages/forgotPassword";
 import { ResetPasswordPage } from "@/pages/resetPassword";
 import { AuthCallbackPage } from "@/pages/authCallback";
@@ -32,7 +31,7 @@ function PricingRoute() {
   if (!isPricingEnabled) {
     return <AuthenticatedHomeRedirect />;
   }
-  return <PricingPage />;
+  return <Navigate to="/subscriptions" replace />;
 }
 
 function CatchAllRedirect() {

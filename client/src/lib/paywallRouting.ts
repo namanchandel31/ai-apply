@@ -34,12 +34,12 @@ export function shouldRequireSubscriptionForPath(
 }
 
 /** Post-auth / home redirect when the user has no active subscription. */
-export function postAuthPathWithoutSubscription(status: SetupStatusData): "/pricing" | "/onboarding" | "/dashboard" {
+export function postAuthPathWithoutSubscription(status: SetupStatusData): "/subscriptions" | "/onboarding" | "/dashboard" {
   const trigger = status.paywallTrigger;
   if (trigger === "before_first_apply" || trigger === "after_onboarding") {
     return isOnboardingFlowComplete(status) ? "/dashboard" : "/onboarding";
   }
-  return "/pricing";
+  return "/subscriptions";
 }
 
 export function mergeSetupStatusWithEntitlement(

@@ -1228,11 +1228,46 @@ export const api = {
       body: JSON.stringify({ entitlements }),
     });
   },
-  adminCreatePricePoint(id: string, body: { label?: string; durationDays: number; amountPaise: number; currency?: string }) {
-    return request<{ success: boolean; data: unknown }>(`/api/admin/plans/${id}/price-points`, {
+  adminCreatePricePoint(id: string, body: { label?: string; durationDays: number; amountPaise: number; currency?: string; interval?: string; isActive?: boolean; sortOrder?: number }) {
+    return request<{ success: boolean; data: AdminPricePoint }>(`/api/admin/plans/${id}/price-points`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    });
+  },
+  adminUpdatePricePoint(planId: string, pricePointId: string, body: Partial<AdminPricePointInput>) {
+    return request<{ success: boolean; data: AdminPricePoint }>(`/api/admin/plans/${planId}/price-points/${pricePointId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminSavePlanConfig(id: string, body: AdminPlanConfigInput) {
+    return request<{ success: boolean; data: AdminPlan }>(`/api/admin/plans/${id}/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminCreatePlanConfig(body: AdminPlanConfigInput & { slug: string }) {
+    return request<{ success: boolean; data: AdminPlan }>("/api/admin/plans/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminDuplicatePlan(id: string, body: { slug: string; displayName?: string; sortOrder?: number }) {
+    return request<{ success: boolean; data: AdminPlan }>(`/api/admin/plans/${id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  adminReplacePlanFeatures(id: string, features: AdminPlanFeatureInput[]) {
+    return request<{ success: boolean; data: unknown }>(`/api/admin/plans/${id}/features`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ features }),
     });
   },
   adminListCampaigns() {
@@ -1286,6 +1321,48 @@ export type AdminFeature = {
   enumOptions?: string[] | null;
   category?: string | null;
   isActive: boolean;
+  showInPlanPicker?: boolean;
+};
+
+export type AdminPricePoint = {
+  id: string;
+  label?: string | null;
+  durationDays: number;
+  amountPaise: number;
+  currency: string;
+  isActive: boolean;
+  interval?: string | null;
+  sortOrder?: number;
+};
+
+export type AdminPricePointInput = {
+  id?: string | null;
+  label?: string | null;
+  durationDays: number;
+  amountPaise: number;
+  currency: string;
+  interval?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+export type AdminPlanFeatureInput = {
+  featureKey: string;
+  label: string;
+  included?: boolean;
+  sortOrder?: number;
+};
+
+export type AdminPlanConfigInput = {
+  displayName: string;
+  description?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  isArchived?: boolean;
+  popular?: boolean;
+  planFeatures?: AdminPlanFeatureInput[];
+  advancedEntitlements?: Array<{ featureKey: string; value: unknown }>;
+  pricePoints?: AdminPricePointInput[];
 };
 
 export type AdminPlanEntitlement = {
@@ -1307,8 +1384,8 @@ export type AdminPlan = {
   isArchived: boolean;
   sortOrder: number;
   popular: boolean;
-  pricePoints?: Array<{ id: string; label?: string | null; durationDays: number; amountPaise: number; currency: string; isActive: boolean }>;
-  features?: Array<{ id: string; label: string; included: boolean; sortOrder: number }>;
+  pricePoints?: AdminPricePoint[];
+  features?: Array<{ id: string; label: string; included: boolean; sortOrder: number; featureKey?: string | null }>;
   entitlements?: AdminPlanEntitlement[];
   onboarding?: string[] | null;
 };
