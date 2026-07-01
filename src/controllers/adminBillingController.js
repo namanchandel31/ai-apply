@@ -11,6 +11,7 @@ const planModel = require("../models/planModel");
 const campaignModel = require("../models/campaignModel");
 const subscriptionModel = require("../models/subscriptionModel");
 const paymentModel = require("../models/paymentModel");
+const planAdminService = require("../services/planAdminService");
 const { isValidFeatureKey, FEATURE_TYPES } = require("../constants/featureKeys");
 
 function fail(res, err, action) {
@@ -48,7 +49,7 @@ const listFeaturesController = async (_req, res) => {
 };
 
 const createFeatureController = async (req, res) => {
-  const { key, displayName, description, type, defaultValue, enumOptions, category } = req.body || {};
+  const { key, displayName, description, type, defaultValue, enumOptions, category, showInPlanPicker } = req.body || {};
   if (!isValidFeatureKey(key)) {
     return error(res, 400, "Invalid feature key (snake_case required, starts with a letter)", ERROR_CODES.BAD_REQUEST);
   }
@@ -59,7 +60,7 @@ const createFeatureController = async (req, res) => {
   try {
     const existing = await featureModel.getFeatureByKey(key);
     if (existing) return error(res, 409, "Feature key already exists", ERROR_CODES.BAD_REQUEST);
-    const created = await featureModel.createFeature({ key, displayName, description, type, defaultValue, enumOptions, category });
+    const created = await featureModel.createFeature({ key, displayName, description, type, defaultValue, enumOptions, category, showInPlanPicker });
     await auditService.record({ req, action: "feature.create", entityType: "feature_definitions", entityId: created.id, after: created });
     return ok(res, created);
   } catch (err) { return fail(res, err, "CREATE_FEATURE"); }
@@ -70,8 +71,8 @@ const updateFeatureController = async (req, res) => {
     const before = await featureModel.getFeatureById(req.params.id);
     if (!before) return error(res, 404, "Feature not found", ERROR_CODES.NOT_FOUND);
     // key and type are immutable.
-    const { displayName, description, defaultValue, enumOptions, category, isActive } = req.body || {};
-    const updated = await featureModel.updateFeature(req.params.id, { displayName, description, defaultValue, enumOptions, category, isActive });
+    const { displayName, description, defaultValue, enumOptions, category, isActive, showInPlanPicker } = req.body || {};
+    const updated = await featureModel.updateFeature(req.params.id, { displayName, description, defaultValue, enumOptions, category, isActive, showInPlanPicker });
     await auditService.record({ req, action: "feature.update", entityType: "feature_definitions", entityId: req.params.id, before, after: updated });
     return ok(res, updated);
   } catch (err) { return fail(res, err, "UPDATE_FEATURE"); }
@@ -81,17 +82,8 @@ const updateFeatureController = async (req, res) => {
 const listPlansController = async (_req, res) => {
   try {
     const plans = await planModel.listPlans();
-    const detailed = [];
-    for (const p of plans) {
-      const [pricePoints, features, entitlements, onboarding] = await Promise.all([
-        planModel.listPricePoints(p.id),
-        planModel.listPlanFeatures(p.id),
-        planModel.listPlanEntitlements(p.id),
-        planModel.getOnboardingFlow(p.id),
-      ]);
-      detailed.push({ ...p, pricePoints, features, entitlements, onboarding });
-    }
-    return ok(res, detailed);
+    const detailed = await Promise.all(plans.map((p) => planAdminService.getPlanDetail(p.id)));
+    return ok(res, detailed.filter(Boolean));
   } catch (err) { return fail(res, err, "LIST_PLANS"); }
 };
 
@@ -123,6 +115,63 @@ const createPricePointController = async (req, res) => {
     await auditService.record({ req, action: "price_point.create", entityType: "plan_price_points", entityId: created.id, after: created });
     return ok(res, created);
   } catch (err) { return fail(res, err, "CREATE_PRICE_POINT"); }
+};
+
+const updatePricePointController = async (req, res) => {
+  try {
+    const before = await planModel.getPricePointById(req.params.pricePointId);
+    if (!before || before.planId !== req.params.id) {
+      return error(res, 404, "Price point not found", ERROR_CODES.NOT_FOUND);
+    }
+    const updated = await planModel.updatePricePoint(req.params.pricePointId, req.body || {}, req.params.id);
+    await auditService.record({ req, action: "price_point.update", entityType: "plan_price_points", entityId: updated.id, before, after: updated });
+    return ok(res, updated);
+  } catch (err) { return fail(res, err, "UPDATE_PRICE_POINT"); }
+};
+
+const savePlanConfigController = async (req, res) => {
+  try {
+    const before = await planAdminService.getPlanDetail(req.params.id);
+    if (!before) return error(res, 404, "Plan not found", ERROR_CODES.NOT_FOUND);
+    const after = await planAdminService.savePlanConfig(req.params.id, req.body || {}, req.user.id);
+    await auditService.record({ req, action: "plan.config.save", entityType: "plans", entityId: req.params.id, before, after });
+    return ok(res, after);
+  } catch (err) {
+    if (err.status === 400) return error(res, 400, err.message, ERROR_CODES.BAD_REQUEST);
+    if (err.status === 404) return error(res, 404, err.message, ERROR_CODES.NOT_FOUND);
+    return fail(res, err, "SAVE_PLAN_CONFIG");
+  }
+};
+
+const createPlanConfigController = async (req, res) => {
+  const { slug } = req.body || {};
+  if (!isValidFeatureKey(slug)) {
+    return error(res, 400, "Invalid plan slug (snake_case required)", ERROR_CODES.BAD_REQUEST);
+  }
+  try {
+    const created = await planAdminService.createPlanWithConfig(req.body || {}, req.user.id);
+    await auditService.record({ req, action: "plan.create_config", entityType: "plans", entityId: created.id, after: created });
+    return ok(res, created);
+  } catch (err) {
+    if (err.status === 400) return error(res, 400, err.message, ERROR_CODES.BAD_REQUEST);
+    return fail(res, err, "CREATE_PLAN_CONFIG");
+  }
+};
+
+const duplicatePlanController = async (req, res) => {
+  const { slug, displayName, sortOrder } = req.body || {};
+  if (!slug || !isValidFeatureKey(slug)) {
+    return error(res, 400, "Valid slug is required", ERROR_CODES.BAD_REQUEST);
+  }
+  try {
+    const created = await planAdminService.duplicatePlan(req.params.id, { slug, displayName, sortOrder }, req.user.id);
+    await auditService.record({ req, action: "plan.duplicate", entityType: "plans", entityId: created.id, after: created });
+    return ok(res, created);
+  } catch (err) {
+    if (err.status === 404) return error(res, 404, err.message, ERROR_CODES.NOT_FOUND);
+    if (err.status === 400) return error(res, 400, err.message, ERROR_CODES.BAD_REQUEST);
+    return fail(res, err, "DUPLICATE_PLAN");
+  }
 };
 
 const replaceFeaturesController = async (req, res) => {
@@ -160,20 +209,7 @@ const updateEntitlementsController = async (req, res) => {
 };
 
 function validateEntitlementValue(feature, value) {
-  switch (feature.type) {
-    case "boolean":
-      return typeof value === "boolean" ? { ok: true } : { ok: false, message: `${feature.key} must be boolean` };
-    case "number":
-      return typeof value === "number" ? { ok: true } : { ok: false, message: `${feature.key} must be a number` };
-    case "enum": {
-      const opts = feature.enumOptions || [];
-      return opts.includes(value) ? { ok: true } : { ok: false, message: `${feature.key} must be one of ${opts.join(", ")}` };
-    }
-    case "string":
-      return typeof value === "string" ? { ok: true } : { ok: false, message: `${feature.key} must be a string` };
-    default:
-      return { ok: true };
-  }
+  return planAdminService.validateEntitlementValue(feature, value);
 }
 
 const updateOnboardingController = async (req, res) => {
@@ -281,6 +317,10 @@ module.exports = {
   createPlanController,
   updatePlanController,
   createPricePointController,
+  updatePricePointController,
+  savePlanConfigController,
+  createPlanConfigController,
+  duplicatePlanController,
   replaceFeaturesController,
   getEntitlementsController,
   updateEntitlementsController,

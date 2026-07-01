@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { RazorpaySecuredBadge } from "@/components/billing/RazorpaySecuredBadge";
@@ -29,6 +29,7 @@ import {
   isUsageBasedFreeTrial,
 } from "@/lib/subscriptionDisplay";
 import { cn } from "@/lib/utils";
+import { pickPrimaryPricePoint, pricingQueryOptions } from "@/queries/pricingQueries";
 import { setupStatusQueryOptions } from "@/queries/bootstrapQueries";
 
 function trialCampaign(plan: PricingPlan) {
@@ -193,7 +194,7 @@ function PlanCard({
   onClaimTrial,
   disableActions,
 }: PlanCardProps) {
-  const pricePoint = plan.pricePoints[0];
+  const pricePoint = pickPrimaryPricePoint(plan.pricePoints);
   const trial = trialCampaign(plan);
   const discount = plan.campaigns.find((c) => c.type === "discount");
   const includedFeatures = plan.features.filter((feature) => feature.included);
@@ -302,36 +303,40 @@ function PlanCard({
 export function SubscriptionsPage() {
   const queryClient = useQueryClient();
   const { user, refreshUser } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatusData | null>(null);
   const [orders, setOrders] = useState<BillingOrder[]>([]);
-  const [plans, setPlans] = useState<PricingPlan[]>([]);
-  const [checkoutEnabled, setCheckoutEnabled] = useState(true);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
+  const pricingQuery = useQuery(pricingQueryOptions);
+
+  const plans = useMemo(
+    () => [...(pricingQuery.data?.data.plans ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [pricingQuery.data]
+  );
+  const checkoutEnabled = pricingQuery.data?.data.paywall.checkoutEnabled ?? true;
+  const loading = subscriptionLoading || pricingQuery.isLoading;
+
+  const loadSubscriptionData = useCallback(async () => {
+    setSubscriptionLoading(true);
     try {
-      const [statusRes, ordersRes, pricingRes] = await Promise.all([
+      const [statusRes, ordersRes] = await Promise.all([
         api.getSubscriptionStatus(),
         api.getBillingOrders(),
-        api.getPricing(),
       ]);
       setSubscriptionStatus(statusRes.data);
       setOrders(ordersRes.data.orders);
-      setPlans([...(pricingRes.data.plans ?? [])].sort((a, b) => a.sortOrder - b.sortOrder));
-      setCheckoutEnabled(pricingRes.data.paywall.checkoutEnabled);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not load subscription details");
     } finally {
-      setLoading(false);
+      setSubscriptionLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadPage();
-  }, [loadPage]);
+    void loadSubscriptionData();
+  }, [loadSubscriptionData]);
 
   const prefillName = useMemo(() => {
     if (user?.fullName?.trim()) return user.fullName.trim();
@@ -347,7 +352,8 @@ export function SubscriptionsPage() {
     }
     await refreshUser();
     await queryClient.refetchQueries({ queryKey: setupStatusQueryOptions.queryKey });
-    await loadPage();
+    await queryClient.invalidateQueries({ queryKey: pricingQueryOptions.queryKey });
+    await loadSubscriptionData();
   };
 
   const handleClaimTrial = async (plan: PricingPlan) => {
@@ -366,7 +372,7 @@ export function SubscriptionsPage() {
   };
 
   const handleSubscribe = async (plan: PricingPlan) => {
-    const pricePoint = plan.pricePoints[0];
+    const pricePoint = pickPrimaryPricePoint(plan.pricePoints);
     if (!pricePoint) {
       toast.error("This plan has no price configured yet");
       return;
@@ -428,7 +434,7 @@ export function SubscriptionsPage() {
     try {
       await api.cancelSubscription(false);
       toast.success("Subscription will cancel at the end of the current period");
-      await loadPage();
+      await loadSubscriptionData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not cancel subscription");
     } finally {

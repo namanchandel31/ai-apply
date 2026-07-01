@@ -21,9 +21,13 @@ admin.patch("/features/:id", c.updateFeatureController);
 // Plans
 admin.get("/plans", c.listPlansController);
 admin.post("/plans", c.createPlanController);
+admin.post("/plans/config", c.createPlanConfigController);
 admin.get("/plans/compare", c.comparePlansController);
 admin.patch("/plans/:id", c.updatePlanController);
+admin.put("/plans/:id/config", c.savePlanConfigController);
+admin.post("/plans/:id/duplicate", c.duplicatePlanController);
 admin.post("/plans/:id/price-points", c.createPricePointController);
+admin.patch("/plans/:id/price-points/:pricePointId", c.updatePricePointController);
 admin.put("/plans/:id/features", c.replaceFeaturesController);
 admin.get("/plans/:id/entitlements", c.getEntitlementsController);
 admin.put("/plans/:id/entitlements", c.updateEntitlementsController);

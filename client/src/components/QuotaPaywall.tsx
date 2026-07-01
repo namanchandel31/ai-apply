@@ -57,7 +57,7 @@ export function QuotaPaywall() {
               <Button
                 onClick={() => {
                   setCtx(null);
-                  navigate("/pricing?plan=managed");
+                  navigate("/subscriptions?plan=managed");
                 }}
               >
                 Upgrade to OneTap AI
@@ -66,7 +66,7 @@ export function QuotaPaywall() {
                 variant="secondary"
                 onClick={() => {
                   setCtx(null);
-                  navigate("/pricing?plan=byok");
+                  navigate("/subscriptions?plan=byok");
                 }}
               >
                 Upgrade to BYOK
@@ -86,7 +86,7 @@ export function QuotaPaywall() {
             <Button
               onClick={() => {
                 setCtx(null);
-                navigate("/pricing");
+                navigate("/subscriptions");
               }}
             >
               View plans

@@ -10,6 +10,7 @@ const campaignService = require("../services/campaignService");
  */
 const getPricingController = async (req, res) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const settings = await settingsService.getPublicSettings();
     const plans = await planModel.listPlans({ activeOnly: true });
     const userId = req.user?.id || null;
