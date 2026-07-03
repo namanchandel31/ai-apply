@@ -1,7 +1,8 @@
-import { keepPreviousData } from "@tanstack/react-query";
-import { api, type ApplicationsListParams } from "@/lib/api";
+import { keepPreviousData, replaceEqualDeep } from "@tanstack/react-query";
+import { api, type ApplicationsListParams, type ApplicationsListResponse } from "@/lib/api";
 import { normalizeApplicationsListParams } from "@/lib/normalizeApplicationsListParams";
 import { APPLICATIONS_STALE_MS } from "@/queries/bootstrapQueries";
+import { preservePipelineStatusOnListRefetch } from "@/lib/applicationsListResponse";
 
 export const APPLICATIONS_LIST_KEY_PREFIX = ["applications", "list"] as const;
 
@@ -25,6 +26,13 @@ export function getApplicationsListQueryOptions(params: ApplicationsListParams) 
       return res.data;
     },
     placeholderData: keepPreviousData,
+    structuralSharing: (oldData, newData) => {
+      const merged = preservePipelineStatusOnListRefetch(
+        oldData as ApplicationsListResponse | undefined,
+        newData as ApplicationsListResponse
+      );
+      return replaceEqualDeep(oldData, merged);
+    },
     staleTime: APPLICATIONS_STALE_MS,
     gcTime: APPLICATIONS_STALE_MS * 2,
     ...sharedQueryOptions,

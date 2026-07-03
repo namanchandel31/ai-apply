@@ -1,5 +1,7 @@
 /**
- * Canonical publish dedupe: one emission per (applicationId, version, orchestrationEpoch).
+ * Canonical publish dedupe: one emission per (applicationId, version, orchestrationEpoch, uiStatus).
+ * uiStatus is part of the key so multiple visible states at the same orchestration version
+ * (e.g. generated → queued_sending → sending) can each emit once.
  * eventId is recorded for diagnostics only — not part of the dedupe key.
  */
 const { logInfo } = require("../utils/logger");
@@ -11,8 +13,14 @@ const MAX_ENTRIES = 10_000;
 /** @type {Map<string, { recordedAt: number, eventId?: string, publishSource?: string }>} */
 const emitted = new Map();
 
-function publishKey(applicationId, version, epoch) {
-  return `${applicationId}:${version}:${epoch}`;
+function normalizeUiStatus(uiStatus) {
+  const s = String(uiStatus || "").trim().toLowerCase();
+  return s || "unknown";
+}
+
+function publishKey(applicationId, version, epoch, uiStatus) {
+  const ui = normalizeUiStatus(uiStatus);
+  return `${applicationId}:${version}:${epoch}:${ui}`;
 }
 
 function evictExpired(now = Date.now()) {
@@ -28,10 +36,15 @@ function evictExpired(now = Date.now()) {
 }
 
 /**
- * @param {{ applicationId: string, version: number, orchestrationEpoch: number, publishSource?: string, blockedAtLayer?: string }} meta
+ * @param {{ applicationId: string, version: number, orchestrationEpoch: number, uiStatus?: string, publishSource?: string, blockedAtLayer?: string }} meta
  */
 function shouldEmitPublish(meta) {
-  const key = publishKey(meta.applicationId, meta.version, meta.orchestrationEpoch);
+  const key = publishKey(
+    meta.applicationId,
+    meta.version,
+    meta.orchestrationEpoch,
+    meta.uiStatus
+  );
   evictExpired();
   const existing = emitted.get(key);
   if (existing) {
@@ -40,6 +53,7 @@ function shouldEmitPublish(meta) {
       applicationId: meta.applicationId,
       version: meta.version,
       orchestrationEpoch: meta.orchestrationEpoch,
+      uiStatus: meta.uiStatus,
       eventId: existing.eventId,
       publishSource: meta.publishSource,
       priorPublishSource: existing.publishSource,
@@ -60,8 +74,8 @@ function recordEmitted(key, meta = {}) {
   evictExpired();
 }
 
-function wasAlreadyEmitted(applicationId, version, epoch) {
-  const key = publishKey(applicationId, version, epoch);
+function wasAlreadyEmitted(applicationId, version, epoch, uiStatus) {
+  const key = publishKey(applicationId, version, epoch, uiStatus);
   evictExpired();
   return emitted.has(key);
 }

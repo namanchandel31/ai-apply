@@ -3,7 +3,7 @@ import type { ApplicationRecord } from "@/lib/api";
 import {
   applicationRowErrorMessage,
   isApplicationRowFailed,
-  isApplicationRowProcessing,
+  isApplicationStatusShimmering,
 } from "@/lib/applicationRowState";
 import {
   ApplicationStatusBadge,
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export function ApplicationTableStatusCell({ app }: Props) {
-  const processing = isApplicationRowProcessing(app);
+  const shimmering = isApplicationStatusShimmering(app);
   const failed = isApplicationRowFailed(app);
   const errorMessage = applicationRowErrorMessage(app);
 
@@ -33,9 +33,9 @@ export function ApplicationTableStatusCell({ app }: Props) {
     );
   }
 
-  if (processing) {
+  if (shimmering) {
     return (
-      <ApplicationTableShimmerText app={app} className={cn(tableTextSecondary, "text-base")}>
+      <ApplicationTableShimmerText shimmer className={cn(tableTextSecondary, "text-base")}>
         {getApplicationStatusLabel(app)}
       </ApplicationTableShimmerText>
     );
@@ -50,16 +50,15 @@ export function ApplicationTableStatusCell({ app }: Props) {
 }
 
 export function ApplicationTableShimmerText({
-  app,
   children,
   className,
+  shimmer = false,
 }: {
-  app: ApplicationRecord;
   children: ReactNode;
   className?: string;
+  shimmer?: boolean;
 }) {
-  const processing = isApplicationRowProcessing(app);
-  if (!processing) {
+  if (!shimmer) {
     return <span className={className}>{children}</span>;
   }
   return (

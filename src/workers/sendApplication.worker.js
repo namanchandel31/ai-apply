@@ -196,6 +196,16 @@ const processor = async (job) => {
     await referralService.recordSuccessfulSendForReferral(userId);
 
     try {
+      const intelligentSendQueueService = require("../services/intelligentSendQueueService");
+      const { userHasIntelligentSendQueues } = require("../services/sendDispatchService");
+      if (await userHasIntelligentSendQueues(userId)) {
+        await intelligentSendQueueService.onSendCompleted({ userId, applicationId });
+      }
+    } catch (queueErr) {
+      logError("intelligent_send_on_completed_failed", queueErr, { applicationId, userId });
+    }
+
+    try {
       const { trackApplicationSent } = require("../observability/posthogAnalytics");
       await trackApplicationSent(userId, {
         application_id: applicationId,

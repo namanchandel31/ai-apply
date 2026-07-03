@@ -3,11 +3,10 @@ const { pool } = require("../db");
 const { logInfo } = require("../utils/logger");
 const { getApplicationById } = require("../models/applicationModel");
 const {
-  createJob,
   hasActiveJob,
   hasCompletedSendJob,
 } = require("../models/applicationJobModel");
-const { enqueueSendJob } = require("../queues/sendApplicationQueue");
+const { requestApplicationSend } = require("../services/sendDispatchService");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { isDashboardSubmission } = require("./applyModeService");
 
@@ -80,16 +79,15 @@ const sendApplication = async (applicationId, userId, recipientEmail, logMeta = 
     return { alreadyProcessing: true };
   }
 
-  const dbJob = await createJob({
-    applicationId,
-    jobType: "send_email",
-    status: "queued",
-  });
+  const sendQueueModel = require("../models/sendQueueModel");
+  const { SEND_QUEUE_ENTRY_STATUS } = require("../constants/schedulerState");
+  const queueEntry = await sendQueueModel.getQueueEntryByApplicationId(applicationId, userId);
+  if (queueEntry?.status === SEND_QUEUE_ENTRY_STATUS.WAITING) {
+    logInfo("send_deferred_to_intelligent_queue", { ...meta });
+    return { queued: true, intelligentQueue: true };
+  }
 
-  await enqueueSendJob(applicationId, userId, recipientEmail, { dbJobId: dbJob.id });
-  logInfo("send_enqueued", { ...meta, dbJobId: dbJob.id });
-
-  return { queued: true, status: "queued" };
+  return requestApplicationSend({ applicationId, userId, recipientEmail });
 };
 
 module.exports = { sendApplication, fetchSmtpCredentials };

@@ -13,7 +13,11 @@ import type {
 } from "@/services/orchestration/orchestrationRegistry";
 import { isTerminalUiStatus } from "@/services/orchestration/orchestrationRegistry";
 
-const ACTIVE_UI = new Set(["processing", "sending", "queued", "retrying"]);
+const ACTIVE_UI = new Set(["processing", "sending", "queued", "queued_sending", "retrying"]);
+
+/** Later send-pipeline UI must not be downgraded by earlier pipeline SSE (same version). */
+const SEND_PIPELINE_UI = new Set(["queued_sending", "sending"]);
+const EARLIER_PIPELINE_UI = new Set(["generated", "processing", "queued", "draft"]);
 
 export type RejectReason =
   | "stale_version"
@@ -130,6 +134,13 @@ export function shouldApplyOrchestrationRowPatch(
     }
   }
 
+  if (
+    SEND_PIPELINE_UI.has(existingUi) &&
+    EARLIER_PIPELINE_UI.has(incomingUi || incomingStatus)
+  ) {
+    return { apply: false, reason: "terminal_downgrade" };
+  }
+
   return { apply: true };
 }
 
@@ -152,6 +163,9 @@ export function orchPatchFromEvent(
   if (event.pollable !== undefined) patch.pollable = event.pollable;
   if (event.canRetry !== undefined) patch.canRetry = event.canRetry;
   if (event.canContinue !== undefined) patch.canContinue = event.canContinue;
+  if (event.canSend !== undefined) patch.canSend = event.canSend;
+  if (event.canSendNow !== undefined) patch.canSendNow = event.canSendNow;
+  if (event.estimatedSendAt !== undefined) patch.estimatedSendAt = event.estimatedSendAt;
   if (event.reviewReason !== undefined) patch.reviewReason = event.reviewReason ?? undefined;
   if (event.updatedAt) patch.updatedAt = event.updatedAt;
 

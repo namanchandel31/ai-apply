@@ -1,4 +1,5 @@
 import type { ApplicationRecord, ApplicationsListResponse } from "@/lib/api";
+import { preservePipelineStatusFromExisting } from "@/lib/applicationPipelineRank";
 
 export type { ApplicationsListResponse };
 
@@ -58,4 +59,19 @@ export function recomputeListPages(
   const totalPages =
     page.totalItems === 0 ? 0 : Math.max(1, Math.ceil(page.totalItems / page.pageSize));
   return { ...page, totalPages };
+}
+
+/** Prevent list refetches from downgrading live pipeline status (e.g. queued_sending → processing). */
+export function preservePipelineStatusOnListRefetch(
+  previous: ApplicationsListResponse | ApplicationRecord[] | undefined,
+  next: ApplicationsListResponse
+): ApplicationsListResponse {
+  const prev = normalizeApplicationsListData(previous);
+  if (!prev.items.length) return next;
+  const prevById = new Map(prev.items.map((row) => [row.id, row]));
+  const items = next.items.map((row) => {
+    const existing = prevById.get(row.id);
+    return preservePipelineStatusFromExisting(row, existing);
+  });
+  return items === next.items ? next : { ...next, items };
 }

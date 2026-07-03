@@ -5,7 +5,7 @@ const { parseJobDescription } = require("./jdParseService");
 const { computeMatch } = require("./matchingService");
 const { generateApplicationEmail } = require("./emailService");
 const { buildEmailGenerationContext } = require("./emailContextBuilder");
-const { enqueueSendJob } = require("../queues/sendApplicationQueue");
+const { requestApplicationSend } = require("./sendDispatchService");
 const { logInfo, logError } = require("../utils/logger");
 const { pool } = require("../db");
 
@@ -188,14 +188,18 @@ const autoApply = async (userId, jobDescriptionText, reqId) => {
   }
 
   try {
-    const { jobId } = await enqueueSendJob(applicationId, userId, contactEmail);
-    logInfo("APPLICATION_QUEUED", { reqId, userId, applicationId, jobId });
-    
+    const sendResult = await requestApplicationSend({
+      applicationId,
+      userId,
+      recipientEmail: contactEmail,
+    });
+    logInfo("APPLICATION_QUEUED", { reqId, userId, applicationId, sendResult });
+
     return {
       success: true,
-      status: "queued",
+      status: sendResult.queued ? "queued_sending" : "queued",
       applicationId,
-      jobId
+      ...sendResult,
     };
   } catch (err) {
     logError("QUEUE_ENQUEUE_FAILED", err, { reqId, userId, applicationId });

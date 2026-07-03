@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ApplicationRecord } from "@/lib/api";
+import { isApplicationJdParsing } from "@/lib/applicationRowState";
 import { api } from "@/lib/api";
 import {
   displayCompany,
@@ -115,7 +116,7 @@ export function ApplicationCompanyCell({ app }: Props) {
           aria-label={`Edit company: ${displayCompany(app)}`}
           title="Click to edit company"
         >
-          <ApplicationTableShimmerText app={app} className={tableTextSecondary}>
+          <ApplicationTableShimmerText shimmer={isApplicationJdParsing(app)} className={tableTextSecondary}>
             {displayCompany(app)}
           </ApplicationTableShimmerText>
         </button>

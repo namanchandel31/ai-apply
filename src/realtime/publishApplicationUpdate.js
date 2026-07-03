@@ -49,6 +49,8 @@ function buildRealtimePayload(applicationId, userId, serialized, meta) {
     canRetry: serialized.canRetry,
     canContinue: serialized.canContinue,
     canSend: serialized.canSend,
+    canSendNow: serialized.canSendNow,
+    estimatedSendAt: serialized.estimatedSendAt ?? null,
     reviewReason: serialized.reviewReason ?? null,
     role: serialized.role ?? null,
     company: serialized.company ?? null,
@@ -100,7 +102,8 @@ async function loadSerializedForPublish(applicationId, userId, client, options, 
   const alreadyTerminal = isTerminalApplicationStatus(appStatus);
   const version = Number(metaRow.orchestration_version) || 0;
   const epoch = Number(metaRow.orchestration_epoch) || 0;
-  const bypassCache = options.forceRevive || options.enteringTerminal;
+  const bypassCache =
+    options.forceRevive || options.enteringTerminal || options.bypassBundleCache;
 
   if (!bypassCache && !alreadyTerminal) {
     const cached = getCachedSerialized(applicationId, version, epoch);
@@ -175,6 +178,33 @@ async function publishApplicationUpdate(applicationId, userId, options = {}) {
     const meta = { version, epoch };
 
     if (!isPublishWorthy(meta, serialized, prev, options)) {
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(process.cwd(), "debug-a0311e.log"),
+          JSON.stringify({
+            sessionId: "a0311e",
+            location: "publishApplicationUpdate.js:skip",
+            message: "publish_skipped",
+            data: {
+              applicationId,
+              uiStatus: serialized.uiStatus,
+              publishSource,
+              prevUi: prev?.uiStatus ?? null,
+              version,
+              epoch,
+            },
+            timestamp: Date.now(),
+            hypothesisId: "H7",
+            runId: "queued-sending-fix-v2",
+          }) + "\n"
+        );
+      } catch {
+        /* ignore */
+      }
+      // #endregion
       if (
         prev &&
         prev.version === version &&
@@ -210,10 +240,68 @@ async function publishApplicationUpdate(applicationId, userId, options = {}) {
       applicationId,
       version,
       orchestrationEpoch: epoch,
+      uiStatus: serialized.uiStatus || serialized.status,
       publishSource,
       blockedAtLayer: "publish_application_update",
     });
-    if (!dedupe.allow) return;
+    if (!dedupe.allow) {
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(process.cwd(), "debug-a0311e.log"),
+          JSON.stringify({
+            sessionId: "a0311e",
+            location: "publishApplicationUpdate.js:dedupe",
+            message: "publish_dedupe_blocked",
+            data: {
+              applicationId,
+              uiStatus: serialized.uiStatus,
+              publishSource,
+              version,
+              epoch,
+            },
+            timestamp: Date.now(),
+            hypothesisId: "H8",
+            runId: "queued-sending-fix-v2",
+          }) + "\n"
+        );
+      } catch {
+        /* ignore */
+      }
+      // #endregion
+      return;
+    }
+
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      fs.appendFileSync(
+        path.join(process.cwd(), "debug-a0311e.log"),
+        JSON.stringify({
+          sessionId: "a0311e",
+          location: "publishApplicationUpdate.js:emit",
+          message: "backend_publish",
+          data: {
+            applicationId,
+            uiStatus: serialized.uiStatus,
+            status: serialized.status,
+            version,
+            epoch,
+            publishSource,
+            bypassBundleCache: Boolean(options.bypassBundleCache),
+          },
+          timestamp: Date.now(),
+          hypothesisId: "H5",
+          runId: "queued-sending-fix-v2",
+        }) + "\n"
+      );
+    } catch {
+      /* ignore */
+    }
+    // #endregion
 
     const { eventId, payload: withEventId } = await appendReplayEvent(userId, withTrace, {
       publishSource,
@@ -230,7 +318,7 @@ async function publishApplicationUpdate(applicationId, userId, options = {}) {
 
     fanOutRealtimePayload(withEventId, { publishSource, eventId });
 
-    const key = publishKey(applicationId, version, epoch);
+    const key = publishKey(applicationId, version, epoch, serialized.uiStatus || serialized.status);
     recordEmitted(key, { eventId, publishSource });
     metrics.increment("orchestration.realtime.publish");
 
@@ -260,6 +348,10 @@ function clearPublishCache(applicationId) {
   bundleCache.delete(applicationId);
 }
 
+function invalidateBundleCache(applicationId) {
+  bundleCache.delete(applicationId);
+}
+
 function resetPublishStateForTests() {
   lastPublished.clear();
   bundleCache.clear();
@@ -270,6 +362,7 @@ module.exports = {
   CHANNEL_APPLICATIONS,
   publishApplicationUpdate,
   clearPublishCache,
+  invalidateBundleCache,
   buildRealtimePayload,
   resetPublishStateForTests,
 };

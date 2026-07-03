@@ -52,6 +52,11 @@ const STATUS_CONFIG: Record<
     className: "bg-warning/15 text-warning border-warning/30",
     icon: Clock,
   },
+  queued_sending: {
+    label: "Queued sending",
+    className: "bg-warning/15 text-warning border-warning/30",
+    icon: Clock,
+  },
   retrying: {
     label: "Retrying",
     className: "bg-warning/15 text-warning border-warning/30",
@@ -71,9 +76,26 @@ const STATUS_CONFIG: Record<
 
 const SPIN = new Set(["processing", "sending", "queued", "retrying"]);
 
+function formatEstimatedSendAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  const diffMs = at.getTime() - Date.now();
+  if (diffMs <= 60_000) return "Est. 1 min";
+  if (diffMs < 3_600_000) {
+    const mins = Math.max(1, Math.round(diffMs / 60_000));
+    return `Est. ${mins} min`;
+  }
+  return `Est. ${at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
 export function getApplicationStatusLabel(app: ApplicationRecord): string {
   const ui = app.uiStatus || app.status;
-  return STATUS_CONFIG[ui]?.label ?? ui;
+  const base = STATUS_CONFIG[ui]?.label ?? ui;
+  if (ui === "queued_sending") {
+    const est = formatEstimatedSendAt(app.estimatedSendAt);
+    return est ? `${base} · ${est}` : base;
+  }
+  return base;
 }
 
 export function ApplicationStatusBadge({

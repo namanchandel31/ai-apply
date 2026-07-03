@@ -30,6 +30,7 @@ const FEATURE_KEYS = Object.freeze({
   QUOTA_JDS_PARSED: "quota_jds_parsed",
   QUOTA_EMAILS_GENERATED: "quota_emails_generated",
   QUOTA_APPLICATIONS_SENT: "quota_applications_sent",
+  CAN_USE_INTELLIGENT_SEND_QUEUES: "can_use_intelligent_send_queues",
 });
 
 const FEATURE_TYPES = Object.freeze(["boolean", "number", "string", "enum", "json"]);

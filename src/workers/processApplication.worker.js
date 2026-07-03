@@ -32,7 +32,7 @@ const {
   resolveSendEnqueueFlags,
 } = require("../services/applyModeService");
 const { autoAssignEmailReadyTrackerStatus } = require("../services/applicationTrackerStatusAssignment");
-const { enqueueSendJob } = require("../queues/sendApplicationQueue");
+const { requestApplicationSend } = require("../services/sendDispatchService");
 const { createJob } = require("../models/applicationJobModel");
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
@@ -306,23 +306,22 @@ async function processorInner(job, { applicationId, userId, dbJobId }) {
       return;
     }
 
-    const sendDbJob = await createJob(
-      { applicationId, jobType: "send_email", status: "queued" },
-      client
-    );
-
     await client.query("COMMIT");
     const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
     await flushRealtimeAfterDbCommit([applicationId]);
 
-    await enqueueSendJob(applicationId, userId, contactEmail, { dbJobId: sendDbJob.id });
+    const sendResult = await requestApplicationSend({
+      applicationId,
+      userId,
+      recipientEmail: contactEmail,
+    });
 
     await recordEvent({
       applicationId,
       eventType: "process_job_queued",
       actorType: "worker",
       actorId: "send",
-      metadata: { sendJobId: sendDbJob.id, ...sendEnqueueFlags, enqueueSend: true },
+      metadata: { ...sendEnqueueFlags, enqueueSend: true, sendResult },
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});

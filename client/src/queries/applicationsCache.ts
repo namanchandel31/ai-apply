@@ -29,7 +29,7 @@ import {
 /** @deprecated use applicationsListQueryKey */
 export const APPLICATIONS_QUERY_KEY = ["applications"] as const;
 
-const ACTIVE_UI = new Set(["processing", "sending", "queued", "retrying", "draft"]);
+import { isApplicationJdParsing } from "@/lib/applicationRowState";
 
 export function getListQueryKey() {
   return applicationsListQueryKey(getActiveListParams());
@@ -253,8 +253,7 @@ export function refreshApplicationsList(queryClient: QueryClient) {
 
 export function displayRole(app: ApplicationRecord): string {
   if (app.role && String(app.role).trim()) return app.role;
-  const ui = app.uiStatus || app.status;
-  if (ACTIVE_UI.has(ui) && app.jdEnrichment !== "complete") {
+  if (isApplicationJdParsing(app)) {
     return "Parsing JD…";
   }
   return "Unknown Role";
@@ -262,8 +261,7 @@ export function displayRole(app: ApplicationRecord): string {
 
 export function displayCompany(app: ApplicationRecord): string {
   if (app.company && String(app.company).trim()) return app.company;
-  const ui = app.uiStatus || app.status;
-  if (ACTIVE_UI.has(ui) && app.jdEnrichment !== "complete") {
+  if (isApplicationJdParsing(app)) {
     return "Parsing JD…";
   }
   return "Unknown Company";

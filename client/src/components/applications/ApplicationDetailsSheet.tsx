@@ -18,6 +18,7 @@ import { MatchScoreCell } from "@/components/applications/MatchScoreCell";
 import { SafeContent } from "@/components/applications/SafeContent";
 import { formatDateTime } from "@/lib/formatDateTime";
 import { patchApplicationAfterMutation } from "@/queries/applicationsCache";
+import { useIntelligentSendQueuesEntitlement } from "@/hooks/useIntelligentSendQueuesEntitlement";
 import { useRealtime } from "@/contexts/useRealtime";
 import { globalOrchestrationRegistry } from "@/services/orchestration/orchestrationRegistry";
 import { toast } from "sonner";
@@ -69,6 +70,8 @@ export function ApplicationDetailsSheet({
     staleTime: 30_000,
   });
 
+  const hasIntelligentSendQueues = useIntelligentSendQueuesEntitlement();
+
   const app = detailRes;
   const isReadyEditable = Boolean(app?.canSend || app?.uiStatus === "generated");
 
@@ -109,12 +112,33 @@ export function ApplicationDetailsSheet({
       }
       await api.send(applicationId);
       patchApplicationAfterMutation(queryClient, applicationId, {
-        uiStatus: "sending",
+        uiStatus: hasIntelligentSendQueues ? "queued_sending" : "sending",
         pollable: true,
         terminal: false,
         canSend: false,
+        canSendNow: hasIntelligentSendQueues,
       });
-      toast.success("Send queued");
+      toast.success(hasIntelligentSendQueues ? "Added to send queue" : "Send queued");
+      void refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleSendNow = async () => {
+    if (!applicationId || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await api.sendApplicationNow(applicationId);
+      patchApplicationAfterMutation(queryClient, applicationId, {
+        uiStatus: "sending",
+        pollable: true,
+        terminal: false,
+        canSendNow: false,
+      });
+      toast.success("Sending now");
       void refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Send failed");
@@ -214,11 +238,16 @@ export function ApplicationDetailsSheet({
 
         {app && !isLoading && (
           <div className="flex flex-1 flex-col min-h-0 overflow-y-auto px-6 py-4">
-            {(app.canRetry || app.canContinue || app.canSend) && (
+            {(app.canRetry || app.canContinue || app.canSend || app.canSendNow) && (
               <div className="flex flex-wrap gap-2 mb-5 shrink-0">
                 {app.canRetry && (
                   <Button size="sm" variant="outline" disabled={actionBusy} onClick={() => void handleRetry()}>
                     Retry
+                  </Button>
+                )}
+                {app.canSendNow && (
+                  <Button size="sm" variant="outline" disabled={actionBusy} onClick={() => void handleSendNow()}>
+                    Send right now
                   </Button>
                 )}
                 {app.canSend && (

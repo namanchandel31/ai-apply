@@ -27,12 +27,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { registerActiveListParams } from "@/services/realtime/cache/activeListParamsRegistry";
 import { defaultApplicationsListParams } from "@/lib/normalizeApplicationsListParams";
+import { SendQueueDailySummary } from "@/components/applications/SendQueueDailySummary";
+import { useIntelligentSendQueuesEntitlement } from "@/hooks/useIntelligentSendQueuesEntitlement";
+import { useApplicationStatusPoll } from "@/hooks/useApplicationStatusPoll";
 import { useAuthReady } from "@/auth/AuthContext";
 
 function ApplicationsDashboardInner() {
   const { params, patchParams, hasActiveFilters } = useApplicationsListParams();
   const queryClient = useQueryClient();
-  const { broadcastRevive } = useRealtime();
+  const { broadcastRevive, connectionState, sseConnected, isLeader } = useRealtime();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -77,6 +80,33 @@ function ApplicationsDashboardInner() {
   const page = normalizeApplicationsListData(data ?? EMPTY_APPLICATIONS_LIST);
   const items = getApplicationsListItems(page);
 
+  const hasIntelligentSendQueues = useIntelligentSendQueuesEntitlement();
+
+  useApplicationStatusPoll(items, queryClient, {
+    connectionState,
+    sseReady: sseConnected,
+    isLeader,
+  });
+
+  const handleSendNow = async (id: string) => {
+    if (actionId) return;
+    setActionId(id);
+    try {
+      await api.sendApplicationNow(id);
+      patchApplicationAfterMutation(queryClient, id, {
+        uiStatus: "sending",
+        pollable: true,
+        terminal: false,
+        canSendNow: false,
+      });
+      toast.success("Sending now");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const openDetails = (id: string) => {
     setSelectedId(id);
     setSheetOpen(true);
@@ -115,12 +145,13 @@ function ApplicationsDashboardInner() {
     try {
       await api.send(id);
       patchApplicationAfterMutation(queryClient, id, {
-        uiStatus: "sending",
+        uiStatus: hasIntelligentSendQueues ? "queued_sending" : "sending",
         pollable: true,
         terminal: false,
         canSend: false,
+        canSendNow: hasIntelligentSendQueues,
       });
-      toast.success("Send queued");
+      toast.success(hasIntelligentSendQueues ? "Added to send queue" : "Send queued");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Send failed");
     } finally {
@@ -144,10 +175,11 @@ function ApplicationsDashboardInner() {
       try {
         await api.send(id);
         patchApplicationAfterMutation(queryClient, id, {
-          uiStatus: "sending",
+          uiStatus: hasIntelligentSendQueues ? "queued_sending" : "sending",
           pollable: true,
           terminal: false,
           canSend: false,
+          canSendNow: hasIntelligentSendQueues,
         });
         queued += 1;
       } catch {
@@ -173,6 +205,7 @@ function ApplicationsDashboardInner() {
   return (
     <>
       <ApplicationsPageFilters isFetching={isFetching} />
+      <SendQueueDailySummary />
       <div className="overflow-hidden">
         <ApplicationsDataGrid
           items={items}
@@ -186,6 +219,7 @@ function ApplicationsDashboardInner() {
           onRetry={handleRetry}
           onContinue={handleContinue}
           onSend={handleSend}
+          onSendNow={handleSendNow}
           actionId={actionId}
         />
         <ApplicationsTableFooter

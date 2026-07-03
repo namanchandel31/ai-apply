@@ -5,10 +5,12 @@
 
 const PROCESS_APPLICATION = "process-application";
 const SEND_APPLICATION = "send-application";
+const INTELLIGENT_SEND_WAKE = "intelligent-send-wake";
 
 const QUEUE_NAMES = Object.freeze({
   PROCESS_APPLICATION,
   SEND_APPLICATION,
+  INTELLIGENT_SEND_WAKE,
 });
 
 /** DB application_jobs.job_type → BullMQ queue */
@@ -20,6 +22,7 @@ const JOB_TYPE_TO_BULLMQ_QUEUE = Object.freeze({
 const ALL_BULLMQ_QUEUES = Object.freeze([
   PROCESS_APPLICATION,
   SEND_APPLICATION,
+  INTELLIGENT_SEND_WAKE,
 ]);
 
 function assertQueueConfiguration() {

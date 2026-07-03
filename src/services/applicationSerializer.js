@@ -23,6 +23,8 @@ function serializeApplication(row, jobs = {}) {
     emailSubject: row.email_subject,
     emailBody: row.email_body,
     sourcePlatform: row.source_platform ?? null,
+    sendQueueStatus: row.send_queue_status ?? null,
+    estimatedSendAt: row.send_queue_estimated_send_at ?? null,
   });
   const resolved = resolveUiStatus(ctx);
 
@@ -36,6 +38,10 @@ function serializeApplication(row, jobs = {}) {
     canRetry: resolved.canRetry,
     canContinue: resolved.canContinue,
     canSend: resolved.canSend,
+    canSendNow: resolved.canSendNow,
+    estimatedSendAt: row.send_queue_estimated_send_at
+      ? new Date(row.send_queue_estimated_send_at).toISOString()
+      : null,
     reviewReason: row.review_reason,
     lastError: row.last_error,
     retryCount: row.retry_count ?? 0,

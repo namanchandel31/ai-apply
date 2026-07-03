@@ -16,6 +16,7 @@ type Props = {
   onRetry: () => void;
   onContinue: () => void;
   onSend?: () => void;
+  onSendNow?: () => void;
   disabled?: boolean;
 };
 
@@ -34,6 +35,7 @@ export function ApplicationRowActions({
   onRetry,
   onContinue,
   onSend,
+  onSendNow,
   disabled,
 }: Props) {
   return (
@@ -64,6 +66,12 @@ export function ApplicationRowActions({
           <DropdownMenuItem onClick={onContinue}>
             <Play className="mr-2 h-4 w-4" />
             Continue send…
+          </DropdownMenuItem>
+        )}
+        {app.canSendNow && onSendNow && (
+          <DropdownMenuItem onClick={onSendNow}>
+            <Send className="mr-2 h-4 w-4" />
+            Send right now
           </DropdownMenuItem>
         )}
         {app.canSend && onSend && (

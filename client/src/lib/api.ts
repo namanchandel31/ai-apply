@@ -710,6 +710,31 @@ export const api = {
     });
   },
 
+  sendApplicationNow(applicationId: string) {
+    return request<{ success: boolean; data: { queued?: boolean } }>(
+      `/api/applications/${applicationId}/send-now`,
+      { method: "POST" }
+    );
+  },
+
+  getSendQueueSummary() {
+    return request<{ success: boolean; data: SendQueueSummary }>("/api/send-queue/summary");
+  },
+
+  pauseSendQueue() {
+    return request<{ success: boolean; data: { paused: boolean; schedulerState: string } }>(
+      "/api/send-queue/pause",
+      { method: "POST" }
+    );
+  },
+
+  resumeSendQueue() {
+    return request<{
+      success: boolean;
+      data: { resumed: boolean; schedulerState: string; dispatched?: boolean };
+    }>("/api/send-queue/resume", { method: "POST" });
+  },
+
   patchApplicationEmail(
     applicationId: string,
     body: { emailSubject: string; emailBody: string }
@@ -1440,6 +1465,8 @@ export type ApplicationStatusPayload = {
   canRetry: boolean;
   canContinue: boolean;
   canSend?: boolean;
+  canSendNow?: boolean;
+  estimatedSendAt?: string | null;
   reviewReason?: string | null;
   version?: number;
   orchestrationEpoch?: number;
@@ -1503,6 +1530,17 @@ export type TrackerStatusSummary = {
   sideBuckets: TrackerStatusSummaryBucket[];
 };
 
+export type SendQueueSummary = {
+  schedulerState: "active" | "paused" | "idle";
+  nextSendAt: string | null;
+  nextSendLabel: string;
+  lastSchedulerRunAt: string | null;
+  queuedToday: number;
+  sentToday: number;
+  failedToday: number;
+  queuedCount: number;
+};
+
 export type ApplicationRecord = {
   id: string;
   status: string;
@@ -1513,6 +1551,8 @@ export type ApplicationRecord = {
   canRetry?: boolean;
   canContinue?: boolean;
   canSend?: boolean;
+  canSendNow?: boolean;
+  estimatedSendAt?: string | null;
   reviewReason?: string | null;
   lastError?: string | null;
   retryCount?: number;

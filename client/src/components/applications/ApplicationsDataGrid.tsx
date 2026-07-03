@@ -37,7 +37,7 @@ import {
 import { cn } from "@/lib/utils";
 import { tableTextPrimary, tableTextSecondary, tableCellPaddingX } from "@/components/applications/applicationsTableTypography";
 import { EMAIL_READY_TRACKER_STATUS_ID } from "@/lib/trackerStatusColors";
-import { isApplicationRowFailed, isApplicationRowProcessing } from "@/lib/applicationRowState";
+import { isApplicationRowFailed, isApplicationRowTileLoading, isApplicationJdParsing } from "@/lib/applicationRowState";
 
 type Props = {
   items: ApplicationRecord[];
@@ -51,6 +51,7 @@ type Props = {
   onRetry: (id: string) => void;
   onContinue: (id: string) => void;
   onSend: (id: string) => void;
+  onSendNow: (id: string) => void;
   actionId: string | null;
 };
 
@@ -63,6 +64,7 @@ type ApplicationTableRowProps = {
   onRetry: (id: string) => void;
   onContinue: (id: string) => void;
   onSend: (id: string) => void;
+  onSendNow: (id: string) => void;
 };
 
 function ApplicationTableRow({
@@ -74,9 +76,10 @@ function ApplicationTableRow({
   onRetry,
   onContinue,
   onSend,
+  onSendNow,
 }: ApplicationTableRowProps) {
   const app = row.original;
-  const processing = isApplicationRowProcessing(app);
+  const tileLoading = isApplicationRowTileLoading(app);
   const failed = isApplicationRowFailed(app);
 
   return (
@@ -86,7 +89,7 @@ function ApplicationTableRow({
         "cursor-pointer transition-colors hover:bg-muted/50",
         selectedId === row.id && "bg-muted/40",
         isSelected && "bg-muted/30",
-        processing && "bg-primary/[0.03]"
+        tileLoading && "bg-primary/[0.03]"
       )}
       onClick={() => onSelectRow(row.original.id)}
     >
@@ -99,7 +102,7 @@ function ApplicationTableRow({
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              {processing ? (
+              {tileLoading ? (
                 <div
                   className="inline-flex h-11 w-11 shrink-0 items-center justify-center"
                   aria-label="Processing application"
@@ -177,6 +180,7 @@ function ApplicationTableRow({
                         onRetry={() => onRetry(row.original.id)}
                         onContinue={() => onContinue(row.original.id)}
                         onSend={() => onSend(row.original.id)}
+                        onSendNow={() => onSendNow(row.original.id)}
                       />
                     ) : null}
                   </div>
@@ -231,6 +235,7 @@ export function ApplicationsDataGrid({
   onRetry,
   onContinue,
   onSend,
+  onSendNow,
   actionId,
 }: Props) {
   const { params, patchParams } = useApplicationsListParams();
@@ -270,7 +275,7 @@ export function ApplicationsDataGrid({
         id: "role",
         header: () => <span className={tableTextSecondary}>Role</span>,
         cell: ({ row }) => (
-          <ApplicationTableShimmerText app={row.original} className={tableTextPrimary}>
+          <ApplicationTableShimmerText shimmer={isApplicationJdParsing(row.original)} className={tableTextPrimary}>
             {displayRole(row.original)}
           </ApplicationTableShimmerText>
         ),
@@ -309,7 +314,7 @@ export function ApplicationsDataGrid({
           const label =
             score == null || Number.isNaN(score) ? "-" : `${Math.round(score)}%`;
           return (
-            <ApplicationTableShimmerText app={row.original} className={cn(tableTextSecondary, "tabular-nums")}>
+            <ApplicationTableShimmerText shimmer={isApplicationJdParsing(row.original)} className={cn(tableTextSecondary, "tabular-nums")}>
               {label}
             </ApplicationTableShimmerText>
           );
@@ -330,7 +335,7 @@ export function ApplicationsDataGrid({
           const { date, time } = formatDateTime(row.original.updatedAt ?? row.original.createdAt);
           const line = date === "-" ? "-" : time ? `${date} · ${time}` : date;
           return (
-            <ApplicationTableShimmerText app={row.original} className={tableTextSecondary}>
+            <ApplicationTableShimmerText shimmer={isApplicationJdParsing(row.original)} className={tableTextSecondary}>
               {line}
             </ApplicationTableShimmerText>
           );
@@ -430,6 +435,7 @@ export function ApplicationsDataGrid({
               onRetry={onRetry}
               onContinue={onContinue}
               onSend={onSend}
+              onSendNow={onSendNow}
             />
           ))}
         </TableBody>

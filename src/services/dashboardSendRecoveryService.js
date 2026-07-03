@@ -1,5 +1,4 @@
-const { createJob } = require("../models/applicationJobModel");
-const { enqueueSendJob } = require("../queues/sendApplicationQueue");
+const { requestApplicationSend } = require("./sendDispatchService");
 const { DASHBOARD_SOURCE_PLATFORM } = require("./applyModeService");
 const { logInfo, logError } = require("../utils/logger");
 const { buildLogContext } = require("../utils/buildLogContext");
@@ -43,14 +42,14 @@ async function recoverDashboardPendingSends(client) {
     });
 
     try {
-      const sendDbJob = await createJob(
-        { applicationId: row.id, jobType: "send_email", status: "queued" },
-        client
-      );
-      await enqueueSendJob(row.id, row.user_id, email, { dbJobId: sendDbJob.id });
+      await requestApplicationSend({
+        applicationId: row.id,
+        userId: row.user_id,
+        recipientEmail: email,
+      });
       await flushRealtimeAfterDbCommit([row.id]);
       recovered += 1;
-      logInfo("RECOVERY_DASHBOARD_SEND_ENQUEUED", { ...ctx, email, sendJobId: sendDbJob.id });
+      logInfo("RECOVERY_DASHBOARD_SEND_ENQUEUED", { ...ctx, email });
     } catch (err) {
       logError("RECOVERY_DASHBOARD_SEND_FAILED", err, ctx);
     }

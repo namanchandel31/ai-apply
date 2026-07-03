@@ -44,6 +44,8 @@ function serializeApplicationListItem(row) {
     canRetry: base.canRetry,
     canContinue: base.canContinue,
     canSend: base.canSend,
+    canSendNow: base.canSendNow,
+    estimatedSendAt: base.estimatedSendAt,
     reviewReason: base.reviewReason,
     lastError: base.lastError,
     retryCount: base.retryCount,

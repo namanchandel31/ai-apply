@@ -18,6 +18,7 @@ const realtime = require("./realtime.config");
 const runtime = require("./runtime.config");
 const cors = require("./cors.config");
 const billing = require("./billing.config");
+const intelligentSendQueue = require("./intelligentSendQueue.config");
 
 const config = Object.freeze({
   server,
@@ -36,6 +37,7 @@ const config = Object.freeze({
   runtime,
   cors,
   billing,
+  intelligentSendQueue,
 });
 
 module.exports = config;

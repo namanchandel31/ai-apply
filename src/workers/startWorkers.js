@@ -4,6 +4,7 @@ const { markBootPhaseComplete } = require("../observability/processLifecycle");
 let workersStarted = false;
 let processWorker = null;
 let sendWorker = null;
+let intelligentSendWakeWorker = null;
 
 /**
  * Start BullMQ consumers (background processing layer).
@@ -32,8 +33,10 @@ async function startWorkers() {
 
   const processModule = require("./processApplication.worker");
   const sendModule = require("./sendApplication.worker");
+  const wakeModule = require("./intelligentSendWake.worker");
   processWorker = processModule.worker;
   sendWorker = sendModule.worker;
+  intelligentSendWakeWorker = wakeModule.worker;
 
   const { pool, startPoolMetricsLogging, POOL_INSTANCE_ID, POOL_OWNER } = require("../db");
   startPoolMetricsLogging(pool, 60_000, {
@@ -44,7 +47,7 @@ async function startWorkers() {
   workersStarted = true;
   logInfo("WORKERS_BOOT_COMPLETE", {
     component: "worker",
-    queues: ["process-application", "send-application"],
+    queues: ["process-application", "send-application", "intelligent-send-wake"],
   });
 
   return { processWorker, sendWorker };
@@ -74,10 +77,21 @@ async function stopWorkers() {
       })
     );
   }
+  if (intelligentSendWakeWorker) {
+    closes.push(
+      intelligentSendWakeWorker.close().catch((err) => {
+        logError("WORKER_CLOSE_FAILED", err, {
+          component: "worker",
+          workerName: "intelligent-send-wake",
+        });
+      })
+    );
+  }
 
   await Promise.all(closes);
   processWorker = null;
   sendWorker = null;
+  intelligentSendWakeWorker = null;
   workersStarted = false;
   logInfo("WORKERS_SHUTDOWN_COMPLETE", { component: "worker" });
 }

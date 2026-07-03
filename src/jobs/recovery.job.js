@@ -288,6 +288,15 @@ async function runRecovery() {
       }
       await recoverStuckJobs(client);
       try {
+        const intelligentSendQueueService = require("../services/intelligentSendQueueService");
+        const { armed } = await intelligentSendQueueService.recoverOverdueSchedulers();
+        if (armed > 0) {
+          logInfo("RECOVERY_INTELLIGENT_SEND_ARMED", { armed });
+        }
+      } catch (intelligentRecoveryErr) {
+        logError("RECOVERY_INTELLIGENT_SEND_FAILED", intelligentRecoveryErr);
+      }
+      try {
         const { recoverDashboardPendingSends } = require("../services/dashboardSendRecoveryService");
         const { recovered } = await recoverDashboardPendingSends(client);
         if (recovered > 0) {

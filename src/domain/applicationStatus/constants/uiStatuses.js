@@ -1,6 +1,7 @@
 const UI_STATUS = {
   DRAFT: "draft",
   QUEUED: "queued",
+  QUEUED_SENDING: "queued_sending",
   PROCESSING: "processing",
   SENDING: "sending",
   GENERATED: "generated",

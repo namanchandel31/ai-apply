@@ -28,6 +28,8 @@ SELECT
   sj.updated_at AS send_job_updated_at,
   sj.last_error AS send_job_last_error,
   sj.retry_count AS send_job_retry_count,
+  sq.status AS send_queue_status,
+  sq.estimated_send_at AS send_queue_estimated_send_at,
   jd.title AS role,
   jd.company_name AS company
 FROM applications a
@@ -46,6 +48,16 @@ LEFT JOIN LATERAL (
   ORDER BY created_at DESC
   LIMIT 1
 ) sj ON true
+LEFT JOIN LATERAL (
+  SELECT status, estimated_send_at
+  FROM send_queue_entries
+  WHERE application_id = a.id
+    AND status IN ('waiting', 'dispatched')
+  ORDER BY
+    CASE status WHEN 'waiting' THEN 0 WHEN 'dispatched' THEN 1 ELSE 2 END,
+    created_at DESC
+  LIMIT 1
+) sq ON true
 WHERE a.id = $1 AND a.user_id = $2
 `;
 
@@ -85,6 +97,8 @@ function mapBundleRow(row) {
     company: row.company,
     jd_title: row.role,
     company_name: row.company,
+    send_queue_status: row.send_queue_status,
+    send_queue_estimated_send_at: row.send_queue_estimated_send_at,
   };
   return {
     row: appRow,

@@ -13,6 +13,8 @@ function buildResolverContext({
   emailSubject = null,
   emailBody = null,
   sourcePlatform = null,
+  sendQueueStatus = null,
+  estimatedSendAt = null,
 }) {
   const latestProcessJobStatus = latestProcessJob?.status ?? null;
   const latestSendJobStatus = latestSendJob?.status ?? null;
@@ -41,6 +43,8 @@ function buildResolverContext({
     emailSubject,
     emailBody,
     sourcePlatform,
+    sendQueueStatus,
+    estimatedSendAt,
   };
 }
 

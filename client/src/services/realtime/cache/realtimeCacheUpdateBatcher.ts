@@ -3,6 +3,8 @@ import type { ApplicationUpdatedPayload } from "@/services/orchestration/orchest
 import { EVENT_BATCH_FLUSH_MS } from "../reconnectRecoveryConfig";
 import { applyRealtimeEventsToCache } from "./applicationCacheSync";
 
+const IMMEDIATE_FLUSH_UI = new Set(["queued_sending", "sending", "sent"]);
+
 /** Coalesce presentation events into one list cache write per flush window. */
 export function createRealtimeCacheUpdateBatcher(queryClient: QueryClient) {
   const pending: ApplicationUpdatedPayload[] = [];
@@ -18,6 +20,11 @@ export function createRealtimeCacheUpdateBatcher(queryClient: QueryClient) {
   return {
     enqueue(event: ApplicationUpdatedPayload) {
       pending.push(event);
+      const ui = (event.uiStatus || event.status || "").toLowerCase();
+      if (IMMEDIATE_FLUSH_UI.has(ui)) {
+        flush();
+        return;
+      }
       if (timer) return;
       timer = setTimeout(flush, EVENT_BATCH_FLUSH_MS);
     },

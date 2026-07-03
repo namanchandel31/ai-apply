@@ -86,7 +86,8 @@ function payloadToStatePatch(p: ApplicationUpdatedPayload): StatePatch {
 }
 
 function lastProcessedKey(payload: ApplicationUpdatedPayload): string {
-  return `${payload.applicationId}:${payload.version ?? 0}:${payload.orchestrationEpoch ?? 0}:${payload.updatedAt ?? ""}`;
+  const ui = payload.uiStatus || payload.status || "";
+  return `${payload.applicationId}:${payload.version ?? 0}:${payload.orchestrationEpoch ?? 0}:${ui}:${payload.updatedAt ?? ""}`;
 }
 
 export function createRealtimeCoordinator(
@@ -110,7 +111,26 @@ export function createRealtimeCoordinator(
     const patches: StatePatch[] = [];
     for (const payload of payloads) {
       const key = lastProcessedKey(payload);
-      if (lastProcessedKeys.has(key)) continue;
+      if (lastProcessedKeys.has(key)) {
+        // #region agent log
+        if (payload.uiStatus === "queued_sending") {
+          fetch("http://127.0.0.1:7895/ingest/718dab8a-57b8-413a-b1ad-ea759aa5bf96", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a0311e" },
+            body: JSON.stringify({
+              sessionId: "a0311e",
+              location: "realtimeCoordinator.ts:onFlush",
+              message: "presentation_dedupe_skipped",
+              data: { applicationId: payload.applicationId, key, uiStatus: payload.uiStatus },
+              timestamp: Date.now(),
+              hypothesisId: "H6",
+              runId: "queued-sending-fix-v4",
+            }),
+          }).catch(() => {});
+        }
+        // #endregion
+        continue;
+      }
       lastProcessedKeys.add(key);
       if (lastProcessedKeys.size > 5000) {
         lastProcessedKeys.clear();
@@ -208,11 +228,9 @@ export function createRealtimeCoordinator(
   const processReplayQueue = () => {
     const queue = [...replayQueue];
     replayQueue.length = 0;
-    batchProcessor.setPaused(true);
     for (const payload of queue) {
       applyEvent(payload, false);
     }
-    batchProcessor.setPaused(false);
     batchProcessor.flushNow();
   };
 
@@ -228,6 +246,27 @@ export function createRealtimeCoordinator(
 
       const channel = normalized.channel || "applications";
       if (channel !== "applications") return;
+
+      // #region agent log
+      if ((normalized as ApplicationUpdatedPayload).uiStatus === "queued_sending") {
+        fetch("http://127.0.0.1:7895/ingest/718dab8a-57b8-413a-b1ad-ea759aa5bf96", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a0311e" },
+          body: JSON.stringify({
+            sessionId: "a0311e",
+            location: "realtimeCoordinator.ts:handleFrame",
+            message: "sse_queued_sending",
+            data: {
+              applicationId: (normalized as ApplicationUpdatedPayload).applicationId,
+              uiStatus: "queued_sending",
+            },
+            timestamp: Date.now(),
+            hypothesisId: "H1",
+            runId: "queued-sending-fix-v2",
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
 
       if (meta.isReplay) {
         replayCount += 1;

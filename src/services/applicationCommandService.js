@@ -12,7 +12,8 @@ const {
   getLatestJobByType,
 } = require("../models/applicationJobModel");
 const { recordEvent } = require("../models/applicationEventModel");
-const { enqueueSendJob } = require("../queues/sendApplicationQueue");
+const { requestApplicationSend } = require("./sendDispatchService");
+const intelligentSendQueueService = require("./intelligentSendQueueService");
 const { enqueueProcessApplicationJob } = require("../queues/processApplicationQueue");
 const { APPLICATION_STATUS } = require("../domain/applicationStatus/constants/uiStatuses");
 const { logInfo } = require("../utils/logger");
@@ -124,10 +125,6 @@ async function continueApplication(userId, applicationId, contactEmail, reqId, i
     );
 
     const previousJob = await getLatestJobByType(applicationId, "send_email", client);
-    const sendJob = await createJob(
-      { applicationId, jobType: "send_email", status: "queued" },
-      client
-    );
 
     await recordEvent(
       {
@@ -146,25 +143,24 @@ async function continueApplication(userId, applicationId, contactEmail, reqId, i
       client
     );
 
-    return { sendJob, tr };
+    return { tr };
   });
 
   const { flushRealtimeAfterDbCommit } = require("../realtime/postCommitFlush");
   await flushRealtimeAfterDbCommit([applicationId]);
 
-  const { jobId } = await enqueueSendJob(
+  const sendResult = await requestApplicationSend({
     applicationId,
     userId,
-    contactEmail.trim().toLowerCase(),
-    { dbJobId: txnResult.sendJob.id }
-  );
+    recipientEmail: contactEmail.trim().toLowerCase(),
+  });
 
-  logInfo("continue_enqueued", buildLogContext({ applicationId, jobId: txnResult.sendJob.id, userId, reqId }));
+  logInfo("continue_enqueued", buildLogContext({ applicationId, userId, reqId, sendResult }));
 
   return {
     applicationId,
     status: APPLICATION_STATUS.GENERATED,
-    jobId,
+    jobId: sendResult.dbJobId ?? null,
     orchestrationEpoch: Number(txnResult.tr.orchestrationMeta?.orchestration_epoch ?? 0),
     version: Number(txnResult.tr.orchestrationMeta?.orchestration_version ?? 0),
   };
@@ -280,13 +276,16 @@ async function retryApplication(userId, applicationId, reqId) {
       err.code = "NOT_FOUND";
       throw err;
     }
-    const dbJob = await createJob({ applicationId, jobType: "send_email", status: "queued" });
-    const { jobId } = await enqueueSendJob(applicationId, userId, email, { dbJobId: dbJob.id });
-    logInfo("retry_send_enqueued", buildLogContext({ applicationId, jobId: dbJob.id, userId, reqId }));
+    const sendResult = await requestApplicationSend({
+      applicationId,
+      userId,
+      recipientEmail: email,
+    });
+    logInfo("retry_send_enqueued", buildLogContext({ applicationId, userId, reqId, sendResult }));
     return {
       applicationId,
       status: APPLICATION_STATUS.GENERATED,
-      jobId,
+      jobId: sendResult.dbJobId ?? null,
       orchestrationEpoch: Number(tr.orchestrationMeta?.orchestration_epoch ?? 0),
       version: Number(tr.orchestrationMeta?.orchestration_version ?? 0),
     };
@@ -337,6 +336,12 @@ async function cancelApplication(userId, applicationId, reqId) {
     actorId: String(userId),
     metadata: { reqId },
   });
+
+  try {
+    await intelligentSendQueueService.cancelQueueEntry(userId, applicationId);
+  } catch {
+    /* non-fatal */
+  }
 
   return { applicationId, status: APPLICATION_STATUS.CANCELLED };
 }

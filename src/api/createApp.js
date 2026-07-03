@@ -68,6 +68,7 @@ function createApp() {
   const sendRoutes = require("../routes/sendRoutes");
   const autoApplyRoutes = require("../routes/autoApplyRoutes");
   const applicationRoutes = require("../routes/applicationRoutes");
+  const sendQueueRoutes = require("../routes/sendQueueRoutes");
   const realtimeRoutes = require("../routes/realtimeRoutes");
   const orchestrationRoutes = require("../routes/orchestrationRoutes");
   const userRoutes = require("../routes/userRoutes");
@@ -94,6 +95,7 @@ function createApp() {
   app.use("/api", gmailIntegrationRoutes);
   app.use("/api", autoApplyRateLimit, autoApplyRoutes);
   app.use("/api", readRateLimit, applicationRoutes);
+  app.use("/api", readRateLimit, sendQueueRoutes);
   app.use("/api", realtimeRoutes);
   app.use("/api", orchestrationRoutes);
   app.use("/api", readRateLimit, userRoutes);

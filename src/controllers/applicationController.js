@@ -113,8 +113,8 @@ const listApplicationsController = async (req, res) => {
 
 const getApplicationController = async (req, res) => {
   try {
-    const row = await getApplicationById(req.params.id, req.user.id);
-    if (!row) {
+    const bundle = await getApplicationStatusBundle(req.params.id, req.user.id);
+    if (!bundle) {
       return sendError(res, {
         status: 404,
         code: ERROR_CODES.NOT_FOUND,
@@ -123,7 +123,10 @@ const getApplicationController = async (req, res) => {
       });
     }
     const events = await listEventsForApplication(req.params.id, 50);
-    const detail = serializeApplicationDetail(row);
+    const detail = serializeApplicationDetail({
+      ...bundle.bundleRow,
+      ...bundle.row,
+    });
     detail.events = events.map((e) => ({
       id: e.id,
       eventType: e.event_type,

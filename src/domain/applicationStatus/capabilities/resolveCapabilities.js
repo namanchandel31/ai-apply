@@ -5,6 +5,7 @@ const ACTIVE_POLL_UI = new Set([
   UI_STATUS.PROCESSING,
   UI_STATUS.SENDING,
   UI_STATUS.QUEUED,
+  UI_STATUS.QUEUED_SENDING,
   UI_STATUS.RETRYING,
 ]);
 
@@ -51,9 +52,12 @@ function resolveCapabilities(ctx, uiStatus) {
     Boolean(ctx.emailSubject?.trim()) &&
     Boolean(ctx.emailBody?.trim()) &&
     !ctx.hasActiveSendJob &&
+    ctx.sendQueueStatus !== "waiting" &&
     !isDashboardSubmission(ctx.sourcePlatform);
 
-  return { terminal, pollable, canContinue, canRetry, canSend };
+  const canSendNow = ctx.sendQueueStatus === "waiting";
+
+  return { terminal, pollable, canContinue, canRetry, canSend, canSendNow };
 }
 
 module.exports = { resolveCapabilities };

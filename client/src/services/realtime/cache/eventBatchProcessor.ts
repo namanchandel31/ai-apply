@@ -8,6 +8,9 @@ import {
 } from "../realtimeQueueLimits";
 import { logDebug } from "@/services/logging/orchestrationLogger";
 import { isDebugEnabled } from "@/services/logging/debugFlags";
+import { pickAdvancedPipelineUi } from "@/lib/applicationPipelineRank";
+
+const IMMEDIATE_FLUSH_UI = new Set(["queued_sending", "sending", "sent"]);
 
 function pickNewer(
   a: ApplicationUpdatedPayload,
@@ -22,6 +25,8 @@ function pickNewer(
   const at = a.updatedAt ?? "";
   const bt = b.updatedAt ?? "";
   if (bt !== at) return bt >= at ? b : a;
+  const pipelineWinner = pickAdvancedPipelineUi(a, b);
+  if (pipelineWinner !== b) return a;
   const aScore = a.matchScore;
   const bScore = b.matchScore;
   if (typeof aScore === "number" && typeof bScore !== "number") return a;
@@ -31,7 +36,7 @@ function pickNewer(
 
 export type EventBatchProcessor = {
   enqueue: (payload: ApplicationUpdatedPayload) => void;
-  flushNow: () => ApplicationUpdatedPayload[];
+  flushNow: () => void;
   setPaused: (paused: boolean) => void;
   getPendingCount: () => number;
   destroy: () => void;
@@ -114,6 +119,15 @@ export function createEventBatchProcessor(
       if (pending.size > MAX_LIVE_QUEUE_EVENTS) {
         compactOverflow();
       }
+      const ui = (payload.uiStatus || payload.status || "").toLowerCase();
+      if (IMMEDIATE_FLUSH_UI.has(ui)) {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        flushInternal();
+        return;
+      }
       scheduleFlush();
     },
     flushNow() {
@@ -121,9 +135,7 @@ export function createEventBatchProcessor(
         clearTimeout(timer);
         timer = null;
       }
-      const payloads = [...pending.values()];
-      pending.clear();
-      return payloads;
+      flushInternal();
     },
     setPaused(p: boolean) {
       paused = p;

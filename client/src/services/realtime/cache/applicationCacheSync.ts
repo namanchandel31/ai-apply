@@ -27,7 +27,7 @@ import {
 import { schedulePartialHydration } from "./partialHydrationScheduler";
 import { PARTIAL_ROW_TTL_MS } from "../convergenceConfig";
 
-const ACTIVE_UI = new Set(["processing", "sending", "queued", "retrying", "draft"]);
+const ACTIVE_UI = new Set(["processing", "sending", "queued", "queued_sending", "retrying", "draft"]);
 const lastConvergedAt = new Map<string, number>();
 const partialSince = new Map<string, number>();
 
@@ -241,7 +241,32 @@ export function applyRealtimeEventsToCache(
         const next = applyPatchToPaginatedList(
           page,
           event.applicationId,
-          (existing) => buildEventRowPatch(event, existing, registryEpoch),
+          (existing) => {
+            const patch = buildEventRowPatch(event, existing, registryEpoch);
+            // #region agent log
+            if (event.uiStatus === "queued_sending" || patch?.uiStatus === "queued_sending") {
+              fetch("http://127.0.0.1:7895/ingest/718dab8a-57b8-413a-b1ad-ea759aa5bf96", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a0311e" },
+                body: JSON.stringify({
+                  sessionId: "a0311e",
+                  location: "applicationCacheSync.ts:applyRealtimeEventsToCache",
+                  message: "cache_patch_queued_sending",
+                  data: {
+                    applicationId: event.applicationId,
+                    incomingUi: event.uiStatus,
+                    cachedUi: existing?.uiStatus ?? null,
+                    patchUi: patch?.uiStatus ?? null,
+                  },
+                  timestamp: Date.now(),
+                  hypothesisId: "H3",
+                  runId: "queued-sending-fix-v3",
+                }),
+              }).catch(() => {});
+            }
+            // #endregion
+            return patch;
+          },
           allowInsert
         );
         if (next) {

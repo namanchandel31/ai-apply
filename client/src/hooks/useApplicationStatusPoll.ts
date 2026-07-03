@@ -39,7 +39,8 @@ function pollIntervalForConnection(
   state: ConnectionState,
   options: { sseReady: boolean; isLeader: boolean }
 ): number | null {
-  if (options.sseReady || !options.isLeader) return null;
+  if (!options.isLeader) return null;
+  if (options.sseReady) return APPLICATION_POLL_SSE_FALLBACK_MS;
   if (state === "connected") return null;
   if (state === "degraded" || state === "disconnected") {
     return APPLICATION_POLL_SSE_FALLBACK_MS;
