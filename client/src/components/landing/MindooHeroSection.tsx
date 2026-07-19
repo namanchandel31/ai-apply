@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { HeroHeadline, HERO_LEAD } from "@/components/landing/HeroHeadline";
-import { mindooScrollTo } from "@/hooks/useMindooScroll";
 import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
 import "@/styles/mindoo.css";
 
@@ -25,16 +25,13 @@ export function MindooHeroSection() {
               {HERO_LEAD}
             </p>
             <div className={`mh-hero-actions${ready ? " is-ready" : ""}`}>
-              <button
-                type="button"
+              <Link
+                to="/signup"
                 className="mh-hero-btn mh-hero-btn-primary"
-                onClick={() => {
-                  trackLandingCtaEngaged("hero_start_free", "#pricing");
-                  mindooScrollTo("pricing");
-                }}
+                onClick={() => trackLandingCtaEngaged("hero_start_free", "/signup")}
               >
                 Start applying for free
-              </button>
+              </Link>
               <p className="mh-hero-actions-note">No credit card required</p>
             </div>
           </div>
