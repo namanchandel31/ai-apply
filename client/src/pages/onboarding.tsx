@@ -18,8 +18,6 @@ import { trackProduct } from "@/lib/analytics";
 
 import { trackOnboardingEvent } from "@/lib/onboardingEvents";
 
-import { markOnboardingWalkthroughPending } from "@/lib/onboardingWalkthrough";
-
 import {
   computeOnboardingFlow,
   ONBOARDING_STEP_DESCRIPTION_CLASS,
@@ -282,7 +280,6 @@ export function Onboarding() {
 
   const finishOnboarding = useCallback(() => {
     clearOnboardingExtensionPending();
-    markOnboardingWalkthroughPending();
     trackOnboardingEvent("dashboard_entered");
     navigate("/dashboard", { replace: true });
   }, [navigate]);

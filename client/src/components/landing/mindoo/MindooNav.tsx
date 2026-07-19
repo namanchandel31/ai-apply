@@ -51,7 +51,7 @@ export function MindooNav() {
               className="m-btn m-btn-primary m-nav-cta"
               onClick={() => trackLandingCtaEngaged("nav_get_started", "/signup")}
             >
-              Get Started for Free
+              Start applying for free
             </Link>
           </div>
 
@@ -93,7 +93,7 @@ export function MindooNav() {
               trackLandingCtaEngaged("nav_get_started", "/signup");
               setOpen(false);
             }}>
-              Get Started for Free
+              Start applying for free
             </Link>
           </div>
         ) : null}

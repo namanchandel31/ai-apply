@@ -23,7 +23,7 @@ export function MindooCtaSection() {
                 mindooScrollTo("pricing");
               }}
             >
-              Get Started Free
+              Start applying for free
             </button>
           </div>
         </div>
