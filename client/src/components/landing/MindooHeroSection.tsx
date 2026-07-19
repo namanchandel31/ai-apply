@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { HeroHeadline, HERO_LEAD } from "@/components/landing/HeroHeadline";
 import { mindooScrollTo } from "@/hooks/useMindooScroll";
 import { trackLandingCtaEngaged } from "@/lib/analytics/landing";
@@ -34,15 +33,9 @@ export function MindooHeroSection() {
                   mindooScrollTo("pricing");
                 }}
               >
-                Start for free
+                Start applying for free
               </button>
-              <Link
-                to="/support"
-                className="mh-hero-btn mh-hero-btn-secondary"
-                onClick={() => trackLandingCtaEngaged("hero_watch_demo", "/support")}
-              >
-                Watch demo
-              </Link>
+              <p className="mh-hero-actions-note">No credit card required</p>
             </div>
           </div>
 

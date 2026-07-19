@@ -787,15 +787,24 @@ html:has(.mindoo-site) {
 /* Hero CTA buttons */
 .mh-hero-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.625rem;
   padding-top: 1.25rem;
   opacity: 0;
   transform: translateY(16px);
   transition:
     opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mh-hero-actions-note {
+  margin: 0;
+  font-family: var(--m-font);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 150%;
+  color: var(--m-body-tertiary);
 }
 
 .mh-hero-actions.is-ready {

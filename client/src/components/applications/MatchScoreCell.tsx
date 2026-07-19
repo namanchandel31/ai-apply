@@ -22,7 +22,9 @@ export function MatchScoreCell({
         : "text-muted-foreground";
   return (
     <div className="flex items-center gap-2">
-      <span className={cn("text-sm font-medium tabular-nums", color)}>{score}%</span>
+      <span className={cn("text-sm font-medium tabular-nums", color)}>
+        {Math.round(score)}% match
+      </span>
       <div className="hidden sm:block h-2 w-12 rounded-full bg-muted overflow-hidden">
         <div
           className={cn(

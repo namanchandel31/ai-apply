@@ -1,24 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { useAutoApply } from "@/hooks/useApplyMode";
 import { ApplyComposer } from "@/components/dashboard/ApplyComposer";
-import { ApplyWalkthrough } from "@/components/dashboard/ApplyWalkthrough";
 import { AutoApplyToggle } from "@/components/dashboard/AutoApplyToggle";
 import { ReferralNearLimitPill } from "@/components/ReferralNearLimitPill";
 import { ReferralShareDialog } from "@/components/ReferralShareDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { applyPageDescription } from "@/lib/applyMode";
-import { shouldStartApplyWalkthrough } from "@/lib/applyWalkthrough";
 
 export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [referralShareOpen, setReferralShareOpen] = useState(false);
   const { autoApplyEnabled, setAutoApplyEnabled, isApplyModePending } = useAutoApply();
   const { data: status, isLoading, isSuccess, isError } = useSetupStatus();
-  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
-  const walkthroughStartedRef = useRef(false);
 
   const setupLoaded = !isLoading && (isSuccess || isError);
   const hasResume = !!status?.hasResume;
@@ -35,14 +31,6 @@ export function Dashboard() {
       toast.error("Failed to load setup status");
     }
   }, [isError]);
-
-  useEffect(() => {
-    if (!setupLoaded || walkthroughOpen || walkthroughStartedRef.current) return;
-    if (!shouldStartApplyWalkthrough()) return;
-    walkthroughStartedRef.current = true;
-    const timer = window.setTimeout(() => setWalkthroughOpen(true), 350);
-    return () => window.clearTimeout(timer);
-  }, [setupLoaded, walkthroughOpen]);
 
   useEffect(() => {
     if (searchParams.get("share") !== "referral") return;
@@ -69,7 +57,6 @@ export function Dashboard() {
   return (
     <>
       <ReferralShareDialog open={referralShareOpen} onOpenChange={setReferralShareOpen} />
-      <ApplyWalkthrough active={walkthroughOpen} onComplete={() => setWalkthroughOpen(false)} />
       <PageShell
         title="Apply"
         description={applyPageDescription(autoApplyEnabled)}
